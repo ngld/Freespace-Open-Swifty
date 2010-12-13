@@ -1164,6 +1164,8 @@ void load_gauge_weapon_energy(int base_w, int base_h, int font, int ship_index)
 	int base_res[2];
 	int Wenergy_text_offsets[2];
 	int Wenergy_h;
+	bool show_ballistic = false;
+	bool moving_text = false;
 	char fname[MAX_FILENAME_LEN];
 	bool slew = true;
 	int font_num = FONT1;
@@ -1234,6 +1236,12 @@ void load_gauge_weapon_energy(int base_w, int base_h, int font, int ship_index)
 	if(optional_string("Text Offsets:")) {
 		stuff_int_list(Wenergy_text_offsets, 2);
 	}
+	if(optional_string("Text Moves:")) {
+		stuff_boolean(&moving_text);
+	}
+	if(optional_string("Show Ballistic Weapons:")) {
+		stuff_boolean(&show_ballistic);
+	}
 
 	HudGaugeWeaponEnergy* hud_gauge = new HudGaugeWeaponEnergy();
 	hud_gauge->initBaseResolution(base_res[0], base_res[1]);
@@ -1241,6 +1249,8 @@ void load_gauge_weapon_energy(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initBitmaps(fname);
 	hud_gauge->initEnergyHeight(Wenergy_h);
 	hud_gauge->initTextOffsets(Wenergy_text_offsets[0], Wenergy_text_offsets[1]);
+	hud_gauge->initMoveText(moving_text);
+	hud_gauge->initShowBallistics(show_ballistic);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
 

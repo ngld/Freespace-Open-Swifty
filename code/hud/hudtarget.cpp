@@ -5749,6 +5749,16 @@ void HudGaugeWeaponEnergy::initEnergyHeight(int h)
 	Wenergy_h = h;
 }
 
+void HudGaugeWeaponEnergy::initMoveText(bool move_text)
+{
+	Moving_text = move_text;
+}
+
+void HudGaugeWeaponEnergy::initShowBallistics(bool show_ballistics)
+{
+	Show_ballistic = show_ballistics;
+}
+
 void HudGaugeWeaponEnergy::initBitmaps(char *fname)
 {
 	Energy_bar.first_frame = bm_load_animation(fname, &Energy_bar.num_frames);
@@ -5859,6 +5869,8 @@ void HudGaugeWeaponEnergy::render(float frametime)
 	else
 	{
 		float percent_left;
+		int ballistic_ammo = 0;
+		int max_ballistic_ammo = 0;
 		int	clip_h, w, h;
 
 		if ( Energy_bar.first_frame == -1 )
@@ -5871,24 +5883,52 @@ void HudGaugeWeaponEnergy::render(float frametime)
 			return;
 		}
 
-		// also leave if no energy can be stored for weapons - Goober5000
-		if (!ship_has_energy_weapons(Player_ship))
-			return;
+		if ( Show_ballistic && Ship_info[Player_ship->ship_info_index].flags & SIF_BALLISTIC_PRIMARIES ) {
+			if ( Player_ship->flags & SF_PRIMARY_LINKED ) {
 
-		percent_left = Player_ship->weapon_energy/Ship_info[Player_ship->ship_info_index].max_weapon_reserve;
-		if ( percent_left > 1 )
-		{
-			percent_left = 1.0f;
+				// find the largest ballistic primaries
+				for ( x = 0; x < Player_ship->weapons.num_primary_banks; x++ ) {
+
+					// skip all pure-energy weapons
+					if( ! ( Weapon_info[Player_ship->weapons.primary_bank_weapons[x]].wi_flags2 & WIF2_BALLISTIC ) ) {
+						continue;
+					}
+
+					// get the largest ammo amount of the current armed weapon
+					ballistic_ammo += Player_ship->weapons.primary_bank_ammo[x]; 
+					max_ballistic_ammo += Player_ship->weapons.primary_bank_start_ammo[x];
+				}
+			} else {
+				ballistic_ammo = Player_ship->weapons.primary_bank_weapons[Player_ship->weapons.current_primary_bank];
+				max_ballistic_ammo = Player_ship->weapons.primary_bank_start_ammo[Player_ship->weapons.current_primary_bank];
+			}
+
+			percent_left = i2fl(ballistic_ammo) / i2fl(max_ballistic_ammo);
+		} else {
+			// also leave if no energy can be stored for weapons - Goober5000
+			if (!ship_has_energy_weapons(Player_ship))
+				return;
+
+			percent_left = Player_ship->weapon_energy/Ship_info[Player_ship->ship_info_index].max_weapon_reserve;
+			if ( percent_left > 1 )
+			{
+				percent_left = 1.0f;
+			}
 		}
 		
-		if ( percent_left <= 0.3 ) {
+		if ( percent_left <= 0.3 || Show_ballistic ) {
 			char buf[32];
 			if ( percent_left < 0.1 ) {
 				gr_set_color_fast(&Color_bright_red);
 			}
-			sprintf(buf,XSTR( "%d%%", 326), fl2i(percent_left*100+0.5f));
+
+			if ( Show_ballistic ) {
+				sprintf(buf, "%d", ballistic_ammo);
+			} else {
+				sprintf(buf,XSTR( "%d%%", 326), fl2i(percent_left*100+0.5f));
+			}
+
 			hud_num_make_mono(buf);
-		//	gr_string(Weapon_energy_text_coords[gr_screen.res][0], Weapon_energy_text_coords[gr_screen.res][1], buf);
 			renderString(position[0] + Wenergy_text_offsets[0], position[1] + Wenergy_text_offsets[1], buf);
 		}
 

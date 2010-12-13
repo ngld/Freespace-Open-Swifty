@@ -239,11 +239,16 @@ protected:
 
 	int Wenergy_text_offsets[2];
 	int Wenergy_h;
+
+	bool Moving_text;
+	bool Show_ballistic;
 public:
 	HudGaugeWeaponEnergy();
 	void initBitmaps(char *fname);
 	void initTextOffsets(int x, int y);
 	void initEnergyHeight(int h);
+	void initMoveText(bool move_text);
+	void initShowBallistics(bool show_ballistics);
 	void render(float frametime);
 	void pageIn();
 };
