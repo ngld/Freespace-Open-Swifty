@@ -240,6 +240,7 @@ protected:
 	int Wenergy_text_offsets[2];
 	int Wenergy_h;
 
+	bool Always_show_text;
 	bool Moving_text;
 	bool Show_ballistic;
 public:
@@ -247,6 +248,7 @@ public:
 	void initBitmaps(char *fname);
 	void initTextOffsets(int x, int y);
 	void initEnergyHeight(int h);
+	void initAlwaysShowText(bool show_text);
 	void initMoveText(bool move_text);
 	void initShowBallistics(bool show_ballistics);
 	void render(float frametime);

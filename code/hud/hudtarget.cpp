@@ -5749,6 +5749,11 @@ void HudGaugeWeaponEnergy::initEnergyHeight(int h)
 	Wenergy_h = h;
 }
 
+void HudGaugeWeaponEnergy::initAlwaysShowText(bool show_text)
+{
+	Always_show_text = show_text;
+}
+
 void HudGaugeWeaponEnergy::initMoveText(bool move_text)
 {
 	Moving_text = move_text;
@@ -5886,7 +5891,7 @@ void HudGaugeWeaponEnergy::render(float frametime)
 		if ( Show_ballistic && Ship_info[Player_ship->ship_info_index].flags & SIF_BALLISTIC_PRIMARIES ) {
 			if ( Player_ship->flags & SF_PRIMARY_LINKED ) {
 
-				// find the largest ballistic primaries
+				// go through all ballistic primaries and add up their ammunition amounts
 				for ( x = 0; x < Player_ship->weapons.num_primary_banks; x++ ) {
 
 					// skip all pure-energy weapons
@@ -5915,9 +5920,13 @@ void HudGaugeWeaponEnergy::render(float frametime)
 				percent_left = 1.0f;
 			}
 		}
+
+		clip_h = fl2i( (1.0f - percent_left) * Wenergy_h + 0.5f );
 		
-		if ( percent_left <= 0.3 || Show_ballistic ) {
+		if ( percent_left <= 0.3 || Show_ballistic || Always_show_text ) {
 			char buf[32];
+			int delta_y = 0;
+
 			if ( percent_left < 0.1 ) {
 				gr_set_color_fast(&Color_bright_red);
 			}
@@ -5928,8 +5937,12 @@ void HudGaugeWeaponEnergy::render(float frametime)
 				sprintf(buf,XSTR( "%d%%", 326), fl2i(percent_left*100+0.5f));
 			}
 
+			if ( Moving_text ) {
+				delta_y = clip_h;
+			}
+
 			hud_num_make_mono(buf);
-			renderString(position[0] + Wenergy_text_offsets[0], position[1] + Wenergy_text_offsets[1], buf);
+			renderString(position[0] + Wenergy_text_offsets[0], position[1] + Wenergy_text_offsets[1] + delta_y, buf);
 		}
 
 		setGaugeColor();
@@ -5945,8 +5958,6 @@ void HudGaugeWeaponEnergy::render(float frametime)
 				}
 			}
 		}
-
-		clip_h = fl2i( (1.0f - percent_left) * Wenergy_h + 0.5f );
 
 		bm_get_info(Energy_bar.first_frame+2,&w,&h);
 		
