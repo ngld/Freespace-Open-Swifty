@@ -5904,7 +5904,7 @@ void HudGaugeWeaponEnergy::render(float frametime)
 					max_ballistic_ammo += Player_ship->weapons.primary_bank_start_ammo[x];
 				}
 			} else {
-				ballistic_ammo = Player_ship->weapons.primary_bank_weapons[Player_ship->weapons.current_primary_bank];
+				ballistic_ammo = Player_ship->weapons.primary_bank_ammo[Player_ship->weapons.current_primary_bank];
 				max_ballistic_ammo = Player_ship->weapons.primary_bank_start_ammo[Player_ship->weapons.current_primary_bank];
 			}
 
