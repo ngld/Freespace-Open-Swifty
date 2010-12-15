@@ -240,6 +240,7 @@ protected:
 	int Wenergy_text_offsets[2];
 	int Wenergy_h;
 
+	int alignment;
 	bool Always_show_text;
 	bool Moving_text;
 	bool Show_ballistic;
@@ -251,6 +252,7 @@ public:
 	void initAlwaysShowText(bool show_text);
 	void initMoveText(bool move_text);
 	void initShowBallistics(bool show_ballistics);
+	void initTextAlignment(int align);
 	void render(float frametime);
 	void pageIn();
 };
