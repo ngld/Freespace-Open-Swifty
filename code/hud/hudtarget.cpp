@@ -5930,7 +5930,7 @@ void HudGaugeWeaponEnergy::render(float frametime)
 		
 		if ( percent_left <= 0.3 || Show_ballistic || Always_show_text ) {
 			char buf[32];
-			int delta_y, delta_x;
+			int delta_y = 0, delta_x = 0;
 
 			if ( percent_left < 0.1 ) {
 				gr_set_color_fast(&Color_bright_red);
@@ -5946,8 +5946,6 @@ void HudGaugeWeaponEnergy::render(float frametime)
 
 			if ( Moving_text ) {
 				delta_y = clip_h;
-			} else {
-				delta_y = Wenergy_text_offsets[1];
 			}
 
 			hud_num_make_mono(buf);
@@ -5957,10 +5955,9 @@ void HudGaugeWeaponEnergy::render(float frametime)
 
 				gr_get_string_size(&w, &h, buf);
 				delta_x = -w;
-			} else {
-				delta_x = 0;
 			}
-			renderString(position[0] + Wenergy_text_offsets[0] + delta_x, position[1] + delta_y, buf);
+
+			renderString(position[0] + Wenergy_text_offsets[0] + delta_x, position[1] + Wenergy_text_offsets[1] + delta_y, buf);
 		}
 
 		setGaugeColor();
