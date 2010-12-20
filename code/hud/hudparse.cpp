@@ -756,6 +756,9 @@ int parse_gauge_type()
 	if(optional_string("+Fixed Messages:"))
 		return HUD_OBJECT_FIXED_MESSAGES;
 
+	if(optional_string("+Flight Path Marker"))
+		return HUD_OBJECT_FLIGHT_PATH;
+
 	return -1;
 }
 
@@ -911,6 +914,9 @@ void load_gauge(int gauge, int base_w, int base_h, int font, int ship_idx)
 		break;
 	case HUD_OBJECT_KILLS:
 		load_gauge_kills(base_w, base_h, font, ship_idx);
+		break;
+	case HUD_OBJECT_FLIGHT_PATH:
+		load_gauge_flight_path(base_w, base_h, font, ship_idx);
 		break;
 	default:
 		Warning(LOCATION, "Invalid gauge found in hud_gauges.tbl");
@@ -5485,6 +5491,56 @@ void load_gauge_kills(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initTextOffsets(text_offsets[0], text_offsets[1]);
 	hud_gauge->initTextValueOffsets(text_value_offsets[0], text_value_offsets[1]);
 	hud_gauge->initSlew(slew);
+	hud_gauge->initFont(font_num);
+
+	if(ship_index >= 0) {
+		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
+	} else {
+		default_hud_gauges.push_back(hud_gauge);
+	}
+}
+
+void load_gauge_flight_path(int base_w, int base_h, int font, int ship_index)
+{
+	int base_res[2];
+	int Marker_half[2];
+	char fname[MAX_FILENAME_LEN] = "flight_path";
+	int font_num = FONT1;
+
+	if(gr_screen.res == GR_640) {
+		base_res[0] = 640;
+		base_res[1] = 480;
+	} else {
+		base_res[0] = 1024;
+		base_res[1] = 768;
+	}
+
+	Marker_half[0] = 21;
+	Marker_half[1] = 21;
+
+	if(check_base_res(base_w, base_h)) {
+		base_res[0] = base_w;
+		base_res[1] = base_h;
+	}
+
+	if ( optional_string("Font:") ) {
+		stuff_int(&font_num);
+	} else {
+		if ( font >=0 ) {
+			font_num = font;
+		}
+	}
+	if(optional_string("Filename:")) {
+		stuff_string(fname, F_NAME, MAX_FILENAME_LEN);
+	}
+	if(optional_string("Center Offsets:")) {
+		stuff_int_list(Marker_half, 2);
+	}
+
+	HudGaugeFlightPath* hud_gauge = new HudGaugeFlightPath();
+	hud_gauge->initBaseResolution(base_res[0], base_res[1]);
+	hud_gauge->initHalfSize(Marker_half[0], Marker_half[1]);
+	hud_gauge->initBitmap(fname);
 	hud_gauge->initFont(font_num);
 
 	if(ship_index >= 0) {
