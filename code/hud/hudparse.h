@@ -184,4 +184,7 @@ void load_gauge_fixed_messages(int base_w, int base_h, int font, int ship_idx = 
 #define HUD_OBJECT_FLIGHT_PATH			50
 void load_gauge_flight_path(int base_w, int base_h, int font, int ship_idx = -1);
 
+#define HUD_OBJECT_WARHEAD_COUNT		51
+void load_gauge_warhead_count(int base_w, int base_h, int font, int ship_idx = -1);
+
 #endif // _HUDPARSE_H

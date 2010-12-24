@@ -335,7 +335,6 @@ public:
 	void initCountSizes(int w, int h);
 	void initMaxSymbols(int count);
 	void initTextAlign(int align);
-	void initVerticalDirection(int direction);
 	void render(float frametime);
 	void pageIn();
 };

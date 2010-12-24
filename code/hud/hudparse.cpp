@@ -756,8 +756,11 @@ int parse_gauge_type()
 	if(optional_string("+Fixed Messages:"))
 		return HUD_OBJECT_FIXED_MESSAGES;
 
-	if(optional_string("+Flight Path Marker"))
+	if(optional_string("+Flight Path Marker:"))
 		return HUD_OBJECT_FLIGHT_PATH;
+
+	if ( optional_string("+Warhead Count:") )
+		return HUD_OBJECT_WARHEAD_COUNT;
 
 	return -1;
 }
@@ -917,6 +920,9 @@ void load_gauge(int gauge, int base_w, int base_h, int font, int ship_idx)
 		break;
 	case HUD_OBJECT_FLIGHT_PATH:
 		load_gauge_flight_path(base_w, base_h, font, ship_idx);
+		break;
+	case HUD_OBJECT_WARHEAD_COUNT:
+		load_gauge_warhead_count(base_w, base_h, font, ship_idx);
 		break;
 	default:
 		Warning(LOCATION, "Invalid gauge found in hud_gauges.tbl");
@@ -5541,6 +5547,108 @@ void load_gauge_flight_path(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initBaseResolution(base_res[0], base_res[1]);
 	hud_gauge->initHalfSize(Marker_half[0], Marker_half[1]);
 	hud_gauge->initBitmap(fname);
+	hud_gauge->initFont(font_num);
+
+	if(ship_index >= 0) {
+		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
+	} else {
+		default_hud_gauges.push_back(hud_gauge);
+	}
+}
+
+void load_gauge_warhead_count(int base_w, int base_h, int font, int ship_index)
+{
+	int coords[2];
+	int base_res[2];
+	int warhead_name_offsets[2] = {6, 4};
+	int warhead_count_offsets[2] = {74, 4};
+	int icon_width;
+	int icon_height;
+	int max_icons;
+	int max_columns;
+	int alignment = 0;
+	char fname[MAX_FILENAME_LEN] = "warhead_icon";
+	bool slew = true;
+	int font_num = FONT1;
+
+	if ( gr_screen.res == GR_640 ) {
+		coords[0] = 497;
+		coords[1] = 361;
+		base_res[0] = 640;
+		base_res[1] = 480;
+	} else {
+		coords[0] = 880;
+		coords[1] = 624;
+		base_res[0] = 1024;
+		base_res[1] = 768;
+	}
+
+	if( check_base_res(base_w, base_h) ) {
+		base_res[0] = base_w;
+		base_res[1] = base_h;
+
+		if ( optional_string("Position:") ) {
+			stuff_int_list(coords, 2);
+		}
+	}
+
+	if ( optional_string("Font:") ) {
+		stuff_int(&font_num);
+	} else {
+		if ( font >=0 ) {
+			font_num = font;
+		}
+	}
+	if ( optional_string("Slew:") ) {
+		stuff_boolean(&slew);
+	}
+
+	if ( optional_string("Filename:") ) {
+		stuff_string(fname, F_NAME, MAX_FILENAME_LEN);
+	}
+
+	if ( optional_string("Name Offsets:") ) {
+		stuff_int_list(warhead_name_offsets, 2);
+	}
+
+	if ( optional_string("Count Offsets:") ) {
+		stuff_int_list(warhead_count_offsets, 2);
+	}
+
+	if ( optional_string("Icon Width:") ) {
+		stuff_int(&icon_width);
+	}
+
+	if ( optional_string("Icon Height:") ) {
+		stuff_int(&icon_height);
+	}
+
+	if ( optional_string("Max Icons:") ) {
+		stuff_int(&max_icons);
+	}
+
+	if ( optional_string("Max Columns:") ) {
+		stuff_int(&max_columns);
+	}
+
+	if ( optional_string("Alignment:") ) {
+		if ( optional_string("Right") ) {
+			alignment = 1;
+		} else {
+			alignment = 0;
+		}
+	}
+
+	HudGaugeWarheadCount* hud_gauge = new HudGaugeWarheadCount();
+	hud_gauge->initPosition(coords[0], coords[1]);
+	hud_gauge->initBaseResolution(base_res[0], base_res[1]);
+	hud_gauge->initBitmap(fname);
+	hud_gauge->initNameOffsets(warhead_name_offsets[0], warhead_name_offsets[1]);
+	hud_gauge->initCountOffsets(warhead_count_offsets[0], warhead_count_offsets[1]);
+	hud_gauge->initCountSizes(icon_width, icon_height);
+	hud_gauge->initMaxSymbols(max_columns);
+	hud_gauge->initTextAlign(alignment);
+	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
 
 	if(ship_index >= 0) {

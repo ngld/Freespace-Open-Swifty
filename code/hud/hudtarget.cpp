@@ -6777,8 +6777,8 @@ void HudGaugeOffscreen::renderOffscreenIndicator(vertex* target_point, vec3d *tp
 	}
 }
 
-void HudGaugeWarheadCount::HudGaugeWarheadCount():
-HudGauge(HUD_OBJECT_WARHEADS, HUD_WEAPONS_GAUGE, true, false, VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY, 255, 255, 255)
+HudGaugeWarheadCount::HudGaugeWarheadCount():
+HudGauge(HUD_OBJECT_WARHEAD_COUNT, HUD_WEAPONS_GAUGE, true, false, false, VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY, 255, 255, 255)
 {
 }
 
@@ -6805,8 +6805,8 @@ void HudGaugeWarheadCount::initCountOffsets(int x, int y)
 
 void HudGaugeWarheadCount::initCountSizes(int w, int h)
 {
-	Warhead_count_size[0] = x;
-	Warhead_count_size[1] = y;
+	Warhead_count_size[0] = w;
+	Warhead_count_size[1] = h;
 }
 
 void HudGaugeWarheadCount::initMaxSymbols(int count)
@@ -6819,9 +6819,9 @@ void HudGaugeWarheadCount::initTextAlign(int align)
 	Text_align = align;
 }
 
-void HudGaugeWarheadCount::initVerticalDirection(int direction)
+void HudGaugeWarheadCount::pageIn()
 {
-	Vert_dir = direction;
+	bm_page_in_aabitmap(Warhead.first_frame, Warhead.num_frames);
 }
 
 void HudGaugeWarheadCount::render(float frametime)
@@ -6847,17 +6847,27 @@ void HudGaugeWarheadCount::render(float frametime)
 	strcpy_s(weapon_name, (wip->alt_name[0]) ? wip->alt_name : wip->name);
 	end_string_at_first_hash_symbol(weapon_name);
 
-	setGaugeColor();
-	renderString(position[0] + Warhead_name_offsets[0], position[1] + Warhead_name_offsets[1], weapon_name);
+	setGaugeColor(HUD_C_BRIGHT);
+
+	if ( Text_align ) {
+		int w, h;
+
+		gr_get_string_size(&w, &h, weapon_name);
+		renderString(position[0] + Warhead_name_offsets[0] - w, position[1] + Warhead_name_offsets[1], weapon_name);
+	} else {
+		renderString(position[0] + Warhead_name_offsets[0], position[1] + Warhead_name_offsets[1], weapon_name);
+	}
 
 	if ( ammo > Max_symbols ) {
-		char	ammo_str[32];
+		char ammo_str[32];
 
 		sprintf(ammo_str, "%d", ammo);
 		hud_num_make_mono(ammo_str);
-		gr_get_string_size(&w, &h, ammo_str);
 
 		if ( Text_align ) {
+			int w, h;
+
+			gr_get_string_size(&w, &h, ammo_str);
 			renderString(position[0] + Warhead_count_offsets[0] - w, position[1] + Warhead_count_offsets[1], ammo_str);
 		} else {
 			renderString(position[0] + Warhead_count_offsets[0], position[1] + Warhead_count_offsets[1], ammo_str);
@@ -6866,7 +6876,7 @@ void HudGaugeWarheadCount::render(float frametime)
 		return;
 	}
 
-	int delta_x;
+	int delta_x = 0, delta_y = 0;
 	if ( Text_align ) {
 		delta_x = -Warhead_count_size[0];
 	} else {
@@ -6875,6 +6885,10 @@ void HudGaugeWarheadCount::render(float frametime)
 
 	int i;
 	for ( i = 0; i < ammo; i++ ) {
-		renderBitmap(Warhead.first_frame, position[0] + Warhead_count_offsets[0] + ammo * delta_x, position[1] + Warhead_count_offsets[1]);
+		if ( Max_columns != -1 ) {
+			delta_y = Warhead_count_size[1] * (i / Max_columns);
+		}
+
+		renderBitmap(Warhead.first_frame, position[0] + Warhead_count_offsets[0] + i * delta_x, position[1] + Warhead_count_offsets[1] + delta_y);
 	}
 }
