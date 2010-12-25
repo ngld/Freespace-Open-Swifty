@@ -6814,6 +6814,11 @@ void HudGaugeWarheadCount::initMaxSymbols(int count)
 	Max_symbols = count;
 }
 
+void HudGaugeWarheadCount::initMaxColumns(int count)
+{
+	Max_columns = count;
+}
+
 void HudGaugeWarheadCount::initTextAlign(int align)
 {
 	Text_align = align;
@@ -6835,6 +6840,7 @@ void HudGaugeWarheadCount::render(float frametime)
 
 	ship_weapon	*sw = &Ships[Player_obj->instance].weapons;
 
+	// don't bother displaying anything if we have no secondaries
 	if ( sw->num_secondary_banks <= 0 ) {
 		return;
 	}
@@ -6843,12 +6849,18 @@ void HudGaugeWarheadCount::render(float frametime)
 	weapon_info *wip = &Weapon_info[sw->secondary_bank_weapons[wep_num]];
 	int ammo = sw->secondary_bank_ammo[wep_num];
 
+	// don't bother displaying anything if we have no ammo.
+	if ( ammo <= 0 ) {
+		return;
+	}
+
 	char weapon_name[NAME_LENGTH + 10];
 	strcpy_s(weapon_name, (wip->alt_name[0]) ? wip->alt_name : wip->name);
 	end_string_at_first_hash_symbol(weapon_name);
 
 	setGaugeColor(HUD_C_BRIGHT);
 
+	// display the weapon name
 	if ( Text_align ) {
 		int w, h;
 
@@ -6858,6 +6870,7 @@ void HudGaugeWarheadCount::render(float frametime)
 		renderString(position[0] + Warhead_name_offsets[0], position[1] + Warhead_name_offsets[1], weapon_name);
 	}
 
+	// if ammo is greater than the icon display limit, just show a numeric
 	if ( ammo > Max_symbols ) {
 		char ammo_str[32];
 
@@ -6883,12 +6896,15 @@ void HudGaugeWarheadCount::render(float frametime)
 		delta_x = Warhead_count_size[0];
 	}
 
-	int i;
+	int i, column;
 	for ( i = 0; i < ammo; i++ ) {
-		if ( Max_columns != -1 ) {
+		if ( Max_columns > 0 ) {
 			delta_y = Warhead_count_size[1] * (i / Max_columns);
+			column = i % Max_columns;
+		} else {
+			column = i;
 		}
 
-		renderBitmap(Warhead.first_frame, position[0] + Warhead_count_offsets[0] + i * delta_x, position[1] + Warhead_count_offsets[1] + delta_y);
+		renderBitmap(Warhead.first_frame, position[0] + Warhead_count_offsets[0] + column * delta_x, position[1] + Warhead_count_offsets[1] + delta_y);
 	}
 }

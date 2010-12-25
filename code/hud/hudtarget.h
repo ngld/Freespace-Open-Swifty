@@ -334,6 +334,7 @@ public:
 	void initCountOffsets(int x, int y);
 	void initCountSizes(int w, int h);
 	void initMaxSymbols(int count);
+	void initMaxColumns(int count);
 	void initTextAlign(int align);
 	void render(float frametime);
 	void pageIn();

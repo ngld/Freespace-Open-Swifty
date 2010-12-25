@@ -5646,7 +5646,8 @@ void load_gauge_warhead_count(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initNameOffsets(warhead_name_offsets[0], warhead_name_offsets[1]);
 	hud_gauge->initCountOffsets(warhead_count_offsets[0], warhead_count_offsets[1]);
 	hud_gauge->initCountSizes(icon_width, icon_height);
-	hud_gauge->initMaxSymbols(max_columns);
+	hud_gauge->initMaxSymbols(max_icons);
+	hud_gauge->initMaxColumns(max_columns);
 	hud_gauge->initTextAlign(alignment);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
