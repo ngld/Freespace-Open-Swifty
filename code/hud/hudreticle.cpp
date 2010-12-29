@@ -497,14 +497,22 @@ void HudGaugeThrottle::render(float frametime)
 	// draw target speed if necessary
 	if ( Show_target_speed ) {
 		char buf[32];
+		int w, h;
 
 		if ( Show_percent ) {
-			sprintf(buf, XSTR( "%d%%", 326), fl2i( (desired_speed/max_speed)*100 + 0.5f ));
+			if ( Player_obj->phys_info.flags & PF_AFTERBURNER_ON ) {
+				strcpy_s(buf, "A/B");
+			} else {
+				sprintf(buf, XSTR( "%d%%", 326), fl2i( (desired_speed/max_speed)*100 + 0.5f ));
+			}
 		} else {
 			sprintf(buf, "%d", fl2i(desired_speed * Hud_speed_multiplier + 0.5f));
 		}
 
-		renderString(position[0] + Target_speed_offsets[0], position[1] + Target_speed_offsets[1], buf);
+		hud_num_make_mono(buf);
+		gr_get_string_size(&w, &h, buf);
+
+		renderString(position[0] + Target_speed_offsets[0] - w, position[1] + Target_speed_offsets[1], buf);
 	}
 
 	// draw the "desired speed" bar on the throttle
