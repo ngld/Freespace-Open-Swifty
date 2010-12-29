@@ -1345,7 +1345,7 @@ void game_loading_callback_init()
 	}
 	//common_set_interface_palette("InterfacePalette");  // set the interface palette
 
-	strcpy(Game_loading_ani.filename, Game_loading_ani_fname[gr_screen.res]);
+	strcpy_s(Game_loading_ani.filename, Game_loading_ani_fname[gr_screen.res]);
 	generic_anim_init(&Game_loading_ani, Game_loading_ani.filename);
 	generic_anim_load(&Game_loading_ani);
 	Assertion( Game_loading_ani.num_frames > 0, "Load Screen animation %s not found, or corrupted. Needs to be an animation with at least 1 frame.", Game_loading_ani.filename );
@@ -6488,6 +6488,8 @@ void game_enter_state( int old_state, int new_state )
 
 			//Set the current hud
 			set_current_hud();
+
+			ship_init_cockpit_displays(Player_ship);
 
 			Game_mode |= GM_IN_MISSION;
 

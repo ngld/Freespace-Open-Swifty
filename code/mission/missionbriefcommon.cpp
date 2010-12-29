@@ -878,7 +878,7 @@ void brief_render_icon_line(int stage_num, int line_num)
 		Warning(LOCATION, "Start icon (%d/%d) missing for line %d in briefing stage %d", bl->start_icon, bs->num_icons, line_num, stage_num);
 		//Remove line
 		bs->num_lines--;
-		for(int i = line_num; i < bs->num_lines; i++)
+		for(i = line_num; i < bs->num_lines; i++)
 			bs->lines[i] = bs->lines[i+1];
 		return;
 	}
@@ -887,7 +887,7 @@ void brief_render_icon_line(int stage_num, int line_num)
 		Warning(LOCATION, "End icon (%d/%d) missing for line %d in briefing stage %d", bl->end_icon, bs->num_icons, line_num, stage_num);
 		//Remove line
 		bs->num_lines--;
-		for(int i = line_num; i < bs->num_lines; i++)
+		for(i = line_num; i < bs->num_lines; i++)
 			bs->lines[i] = bs->lines[i+1];
 		return;
 	}
@@ -1632,8 +1632,8 @@ void brief_set_text_color(int color_index)
 }
 
 // Returns true when a character is a word separator.
-// @param character is the character to be analysed
-// @return true when the given character is a word separator, and false when the caracter is part of a word.
+// @param character is the character to be analysed.
+// @return true when the given character is a word separator, and false when the character is part of a word.
 bool is_a_word_separator(char character){
 	return character<=33					//  2 characters including (space) and !
 		|| (35<=character && character<=38)	//  4 characters #$%&
