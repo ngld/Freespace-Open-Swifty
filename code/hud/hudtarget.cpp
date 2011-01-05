@@ -5750,9 +5750,18 @@ void HudGaugeWeaponEnergy::initEnergyHeight(int h)
 	Wenergy_h = h;
 }
 
-void HudGaugeWeaponEnergy::initTextAlignment(int align)
+void HudGaugeWeaponEnergy::initAlignments(int text_align, int armed_align)
 {
-	alignment = align;
+	Text_alignment = text_align;
+	Armed_alignment = armed_align;
+}
+
+void HudGaugeWeaponEnergy::initArmedOffsets(int x, int y, int h, bool show)
+{
+	Armed_name_offsets[0] = x;
+	Armed_name_offsets[1] = y;
+	Show_armed = show;
+	Armed_name_h = h;
 }
 
 void HudGaugeWeaponEnergy::initAlwaysShowText(bool show_text)
@@ -5882,36 +5891,39 @@ void HudGaugeWeaponEnergy::render(float frametime)
 		float percent_left;
 		int ballistic_ammo = 0;
 		int max_ballistic_ammo = 0;
-		int	clip_h, w, h;
+		int	clip_h, w, h, i;
+		weapon_info *wip;
+		ship_weapon *sw;
+		char buf[40] = "";
 
-		if ( Energy_bar.first_frame == -1 )
-		{
+		if ( Energy_bar.first_frame == -1 ) {
 			return;
 		}
 
-		if ( Player_ship->weapons.num_primary_banks <= 0 )
-		{
+		if ( Player_ship->weapons.num_primary_banks <= 0 ) {
 			return;
 		}
 
+		sw = &Player_ship->weapons;
+
+		// show ballistic ammunition in energy gauge if need be
 		if ( Show_ballistic && Ship_info[Player_ship->ship_info_index].flags & SIF_BALLISTIC_PRIMARIES ) {
 			if ( Player_ship->flags & SF_PRIMARY_LINKED ) {
 
-				// go through all ballistic primaries and add up their ammunition amounts
-				for ( x = 0; x < Player_ship->weapons.num_primary_banks; x++ ) {
+				// go through all ballistic primaries and add up their ammunition totals and max capacities
+				for ( i = 0; i < sw->num_primary_banks; i++ ) {
 
 					// skip all pure-energy weapons
-					if( ! ( Weapon_info[Player_ship->weapons.primary_bank_weapons[x]].wi_flags2 & WIF2_BALLISTIC ) ) {
+					if( ! ( Weapon_info[sw->primary_bank_weapons[i]].wi_flags2 & WIF2_BALLISTIC ) ) {
 						continue;
 					}
 
-					// get the largest ammo amount of the current armed weapon
-					ballistic_ammo += Player_ship->weapons.primary_bank_ammo[x]; 
-					max_ballistic_ammo += Player_ship->weapons.primary_bank_start_ammo[x];
+					ballistic_ammo += sw->primary_bank_ammo[i]; 
+					max_ballistic_ammo += sw->primary_bank_start_ammo[i];
 				}
 			} else {
-				ballistic_ammo = Player_ship->weapons.primary_bank_ammo[Player_ship->weapons.current_primary_bank];
-				max_ballistic_ammo = Player_ship->weapons.primary_bank_start_ammo[Player_ship->weapons.current_primary_bank];
+				ballistic_ammo = sw->primary_bank_ammo[sw->current_primary_bank];
+				max_ballistic_ammo = sw->primary_bank_start_ammo[sw->current_primary_bank];
 			}
 
 			percent_left = i2fl(ballistic_ammo) / i2fl(max_ballistic_ammo);
@@ -5930,7 +5942,6 @@ void HudGaugeWeaponEnergy::render(float frametime)
 		clip_h = fl2i( (1.0f - percent_left) * Wenergy_h + 0.5f );
 		
 		if ( percent_left <= 0.3 || Show_ballistic || Always_show_text ) {
-			char buf[32];
 			int delta_y = 0, delta_x = 0;
 
 			if ( percent_left < 0.1 ) {
@@ -5951,9 +5962,7 @@ void HudGaugeWeaponEnergy::render(float frametime)
 
 			hud_num_make_mono(buf);
 
-			if ( alignment ) {
-				int w, h;
-
+			if ( Text_alignment ) {
 				gr_get_string_size(&w, &h, buf);
 				delta_x = -w;
 			}
@@ -5962,11 +5971,42 @@ void HudGaugeWeaponEnergy::render(float frametime)
 		}
 
 		setGaugeColor();
-		for ( x = 0;x < Player_ship->weapons.num_primary_banks; x++ )
+
+		// list currently armed primary banks if we have to
+		if ( Player_ship->flags & SF_PRIMARY_LINKED ) {
+			// show all primary banks
+			for ( i = 0; i < Player_ship->weapons.num_primary_banks; i++ ) {
+				wip = &Weapon_info[sw->primary_bank_weapons[i]];
+				strcpy_s(buf, (wip->alt_name[0]) ? wip->alt_name : wip->name);
+
+				if ( Armed_alignment ) {
+					gr_get_string_size(&w, &h, buf);
+				} else {
+					w = 0;
+				}
+					
+				renderString(position[0] + Armed_name_offsets[0] - w, position[1] + Armed_name_offsets[1] + Armed_name_h * i, buf);
+			}
+		} else {
+			// just show the current armed bank
+			i = Player_ship->weapons.current_primary_bank;
+			wip = &Weapon_info[sw->primary_bank_weapons[i]];
+			strcpy_s(buf, (wip->alt_name[0]) ? wip->alt_name : wip->name);
+
+			if ( Armed_alignment ) {
+				gr_get_string_size(&w, &h, buf);
+			} else {
+				w = 0;
+			}
+
+			renderString(position[0] + Armed_name_offsets[0] - w, position[1] + Armed_name_offsets[1], buf);
+		}
+
+		for ( i = 0; i < sw->num_primary_banks; i++ )
 		{
-			if ( !timestamp_elapsed(Weapon_flash_info.flash_duration[x]) )
+			if ( !timestamp_elapsed(Weapon_flash_info.flash_duration[i]) )
 			{
-				if ( Weapon_flash_info.is_bright & (1<<x) )
+				if ( Weapon_flash_info.is_bright & (1<<i) )
 				{
 					// hud_set_bright_color();
 					setGaugeColor(HUD_C_BRIGHT);

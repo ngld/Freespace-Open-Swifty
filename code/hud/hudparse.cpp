@@ -1176,10 +1176,14 @@ void load_gauge_weapon_energy(int base_w, int base_h, int font, int ship_index)
 	int base_res[2];
 	int Wenergy_text_offsets[2];
 	int Wenergy_h;
-	int alignment = 0;
+	int text_alignment = 0;
 	bool always_show_text = false;
 	bool show_ballistic = false;
 	bool moving_text = false;
+	int armed_weapon_offsets[2] = {0, 0};
+	int armed_weapon_h = 12;
+	int weapon_alignment = 0;
+	bool show_weapons = false;
 	char fname[MAX_FILENAME_LEN];
 	bool slew = true;
 	int font_num = FONT1;
@@ -1249,20 +1253,35 @@ void load_gauge_weapon_energy(int base_w, int base_h, int font, int ship_index)
 	}
 	if(optional_string("Text Offsets:")) {
 		stuff_int_list(Wenergy_text_offsets, 2);
-	}
-	if(optional_string("Text Alignment:")) {
-		if(required_string("Right")) {
-			alignment = 1;
+
+		if(optional_string("Alignment:")) {
+			if(required_string("Right")) {
+				text_alignment = 1;
+			}
 		}
 	}
 	if(optional_string("Always Show Text:")) {
 		stuff_boolean(&always_show_text);
 	}
-	if(optional_string("Text Moves:")) {
+	if(optional_string("Text Follows:")) {
 		stuff_boolean(&moving_text);
 	}
 	if(optional_string("Show Ballistic Ammo:")) {
 		stuff_boolean(&show_ballistic);
+	}
+	if(optional_string("Armed Weapons Offsets:")) {
+		stuff_int_list(armed_weapon_offsets, 2);
+		show_weapons = true;
+
+		if(optional_string("Alignment:")) {
+			if(required_string("Right")) {
+				weapon_alignment = 1;
+			}
+		}
+
+		if(optional_string("Entry Height:")) {
+			stuff_int(&armed_weapon_h);
+		}
 	}
 
 	HudGaugeWeaponEnergy* hud_gauge = new HudGaugeWeaponEnergy();
@@ -1271,10 +1290,11 @@ void load_gauge_weapon_energy(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initBitmaps(fname);
 	hud_gauge->initEnergyHeight(Wenergy_h);
 	hud_gauge->initTextOffsets(Wenergy_text_offsets[0], Wenergy_text_offsets[1]);
-	hud_gauge->initTextAlignment(alignment);
+	hud_gauge->initAlignments(text_alignment, weapon_alignment);
 	hud_gauge->initAlwaysShowText(always_show_text);
 	hud_gauge->initMoveText(moving_text);
 	hud_gauge->initShowBallistics(show_ballistic);
+	hud_gauge->initArmedOffsets(armed_weapon_offsets[0], armed_weapon_offsets[1], armed_weapon_h, show_weapons);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
 
