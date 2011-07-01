@@ -4820,7 +4820,9 @@ void hud_maybe_flash_weapon(int index)
 	}
 }
 
-// check if targeting is possible based on sensors strength
+/**
+ * @brief Check if targeting is possible based on sensors strength
+ */
 int hud_sensors_ok(ship *sp, int show_msg)
 {
 	float	sensors_str;
@@ -6487,7 +6489,7 @@ void hud_target_clear_display_list()
 }
 
 HudGaugeOffscreen::HudGaugeOffscreen():
-HudGauge(HUD_OBJECT_OFFSCREEN, HUD_OFFSCREEN_INDICATOR, true, false, true, VM_DEAD_VIEW, 255, 255, 255)
+HudGauge(HUD_OBJECT_OFFSCREEN, HUD_OFFSCREEN_INDICATOR, true, false, true, VM_DEAD_VIEW | VM_OTHER_SHIP, 255, 255, 255)
 {
 }
 

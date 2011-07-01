@@ -991,6 +991,7 @@ void game_level_close()
 		subtitles_close();
 		trail_level_close();
 		hud_level_close();
+		model_instance_free_all();
 
 		// be sure to not only reset the time but the lock as well
 		set_time_compression(1.0f, 0.0f);
@@ -3137,6 +3138,11 @@ void say_view_target()
 				Viewer_mode &= ~VM_OTHER_SHIP;
 				break;
 				}
+			case OBJ_DEBRIS: {
+				strcpy_s(view_target_name, "Debris");
+				Viewer_mode &= ~VM_OTHER_SHIP;
+				break;
+				}
 
 			default:
 				Int3();
@@ -3748,6 +3754,7 @@ camid game_render_frame_setup()
 					observer_get_eye( &eye_pos, &eye_orient, Viewer_obj );					
 					break;
 				default :
+					mprintf(("Invalid Value for Viewer_obj->type. Expected values are OBJ_SHIP (1) and OBJ_OBSERVER (12), we encountered %d. Please tell a coder.\n", Viewer_obj->type));
 					Int3();
 				}
 
@@ -3832,8 +3839,6 @@ void game_render_frame( camid cid )
 	gr_zbuffer_clear(TRUE);
 
 	gr_post_process_begin();
-
-	clip_frame_view();
 
 	neb2_render_setup(cid);
 
@@ -4211,9 +4216,6 @@ void game_simulation_frame()
 		// move all the objects now
 		obj_move_all(flFrametime);
 
-		// check for cargo reveal (this has an internal timestamp, so only runs every N ms)
-		// AL: 3-15-98: It was decided to not let AI ships inspect cargo
-		//	ship_check_cargo_all();
 		if(!(Game_mode & GM_DEMO_PLAYBACK)){
 			mission_eval_goals();
 		}
@@ -4671,8 +4673,6 @@ void game_frame(int paused)
 			DEBUG_GET_TIME( render3_time1 )
 			camid cid = game_render_frame_setup();
 
-			clip_frame_view();
-
 			game_render_frame( cid );
 
 			// save the eye position and orientation
@@ -4721,6 +4721,9 @@ void game_frame(int paused)
 					}
 				}
 			}
+
+			//Cutscene bars
+			clip_frame_view();
 
 			DEBUG_GET_TIME( render3_time2 )
 			DEBUG_GET_TIME( render2_time1 )

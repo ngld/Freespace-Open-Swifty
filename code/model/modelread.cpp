@@ -284,12 +284,26 @@ void model_free_all()
 	}
 
 	mprintf(( "Freeing all existing models...\n" ));
+	model_instance_free_all();
 
 	for (i=0;i<MAX_POLYGON_MODELS;i++) {
 		// forcefully unload all loaded models (be careful with this)
 		model_unload(i, 1);		
 	}
+}
 
+void model_instance_free_all()
+{
+	size_t i;
+
+	// free any outstanding model instances
+	for ( i = 0; i < Polygon_model_instances.size(); ++i ) {
+		if ( Polygon_model_instances[i] ) {
+			model_delete_instance(i);
+		}
+	}
+
+	Polygon_model_instances.clear();
 }
 
 void model_page_in_start()
@@ -605,10 +619,8 @@ void do_new_subsystem( int n_subsystems, model_subsystem *slist, int subobj_num,
 		// Goober5000 - notify if there's a mismatch
 		if ( stricmp(subobj_name, subsystemp->subobj_name) && !subsystem_stricmp(subobj_name, subsystemp->subobj_name) )
 		{
-			Warning(LOCATION, "Subsystem \"%s\" in model \"%s\" is represented as \"%s\" in ships.tbl.  "
-				"Although FS2_OPEN 3.6 and later will catch and correct this error, earlier "
-				"versions (as well as retail FS2) will not.  You are advised to fix this if "
-				"you plan to support earlier versions of FreeSpace.\n", subobj_name, model_get(model_num)->filename, subsystemp->subobj_name);
+			nprintf(("Model", "NOTE: Subsystem \"%s\" in model \"%s\" is represented as \"%s\" in ships.tbl.  This works fine in FSO v3.6 and up, "
+				"but is not compatible with FS2 retail.\n", subobj_name, model_get(model_num)->filename, subsystemp->subobj_name));
 
 		}
 #endif
@@ -665,11 +677,11 @@ void print_family_tree( polymodel *obj, int modelnum, char * ident, int islast )
 		mprintf(( " %s", obj->submodel[modelnum].name ));
 		sprintf( temp, " " );
 	} else if ( islast ) 	{
-		mprintf(( "%sÀÄ%s", ident, obj->submodel[modelnum].name ));
+		mprintf(( "%s:%s", ident, obj->submodel[modelnum].name ));
 		sprintf( temp, "%s  ", ident );
 	} else {
-		mprintf(( "%sÃÄ%s", ident, obj->submodel[modelnum].name ));
-		sprintf( temp, "%s³ ", ident );
+		mprintf(( "%s:%s", ident, obj->submodel[modelnum].name ));
+		sprintf( temp, "%s ", ident );
 	}
 
 	mprintf(( "\n" ));
@@ -2618,6 +2630,23 @@ int model_create_instance(int model_num, int submodel_num)
 	return open_slot;
 }
 
+void model_delete_instance(int model_instance_num)
+{
+	Assert(model_instance_num >= 0);
+	Assert(model_instance_num < (int)Polygon_model_instances.size());
+	Assert(Polygon_model_instances[model_instance_num] != NULL);
+
+	polymodel_instance *pmi = Polygon_model_instances[model_instance_num];
+
+	if ( pmi->submodel ) {
+		vm_free(pmi->submodel);
+	}
+
+	vm_free(pmi);
+
+	Polygon_model_instances[model_instance_num] = NULL;
+}
+
 // ensure that the subsys path is at least SUBSYS_PATH_DIST from the 
 // second last to last point.
 void model_maybe_fixup_subsys_path(polymodel *pm, int path_num)
@@ -2826,10 +2855,13 @@ polymodel * model_get(int model_num)
 
 	int num = model_num % MAX_POLYGON_MODELS;
 	
-	Assert( num >= 0 );
-	Assert( num < MAX_POLYGON_MODELS );
-	Assert( Polygon_models[num] );
-	Assert( Polygon_models[num]->id == model_num );
+	Assertion( num >= 0, "Model id %d is invalid. Please backtrace and investigate.\n", num);
+	Assertion( num < MAX_POLYGON_MODELS, "Model id %d is larger than MAX_POLYGON_MODELS (%d). This is impossible, thus we have to conclude that math as we know it has ceased to work.\n", num, MAX_POLYGON_MODELS );
+	Assertion( Polygon_models[num], "No model with id %d found. Please backtrace and investigate.\n", num );
+	Assertion( Polygon_models[num]->id == model_num, "Index collision between model %s and requested model %d. Please backtrace and investigate.\n", Polygon_models[num]->filename, model_num );
+
+	if (num < 0 || num > MAX_POLYGON_MODELS || !Polygon_models[num] || Polygon_models[num]->id != model_num)
+		return NULL;
 
 	return Polygon_models[num];
 }
@@ -3947,6 +3979,43 @@ void model_find_world_dir(vec3d * out_dir, vec3d *in_dir,int model_num, int sub_
 		// to the parent - KeldorKatarn
 		matrix rotation_matrix = pm->submodel[mn].orientation;
 		vm_rotate_matrix_by_angles(&rotation_matrix, &pm->submodel[mn].angs);
+
+		matrix inv_orientation;
+		vm_copy_transpose_matrix(&inv_orientation, &pm->submodel[mn].orientation);
+
+		vm_matrix_x_matrix(&m, &rotation_matrix, &inv_orientation);
+
+		vm_vec_unrotate(&tpnt, &pnt, &m);
+		pnt = tpnt;
+
+		mn = pm->submodel[mn].parent;
+	}
+
+	//now instance for the entire object
+	vm_vec_unrotate(out_dir,&pnt,objorient);
+}
+
+// the same as above - just taking model instance data into account
+// model_find_world_dir
+void model_instance_find_world_dir(vec3d * out_dir, vec3d *in_dir,int model_num, int model_instance_num, int sub_model_num, matrix * objorient, vec3d * objpos )
+{
+	vec3d pnt;
+	vec3d tpnt;
+	matrix m;
+	int mn;
+	polymodel *pm = model_get(model_num);
+	polymodel_instance *pmi = model_get_instance(model_instance_num);
+
+	pnt = *in_dir;
+	mn = sub_model_num;
+
+	//instance up the tree for this point
+	while ( (mn >= 0) && (pm->submodel[mn].parent >= 0) ) {
+		// By using this kind of computation, the rotational angles can always
+		// be computed relative to the submodel itself, instead of relative
+		// to the parent - KeldorKatarn
+		matrix rotation_matrix = pm->submodel[mn].orientation;
+		vm_rotate_matrix_by_angles(&rotation_matrix, &pmi->submodel[mn].angs);
 
 		matrix inv_orientation;
 		vm_copy_transpose_matrix(&inv_orientation, &pm->submodel[mn].orientation);
