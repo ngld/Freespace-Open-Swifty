@@ -248,6 +248,7 @@ flag_def_list Subsystem_flags[] = {
 	{ "damage as hull",			MSS_FLAG_DAMAGE_AS_HULL,	0 },
 	{ "starts locked",          MSS_FLAG_TURRET_LOCKED,     0 },
 	{ "no aggregate",			MSS_FLAG_NO_AGGREGATE,		0 },
+	{ "wait for animation",     MSS_FLAG_TURRET_ANIM_WAIT,  0 },
 };
 
 int Num_subsystem_flags = sizeof(Subsystem_flags)/sizeof(flag_def_list);
@@ -11875,7 +11876,11 @@ void ship_model_update_instance(object *objp)
 			model_update_instance(model_instance_num, psub->turret_gun_sobj, &pss->submodel_info_2 );
 		}
 	}
+
 	model_instance_dumb_rotation(model_instance_num);
+
+	// preprocess subobject orientations for collision detection
+	model_collide_preprocess(&objp->orient, model_instance_num);
 }
 
 //==========================================================
