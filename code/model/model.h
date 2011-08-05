@@ -355,7 +355,6 @@ typedef struct bsp_info {
 		rad = 0.f;
 		lod_name[ 0 ] = '\0';  
 		collision_model = -1;
-		collision_model = -1;
 
 		/* Compound types */
 		memset( live_debris, 0, sizeof( live_debris ) );
