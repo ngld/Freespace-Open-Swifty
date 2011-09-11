@@ -38,7 +38,7 @@
 #include "missionui/chatbox.h"
 #include "network/multi_pmsg.h"
 #include "parse/parselo.h"
-
+#include "io/timer.h"
 
 
 #define IS_BANK_PRIMARY(x)			(x < MAX_SHIP_PRIMARY_BANKS)
@@ -68,11 +68,7 @@ typedef struct wl_bitmap_group
 	int num_frames;
 } wl_bitmap_group;
 
-#ifdef FS2_DEMO
-#define WEAPON_ANIM_LOOP_FRAME				1
-#else
 #define WEAPON_ANIM_LOOP_FRAME				52			// frame (from 0) to loop weapon anim
-#endif
 
 #define WEAPON_ICON_FRAME_NORMAL				0
 #define WEAPON_ICON_FRAME_HOT					1
@@ -96,6 +92,7 @@ typedef struct wl_bitmap_group
 #define WL_BUTTON_MULTI_LOCK				6
 #define WL_BUTTON_APPLY_ALL					7
 
+extern int anim_timer_start;
 
 // convenient struct for handling all button controls
 struct wl_buttons {
@@ -442,7 +439,6 @@ void wl_pick_icon_from_list(int index);
 void pick_from_ship_slot(int num);
 void start_weapon_animation(int weapon_class);
 void stop_weapon_animation();
-void wl_start_slot_animation(int n);
 int wl_get_pilot_subsys_index(p_object *pobjp);
 
 void wl_reset_to_defaults();
@@ -461,24 +457,6 @@ void wl_reset_carried_icon();
 int wl_icon_being_carried();
 void wl_set_carried_icon(int from_bank, int from_slot, int weapon_class);
 
-
-// Determine hack offset for how to draw fury missile icon. 
-int wl_fury_missile_offset_hack(int weapon_class, int num_missiles)
-{
-	if ( weapon_class < 0 ) {
-		return 0;
-	}
-
-	if ( num_missiles < 100 ) {
-		return 0 ;
-	} 			
-
-	if ( !strnicmp(Weapon_info[weapon_class].name, NOX("fury"), 4) ) {
-		return 3;
-	}
-
-	return 0;
-}
 
 char *wl_tooltip_handler(char *str)
 {
@@ -963,10 +941,10 @@ void wl_render_overhead_view(float frametime)
 						vm_vec_unrotate(&subobj_pos,&pm->gun_banks[x].pnt[y],&object_orient);
 						g3_rotate_vertex(&draw_point, &subobj_pos);
 						g3_project_vertex(&draw_point);
-						gr_unsize_screen_posf(&draw_point.sx, &draw_point.sy);
+						gr_unsize_screen_posf(&draw_point.screen.xyw.x, &draw_point.screen.xyw.y);
 
-						xc = fl2i(draw_point.sx + Wl_overhead_coords[gr_screen.res][0]);
-						yc = fl2i(draw_point.sy +Wl_overhead_coords[gr_screen.res][1]);
+						xc = fl2i(draw_point.screen.xyw.x + Wl_overhead_coords[gr_screen.res][0]);
+						yc = fl2i(draw_point.screen.xyw.y +Wl_overhead_coords[gr_screen.res][1]);
 
 						//get the curve right.
 						int curve;
@@ -1058,10 +1036,10 @@ void wl_render_overhead_view(float frametime)
 						vm_vec_unrotate(&subobj_pos,&pm->missile_banks[x].pnt[y],&object_orient);
 						g3_rotate_vertex(&draw_point, &subobj_pos);
 						g3_project_vertex(&draw_point);
-						gr_unsize_screen_posf(&draw_point.sx, &draw_point.sy);
+						gr_unsize_screen_posf(&draw_point.screen.xyw.x, &draw_point.screen.xyw.y);
 
-						xc = fl2i(draw_point.sx + Wl_overhead_coords[gr_screen.res][0]);
-						yc = fl2i(draw_point.sy +Wl_overhead_coords[gr_screen.res][1]);
+						xc = fl2i(draw_point.screen.xyw.x + Wl_overhead_coords[gr_screen.res][0]);
+						yc = fl2i(draw_point.screen.xyw.y +Wl_overhead_coords[gr_screen.res][1]);
 
 						//get the curve right.
 						int curve;
@@ -1142,13 +1120,11 @@ int eval_weapon_flag_for_game_type(int weapon_flags)
 {
 	int	rval = 0;
 
-#if !defined FS2_DEMO
 	if (MULTI_DOGFIGHT) {
 		if (weapon_flags & DOGFIGHT_WEAPON)
 			rval = 1;
 	}
 	else
-#endif
 		if (weapon_flags & REGULAR_WEAPON)
 			rval  = 1;
 
@@ -1221,6 +1197,8 @@ void maybe_select_new_weapon(int index)
 {
 	int weapon_class;
 
+	anim_timer_start = timer_get_milliseconds();
+
 	// if a weapon is being carried, do nothing
 	if ( wl_icon_being_carried() ) {
 		return;
@@ -1256,6 +1234,8 @@ void maybe_select_new_weapon(int index)
 void maybe_select_new_ship_weapon(int index)
 {
 	int *wep, *wep_count;
+	
+	anim_timer_start = timer_get_milliseconds();
 
 	if ( Selected_wl_slot == -1 )
 		return;
@@ -1349,7 +1329,6 @@ void wl_load_icons(int weapon_class)
 // load all the icons for weapons in the pool
 void wl_load_all_icons()
 {
-	#ifndef DEMO // not for FS2_DEMO
 
 	int i, j;
 
@@ -1368,8 +1347,6 @@ void wl_load_all_icons()
 			wl_load_icons(i);
 		}
 	}
-
-	#endif
 }
 
 //	wl_unload_icons() frees the bitmaps used for weapon icons 
@@ -1532,73 +1509,9 @@ void wl_maybe_reset_selected_weapon_class()
 	}
 }
 
-// start an overhead animation, since selected slot has changed
-void wl_start_slot_animation(int n)
-{
-	#ifndef DEMO // not for FS2_DEMO
-
-	// don't use ani's
-	// fallback code in wl_render_overhead_view() will 
-	// use the .pcx files
-	// should prolly scrub out the 1e06 lines of dead code this leaves
-	return;
-
-/*
-
-	int						ship_class;
-	wl_ship_class_info	*wl_ship;
-	anim_play_struct		aps;
-
-	if ( n < 0 ) {
-		return;
-	}
-
-	ship_class = Wss_slots[n].ship_class;
-	
-	if ( ship_class < 0 ) {
-		Int3();
-		return;
-	}
-
-	wl_ship = &Wl_ships[ship_class];
-
-	// maybe this animation is already playing?
-	if ( wl_ship->anim_instance ) {
-		anim_stop_playing(wl_ship->anim_instance);
-		wl_ship->anim_instance = NULL;
-	}
-	
-	// maybe we have to load this animation
-	if ( wl_ship->anim == NULL ) {
-		wl_ship->anim = anim_load(Ship_info[ship_class].overhead_filename, CF_TYPE_ANY, 1);
-		if ( wl_ship->anim == NULL ) {
-			Int3();		// couldn't load anim filename.. get Alan
-			return;
-		}
-	}
-
-	anim_play_init(&aps, wl_ship->anim, Wl_overhead_coords[gr_screen.res][0], Wl_overhead_coords[gr_screen.res][1]);
-	aps.screen_id = ON_WEAPON_SELECT;
-	aps.framerate_independent = 1;
-	aps.skip_frames = 0;
-	wl_ship->anim_instance = anim_play(&aps);
-*/
-	#endif
-}
-
 // Call when Selected_wl_slot needs to be changed
 void wl_set_selected_slot(int slot_num)
 {
-	if ( (slot_num >= 0) && (slot_num != Selected_wl_slot) ) {
-		// slot has changed.... start an animation
-		wl_start_slot_animation(slot_num);
-/*
-		if ( Current_screen == ON_WEAPON_SELECT ) {
-			gamesnd_play_iface(SND_OVERHEAD_SHIP_ANIM);
-		}
-*/
-  }
-
 	Selected_wl_slot = slot_num;
 	if ( Selected_wl_slot >= 0 ) {
 		Assert( Wss_slots != NULL );
@@ -2061,7 +1974,6 @@ void weapon_select_init()
 
 	if ( Weapon_select_open ) {
 		wl_maybe_reset_selected_weapon_class();
-		wl_start_slot_animation(Selected_wl_slot);
 		common_buttons_maybe_reload(&Weapon_ui_window);	// AL 11-21-97: this is necessary since we may returning from the hotkey
 																		// screen, which can release common button bitmaps.
 		common_reset_buttons();
@@ -2782,16 +2694,19 @@ void weapon_select_do(float frametime)
 	if(Wl_icons[Selected_wl_class].model_index != -1) {
 		static float WeapSelectScreenWeapRot = 0.0f;
 		wl_icon_info *sel_icon					= &Wl_icons[Selected_wl_class];
+		weapon_info *wip = &Weapon_info[Selected_wl_class];
 		draw_model_rotating(sel_icon->model_index,
 			weapon_ani_coords[0],
 			weapon_ani_coords[1],
 			gr_screen.res == 0 ? 202 : 332,
-			gr_screen.res == 0 ? 185 : 304,
+			gr_screen.res == 0 ? 185 : 260,
 			&WeapSelectScreenWeapRot,
 			NULL,
 			.65f,
 			REVOLUTION_RATE,
-			MR_IS_MISSILE | MR_LOCK_DETAIL | MR_AUTOCENTER | MR_NO_FOGGING);
+			MR_IS_MISSILE | MR_LOCK_DETAIL | MR_AUTOCENTER | MR_NO_FOGGING,
+			true,
+			wip->selection_effect);
 	}
 
 	else if ( Weapon_anim_class != -1 && ( Selected_wl_class == Weapon_anim_class )) {
@@ -2902,13 +2817,13 @@ void weapon_select_do(float frametime)
 				if (Lcl_gr)
 				{
 					char display_name[NAME_LENGTH];
-					strncpy(display_name, (Weapon_info[Carried_wl_icon.weapon_class].alt_name[0]) ? Weapon_info[Carried_wl_icon.weapon_class].alt_name : Weapon_info[Carried_wl_icon.weapon_class].name, NAME_LENGTH);
+					strncpy(display_name, (Weapon_info[Carried_wl_icon.weapon_class].alt_name[0] != '\0' ) ? Weapon_info[Carried_wl_icon.weapon_class].alt_name : Weapon_info[Carried_wl_icon.weapon_class].name, NAME_LENGTH);
 					lcl_translate_wep_name(display_name);
-					popup(PF_USE_AFFIRMATIVE_ICON, 1, POPUP_OK, XSTR("A %s is unable to carry %s weaponry", 633), (Ship_info[ship_class].name[0]) ? Ship_info[ship_class].alt_name : Ship_info[ship_class].name, display_name);
+					popup(PF_USE_AFFIRMATIVE_ICON, 1, POPUP_OK, XSTR("A %s is unable to carry %s weaponry", 633), (Ship_info[ship_class].alt_name[0] != '\0') ? Ship_info[ship_class].alt_name : Ship_info[ship_class].name, display_name);
 				}
 				else
 				{
-					popup(PF_USE_AFFIRMATIVE_ICON, 1, POPUP_OK, XSTR("A %s is unable to carry %s weaponry", 633), (Ship_info[ship_class].name[0]) ? Ship_info[ship_class].alt_name : Ship_info[ship_class].name, Weapon_info[Carried_wl_icon.weapon_class].name);
+					popup(PF_USE_AFFIRMATIVE_ICON, 1, POPUP_OK, XSTR("A %s is unable to carry %s weaponry", 633), (Ship_info[ship_class].alt_name[0] != '\0') ? Ship_info[ship_class].alt_name : Ship_info[ship_class].name, Weapon_info[Carried_wl_icon.weapon_class].name);
 				}
 
 				//wl_unpause_anim();
@@ -3178,9 +3093,7 @@ void wl_draw_ship_weapons(int index)
 
 		if ( (wep[i] != -1) && (wep_count[i] > 0) )
 		{
-			int x_offset = wl_fury_missile_offset_hack(wep[i], wep_count[i]);
-			x_offset = 0;
-			wl_render_icon( wep[i], Wl_bank_coords[gr_screen.res][i][0]+x_offset, Wl_bank_coords[gr_screen.res][i][1], wep_count[i], Wl_bank_count_draw_flags[i], -1, i, wep[i]);
+			wl_render_icon( wep[i], Wl_bank_coords[gr_screen.res][i][0], Wl_bank_coords[gr_screen.res][i][1], wep_count[i], Wl_bank_count_draw_flags[i], -1, i, wep[i]);
 		}
 	}
 }
@@ -3316,8 +3229,7 @@ void pick_from_ship_slot(int num)
 			
 	mouse_get_pos_unscaled( &mx, &my );
 
-	int x_offset = wl_fury_missile_offset_hack(wep[num], wep_count[num]);
-	Wl_delta_x = Wl_bank_coords[gr_screen.res][num][0] - mx + x_offset;
+	Wl_delta_x = Wl_bank_coords[gr_screen.res][num][0] - mx;
 	Wl_delta_y = Wl_bank_coords[gr_screen.res][num][1] - my;
 
 	Carried_wl_icon.from_x = mx;
@@ -3457,6 +3369,8 @@ void start_weapon_animation(int weapon_class)
 
 	icon = &Wl_icons[weapon_class];
 
+	gamesnd_play_iface(SND_WEAPON_ANIM_START);
+
 	//load a new animation if it's different to what's already playing
 	if(strcmp(Cur_Anim.filename, Weapon_info[weapon_class].anim_filename) != 0) {
 		//unload the previous anim
@@ -3465,7 +3379,6 @@ void start_weapon_animation(int weapon_class)
 		p = strchr( Weapon_info[weapon_class].anim_filename, '.' );
 		if(p)
 			*p = '\0';
-		gamesnd_play_iface(SND_WEAPON_ANIM_START);
 		if (gr_screen.res == GR_1024) {
 			strcpy_s(animation_filename, "2_");
 			strcat_s(animation_filename, Weapon_info[weapon_class].anim_filename);

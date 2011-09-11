@@ -284,9 +284,6 @@ int sexp_tree::save_branch(int cur, int at_root)
 			} else {
 				node = alloc_sexp(tree_nodes[cur].text, SEXP_ATOM, SEXP_ATOM_STRING, -1, -1);
 			}
-		} else if (tree_nodes[cur].type & SEXPT_STRING) {
-			Assert( !(tree_nodes[cur].type & SEXPT_VARIABLE) );
-			Int3();
 		} else {
 			Assert(0); // unknown and/or invalid type
 		}
@@ -824,6 +821,10 @@ void sexp_tree::right_clicked(int mode)
 									// enable navsystem always
 									if (op_type == OPF_NAV_POINT)
 										flag &= ~MF_GRAYED;
+
+									if (!( (idx + 3) % 30)) {
+										flag |= MF_MENUBARBREAK;
+									}
 
 									char buf[128];
 									// append list of variable names and values
@@ -2253,7 +2254,9 @@ int sexp_tree::add_default_operator(int op, int argnum)
 				(argnum == 5 && Operators[op].value == OP_ADD_SUN_BITMAP) ||
 				(argnum == 2 && Operators[op].value == OP_STRING_CONCATENATE) ||
 				(argnum == 0 && Operators[op].value == OP_DIRECTIVE_IS_VARIABLE) ||
-				(argnum == 1 && Operators[op].value == OP_INT_TO_STRING))
+				(argnum == 1 && Operators[op].value == OP_INT_TO_STRING) ||
+				(argnum == 3 && Operators[op].value == OP_STRING_GET_SUBSTRING) ||
+				(argnum == 4 && Operators[op].value == OP_STRING_SET_SUBSTRING))
 			{
 
 				int sexp_var_index = get_index_sexp_variable_name(item.text);
@@ -2702,6 +2705,7 @@ int sexp_tree::query_default_argument_available(int op, int i)
 		case OPF_WEAPON_BANK_NUMBER:
 		case OPF_MESSAGE_OR_STRING:
 		case OPF_HUD_GAUGE:
+		case OPF_SHIP_EFFECT:
 			return 1;
 
 		case OPF_SHIP:
@@ -2746,9 +2750,7 @@ int sexp_tree::query_default_argument_available(int op, int i)
 
 		case OPF_POINT:
 		case OPF_WAYPOINT_PATH:
-			if (Num_waypoint_lists)
-				return 1;
-			return 0;
+			return Waypoint_lists.empty() ? 0 : 1;
 
 		case OPF_MISSION_NAME:
 			if (m_mode != MODE_CAMPAIGN) {
@@ -3261,7 +3263,6 @@ void sexp_tree::verify_and_fix_arguments(int node)
 		return;
 
 	tmp = item_index;
-	item_index = node;
 
 	arg_num = 0;
 	item_index = tree_nodes[node].child;
@@ -3294,7 +3295,9 @@ void sexp_tree::verify_and_fix_arguments(int node)
 						(arg_num == 5 && Operators[op].value == OP_ADD_SUN_BITMAP) ||
 						(arg_num == 2 && Operators[op].value == OP_STRING_CONCATENATE) ||
 						(arg_num == 0 && Operators[op].value == OP_DIRECTIVE_IS_VARIABLE) ||
-						(arg_num == 1 && Operators[op].value == OP_INT_TO_STRING))
+						(arg_num == 1 && Operators[op].value == OP_INT_TO_STRING) ||
+						(arg_num == 3 && Operators[op].value == OP_STRING_GET_SUBSTRING) ||
+						(arg_num == 4 && Operators[op].value == OP_STRING_SET_SUBSTRING))
 					{
 						// make text_ptr to start - before '('
 						get_variable_name_from_sexp_tree_node_text(tree_nodes[item_index].text, default_variable_text);
@@ -4440,6 +4443,10 @@ sexp_list_item *sexp_tree::get_listing_opf(int opf, int parent_node, int arg_ind
 			list = get_listing_hud_gauge();
 			break;
 
+		case OPF_SHIP_EFFECT:
+			list = get_listing_ship_effects();
+			break;
+
 		default:
 			Int3();  // unknown OPF code
 			list = NULL;
@@ -4804,6 +4811,8 @@ sexp_list_item *sexp_tree::get_listing_opf_subsystem(int parent_node, int arg_in
 			// if this is arg index 3 (targeted ship)
 			if(arg_index == 3)
 			{
+				special_subsys = OPS_STRENGTH;
+
 				child = tree_nodes[child].next;
 				Assert(child >= 0);			
 				child = tree_nodes[child].next;			
@@ -4812,6 +4821,10 @@ sexp_list_item *sexp_tree::get_listing_opf_subsystem(int parent_node, int arg_in
 			{
 				Assert(arg_index == 1);
 			}
+			break;
+
+		case OP_BEAM_FIRE_COORDS:
+			special_subsys = OPS_BEAM_TURRET;
 			break;
 
 		// these sexps check the subsystem of the *second entry* on the list, not the first
@@ -4854,7 +4867,7 @@ sexp_list_item *sexp_tree::get_listing_opf_subsystem(int parent_node, int arg_in
 			Assert(child >= 0);
 			child = tree_nodes[child].next;
 			break;
-	}			
+	}
 
 	// now find the ship and add all relevant subsystems
 	Assert(child >= 0);
@@ -4964,14 +4977,18 @@ sexp_list_item *sexp_tree::get_listing_opf_subsystem_type(int parent_node)
 sexp_list_item *sexp_tree::get_listing_opf_point()
 {
 	char buf[NAME_LENGTH+8];
-	int i, j;
+	SCP_list<waypoint_list>::iterator ii;
+	int j;
 	sexp_list_item head;
 
-	for (i=0; i<Num_waypoint_lists; i++)
-		for (j=0; j<Waypoint_lists[i].count; j++) {
-			sprintf(buf, "%s:%d", Waypoint_lists[i].name, j + 1);
+	for (ii = Waypoint_lists.begin(); ii != Waypoint_lists.end(); ++ii)
+	{
+		for (j = 0; (uint) j < ii->get_waypoints().size(); ++j)
+		{
+			sprintf(buf, "%s:%d", ii->get_name(), j + 1);
 			head.add_data_dup(buf);
 		}
+	}
 
 	return head.next;
 }
@@ -5326,6 +5343,17 @@ sexp_list_item *sexp_tree::get_listing_hud_gauge()
 	return head.next;
 }
 
+sexp_list_item *sexp_tree::get_listing_ship_effects() 
+{
+	sexp_list_item head;
+	
+	for (SCP_vector<ship_effect>::iterator sei = Ship_effects.begin(); sei != Ship_effects.end(); ++sei) {
+		head.add_data_dup(sei->name);
+	}
+
+	return head.next;
+}
+
 sexp_list_item *sexp_tree::get_listing_opf_explosion_option()
 {
 	sexp_list_item head;
@@ -5338,11 +5366,11 @@ sexp_list_item *sexp_tree::get_listing_opf_explosion_option()
 
 sexp_list_item *sexp_tree::get_listing_opf_waypoint_path()
 {
-	int i;
+	SCP_list<waypoint_list>::iterator ii;
 	sexp_list_item head;
 
-	for (i=0; i<Num_waypoint_lists; i++)
-		head.add_data(Waypoint_lists[i].name);
+	for (ii = Waypoint_lists.begin(); ii != Waypoint_lists.end(); ++ii)
+		head.add_data(ii->get_name());
 
 	return head.next;
 }

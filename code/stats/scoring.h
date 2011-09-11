@@ -89,7 +89,7 @@ typedef struct scoring_struct {
 
 	unsigned int p_bonehead_hits;		// alltime primary friendly hits
 	unsigned int s_bonehead_hits;		// alltime secondary friendly hits
-   int          bonehead_kills;		// alltime friendly kills
+    int          bonehead_kills;		// alltime friendly kills
 
 	unsigned int missions_flown;		// total # of missions flown
 	unsigned int flight_time;			// total # of flight hours the player has
@@ -109,7 +109,7 @@ typedef struct scoring_struct {
 	int m_kill_count;						// total kills for this mission
 	int m_kill_count_ok;             // total (non-friendly) kills for this mission
 	int m_assists;							// player assits for the mission
-   unsigned int mp_shots_fired;		// primary shots fired for the mission
+    unsigned int mp_shots_fired;		// primary shots fired for the mission
 	unsigned int ms_shots_fired;		// secondary shots fired for the mission
 	unsigned int mp_shots_hit;			// primary shots hit for the mission
 	unsigned int ms_shots_hit;			// secondary shots hit for the mission
@@ -138,7 +138,9 @@ void scoring_do_accept( scoring_struct *score );
 void scoring_check_medal(scoring_struct *sc);
 
 void scoring_add_damage(object *ship_obj,object *other_obj,float damage);
+void scoring_add_damage_to_weapon(object *weapon_obj,object *other_obj,float damage);
 int scoring_eval_kill(object *ship_obj);
+int scoring_eval_kill_on_weapon(object *weapon_obj, object *other_obj);
 void scoring_eval_assists(ship *sp,int killer_sig, bool enemy_player = false);
 
 // bash the passed player to the specified rank

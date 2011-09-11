@@ -36,7 +36,6 @@
 #include "jumpnode/jumpnode.h"
 #include "weapon/beam.h"
 #include "weapon/swarm.h"
-#include "demo/demo.h"
 #include "radar/radarsetup.h"
 #include "object/objectdock.h"
 #include "mission/missionparse.h" //For 2D Mode
@@ -305,6 +304,7 @@ void obj_init()
 	for (i=0; i<MAX_OBJECTS; i++)	{
 		objp->type = OBJ_NONE;
 		objp->signature = i + 100;
+		objp->collision_group_id = 0;
 
 		// zero all object sounds
 		for(idx=0; idx<MAX_OBJECT_SOUNDS; idx++){
@@ -465,6 +465,8 @@ int obj_create(ubyte type,int parent_obj,int instance, matrix * orient,
 	}
 	obj->num_pairs = 0;
 	obj->net_signature = 0;			// be sure to reset this value so new objects don't take on old signatures.	
+
+	obj->collision_group_id = 0;
 
 	//WMC
 	/*
@@ -1258,11 +1260,17 @@ void obj_move_all_post(object *objp, float frametime)
 						p = 1.0f - p;
 
 					p *= 2.0f;
-
-					// P goes from 0 to 1 to 0 over the life of the explosion
 					float rad = p * (1.0f + frand() * 0.05f) * objp->radius;
-
-					light_add_point( &objp->pos, rad * 2.0f, rad * 5.0f, 1.0f, r, g, b, -1 );
+					
+					float intensity = 1.0f;
+					if(fireball_is_warp(objp))
+					{
+						intensity = fireball_wormhole_intensity(objp); // Valathil: Get wormhole radius for lighting
+						rad = objp->radius;
+					}
+					// P goes from 0 to 1 to 0 over the life of the explosion
+					
+					light_add_point( &objp->pos, rad * 2.0f, rad * 5.0f, intensity, r, g, b, -1 );
 				}
 			}
 
@@ -1380,11 +1388,6 @@ void obj_move_all(float frametime)
 			continue;
 		}
 
-		// if we're playing a demo back, only sim stuff that we're supposed to
-		if ((Game_mode & GM_DEMO_PLAYBACK) && !demo_should_sim(objp)) {
-			continue;
-		}
-
 		vec3d cur_pos = objp->pos;			// Save the current position
 
 #ifdef OBJECT_CHECK 
@@ -1432,19 +1435,17 @@ void obj_move_all(float frametime)
 	}
 
 	//	After all objects have been moved, move all docked objects.
-	if (!(Game_mode & GM_DEMO_PLAYBACK)) {
-		for (objp = GET_FIRST(&obj_used_list); objp != END_OF_LIST(&obj_used_list); objp = GET_NEXT(objp)) {
-			dock_move_docked_objects(objp);
+	objp = GET_FIRST(&obj_used_list);
+	while( objp !=END_OF_LIST(&obj_used_list) )	{
+		dock_move_docked_objects(objp);
 
-			// unflag all objects as being updates
-			objp->flags &= ~OF_JUST_UPDATED;
-		}
+		// unflag all objects as being updates
+		objp->flags &= ~OF_JUST_UPDATED;
+
+		objp = GET_NEXT(objp);
 	}
 
-	// If any cmeasures fired, maybe steer away homing missiles
-	if (!(Game_mode & GM_DEMO_PLAYBACK)) {
-		find_homing_object_cmeasures();
-	}
+	find_homing_object_cmeasures();	//	If any cmeasures fired, maybe steer away homing missiles	
 
 	// do pre-collision stuff for beam weapons
 	beam_move_all_pre();
@@ -1453,9 +1454,7 @@ void obj_move_all(float frametime)
 		obj_check_all_collisions();		
 	}
 
-	if (!(Game_mode & GM_DEMO_PLAYBACK)) {
-		turret_swarm_check_validity();
-	}
+	turret_swarm_check_validity();
 
 	// do post-collision stuff for beam weapons
 	beam_move_all_post();

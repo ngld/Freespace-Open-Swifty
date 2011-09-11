@@ -19,6 +19,11 @@ geometry_batcher::~geometry_batcher()
 		vm_free(vert);
 		vert = NULL;
 	}
+
+	if (radius_list != NULL) {
+		vm_free(radius_list);
+		radius_list = NULL;
+	}
 }
 
 void geometry_batcher::allocate_internal(int n_verts)
@@ -32,15 +37,25 @@ void geometry_batcher::allocate_internal(int n_verts)
 			vert = NULL;
 		}
 
+		if (radius_list != NULL) {
+			vm_free(radius_list);
+			radius_list = NULL;
+		}
+
 		vert = (vertex *) vm_malloc( sizeof(vertex) * n_verts );
+		radius_list = (float *) vm_malloc( sizeof(float) * n_verts );
 
 		Verify( (vert != NULL) );
+		Verify( (radius_list != NULL) );
 
 		memset( vert, 0, sizeof(vertex) * n_verts );
+		memset( radius_list, 0, sizeof(float) * n_verts );
+
 		n_allocated = n_verts;
 	}
 
 	n_to_render = 0;
+	use_radius = true;
 }
 
 void geometry_batcher::allocate(int quad, int n_tri)
@@ -75,17 +90,26 @@ void geometry_batcher::add_allocate(int quad, int n_tri)
 	}
 
 	vertex *old_vert = vert;
+	float *old_radius_list = radius_list;
 
 	if (to_alloc > n_allocated) {
 		vert = (vertex *) vm_malloc( sizeof(vertex) * to_alloc );
+		radius_list = (float *) vm_malloc( sizeof(float) * to_alloc );
 
 		Verify( (vert != NULL) );
+		Verify( (radius_list != NULL) );
 
 		memset( vert, 0, sizeof(vertex) * to_alloc );
+		memset( radius_list, 0, sizeof(float) * to_alloc );
 
 		if (old_vert != NULL) {
 			memcpy( vert, old_vert, sizeof(vertex) * n_to_render * 3 );
 			vm_free(old_vert);
+		}
+
+		if (old_radius_list != NULL) {
+			memcpy( radius_list, old_radius_list, sizeof(float) * n_to_render * 3 );
+			vm_free(old_radius_list);
 		}
 
 		n_allocated = to_alloc;
@@ -96,13 +120,17 @@ void geometry_batcher::clone(const geometry_batcher &geo)
 {
 	n_to_render = geo.n_to_render;
 	n_allocated = geo.n_allocated;
+	use_radius = geo.use_radius;
 
 	if (n_allocated > 0) {
 		vert = (vertex *) vm_malloc( sizeof(vertex) * n_allocated );
+		radius_list = (float *) vm_malloc( sizeof(float) * n_allocated );
 
 		memcpy( vert, geo.vert, sizeof(vertex) * n_allocated );
+		memcpy( radius_list, geo.radius_list, sizeof(float) * n_allocated);
 	} else {
 		vert = NULL;
+		radius_list = NULL;
 	}
 }
 
@@ -123,14 +151,14 @@ const geometry_batcher &geometry_batcher::operator=(const geometry_batcher &geo)
 */
 void geometry_batcher::draw_bitmap(vertex *pnt, int orient, float rad, float depth)
 {
+	float radius = rad;
 	rad *= 1.41421356f;//1/0.707, becase these are the points of a square or width and height rad
 
-	vec3d PNT, p[4];
+	vec3d PNT(pnt->world);
+	vec3d p[4];
 	vec3d fvec, rvec, uvec;
 	vertex *P = &vert[n_to_render * 3];
-
-	vm_vert2vec(pnt, &PNT);
-
+	float *R = &radius_list[n_to_render * 3];
 
 	// get the direction from the point to the eye
 	vm_vec_sub(&fvec, &View_position, &PNT);
@@ -140,11 +168,11 @@ void geometry_batcher::draw_bitmap(vertex *pnt, int orient, float rad, float dep
 	uvec = View_matrix.vec.uvec;
 
 	// make a right vector from the f and up vector, this r vec is exactly what we want, so...
-	vm_vec_crossprod(&rvec, &fvec, &uvec);
+	vm_vec_crossprod(&rvec, &View_matrix.vec.fvec, &uvec);
 	vm_vec_normalize_safe(&rvec);
 
 	// fix the u vec with it
-	vm_vec_crossprod(&uvec, &fvec, &rvec);
+	vm_vec_crossprod(&uvec, &View_matrix.vec.fvec, &rvec);
 
 	// move the center of the sprite based on the depth parameter
 	if ( depth != 0.0f )
@@ -177,42 +205,42 @@ void geometry_batcher::draw_bitmap(vertex *pnt, int orient, float rad, float dep
 	// set up the UV coords
 	if ( orient & 1 ) {
 		// tri 1
-		P[5].u = 1.0f;
-		P[4].u = 0.0f;
-		P[3].u = 0.0f;
+		P[5].texture_position.u = 1.0f;
+		P[4].texture_position.u = 0.0f;
+		P[3].texture_position.u = 0.0f;
 		// tri 2
-		P[2].u = 1.0f;
-		P[1].u = 0.0f;
-		P[0].u = 1.0f;
+		P[2].texture_position.u = 1.0f;
+		P[1].texture_position.u = 0.0f;
+		P[0].texture_position.u = 1.0f;
 	} else {
 		// tri 1
-		P[5].u = 0.0f;
-		P[4].u = 1.0f;
-		P[3].u = 1.0f;
+		P[5].texture_position.u = 0.0f;
+		P[4].texture_position.u = 1.0f;
+		P[3].texture_position.u = 1.0f;
 		// tri 2
-		P[2].u = 0.0f;
-		P[1].u = 1.0f;
-		P[0].u = 0.0f;
+		P[2].texture_position.u = 0.0f;
+		P[1].texture_position.u = 1.0f;
+		P[0].texture_position.u = 0.0f;
 	}
 
 	if ( orient & 2 ) {
 		// tri 1
-		P[5].v = 1.0f;
-		P[4].v = 1.0f;
-		P[3].v = 0.0f;
+		P[5].texture_position.v = 1.0f;
+		P[4].texture_position.v = 1.0f;
+		P[3].texture_position.v = 0.0f;
 		// tri 2
-		P[2].v = 1.0f;
-		P[1].v = 0.0f;
-		P[0].v = 0.0f;
+		P[2].texture_position.v = 1.0f;
+		P[1].texture_position.v = 0.0f;
+		P[0].texture_position.v = 0.0f;
 	} else {
 		// tri 1
-		P[5].v = 0.0f;
-		P[4].v = 0.0f;
-		P[3].v = 1.0f;
+		P[5].texture_position.v = 0.0f;
+		P[4].texture_position.v = 0.0f;
+		P[3].texture_position.v = 1.0f;
 		// tri 2
-		P[2].v = 0.0f;
-		P[1].v = 1.0f;
-		P[0].v = 1.0f;
+		P[2].texture_position.v = 0.0f;
+		P[1].texture_position.v = 1.0f;
+		P[0].texture_position.v = 1.0f;
 	}
 
 	for (int i = 0; i < 6 ; i++) {
@@ -220,38 +248,41 @@ void geometry_batcher::draw_bitmap(vertex *pnt, int orient, float rad, float dep
 		P[i].g = pnt->g;
 		P[i].b = pnt->b;
 		P[i].a = pnt->a;
+
+		R[i] = radius;
 	}
 
 	n_to_render += 2;
 }
 
-void geometry_batcher::draw_bitmap(vertex *pnt, int orient, float rad, float angle, float depth)
+void geometry_batcher::draw_bitmap(vertex *pnt, float rad, float angle, float depth)
 {
+	float radius = rad;
 	rad *= 1.41421356f;//1/0.707, becase these are the points of a square or width and height rad
 
 	extern float Physics_viewer_bank;
-	angle += Physics_viewer_bank;
+	angle -= Physics_viewer_bank;
 
 	if ( angle < 0.0f )
 		angle += PI2;
 	else if ( angle > PI2 )
 		angle -= PI2;
 
-	vec3d PNT, p[4];
+	vec3d PNT(pnt->world);
+	vec3d p[4];
 	vec3d fvec, rvec, uvec;
 	vertex *P = &vert[n_to_render * 3];
-
-	vm_vert2vec(pnt, &PNT);
+	float *R = &radius_list[n_to_render * 3];
 
 	vm_vec_sub(&fvec, &View_position, &PNT);
 	vm_vec_normalize_safe(&fvec);
 
-	vm_rot_point_around_line(&uvec, &View_matrix.vec.uvec, angle, &vmd_zero_vector, &fvec);
+	vm_rot_point_around_line(&uvec, &View_matrix.vec.uvec, angle, &vmd_zero_vector, &View_matrix.vec.fvec);
 //	uvec = View_matrix.vec.uvec;
 
-	vm_vec_crossprod(&rvec, &fvec, &uvec);
+	vm_vec_crossprod(&rvec, &View_matrix.vec.fvec, &uvec);
 	vm_vec_normalize_safe(&rvec);
-	vm_vec_crossprod(&uvec, &fvec, &rvec);
+	vm_vec_crossprod(&uvec, &View_matrix.vec.fvec, &rvec);
 
 	vm_vec_scale_add(&PNT, &PNT, &fvec, depth);
 	vm_vec_scale_add(&p[0], &PNT, &rvec, rad);
@@ -275,6 +306,7 @@ void geometry_batcher::draw_bitmap(vertex *pnt, int orient, float rad, float ang
 	g3_transfer_vertex(&P[0], &p[0]);
 
 	// set up the UV coords
+	/*
 	if ( orient & 1 ) {
 		// tri 1
 		P[5].u = 1.0f;
@@ -314,22 +346,25 @@ void geometry_batcher::draw_bitmap(vertex *pnt, int orient, float rad, float ang
 		P[1].v = 1.0f;
 		P[0].v = 1.0f;
 	}
+	*/
 
-/*	//tri 1
-	P[5].u = 0.0f;	P[5].v = 0.0f;
-	P[4].u = 1.0f;	P[4].v = 0.0f;
-	P[3].u = 1.0f;	P[3].v = 1.0f;
+	//tri 1
+	P[5].texture_position.u = 0.0f;	P[5].texture_position.v = 0.0f;
+	P[4].texture_position.u = 1.0f;	P[4].texture_position.v = 0.0f;
+	P[3].texture_position.u = 1.0f;	P[3].texture_position.v = 1.0f;
 
 	//tri 2
-	P[2].u = 0.0f;	P[2].v = 0.0f;
-	P[1].u = 1.0f;	P[1].v = 1.0f;
-	P[0].u = 0.0f;	P[0].v = 1.0f;*/
+	P[2].texture_position.u = 0.0f;	P[2].texture_position.v = 0.0f;
+	P[1].texture_position.u = 1.0f;	P[1].texture_position.v = 1.0f;
+	P[0].texture_position.u = 0.0f;	P[0].texture_position.v = 1.0f;
 
 	for (int i = 0; i < 6 ; i++) {
 		P[i].r = pnt->r;
 		P[i].g = pnt->g;
 		P[i].b = pnt->b;
 		P[i].a = pnt->a;
+
+		R[i] = radius;
 	}
 
 	n_to_render += 2;
@@ -343,6 +378,7 @@ void geometry_batcher::draw_tri(vertex* verts)
 		P[i] = verts[i];
 
 	n_to_render += 1;
+	use_radius = false;
 }
 
 void geometry_batcher::draw_quad(vertex* verts)
@@ -358,6 +394,7 @@ void geometry_batcher::draw_quad(vertex* verts)
 	P[3] = verts[3];
 
 	n_to_render += 2;
+	use_radius = false;
 }
 
 
@@ -365,6 +402,7 @@ void geometry_batcher::draw_beam(vec3d *start, vec3d *end, float width, float in
 {
 	vec3d p[4];
 	vertex *P = &vert[n_to_render * 3];
+	float *R = &radius_list[n_to_render * 3];
 
 	vec3d fvec, uvecs, uvece, evec;
 
@@ -403,22 +441,24 @@ void geometry_batcher::draw_beam(vec3d *start, vec3d *end, float width, float in
 
 	//set up the UV coords
 	//tri 1
-	P[0].u = 0.0f;	P[0].v = 0.0f;
-	P[1].u = 1.0f;	P[1].v = 0.0f;
-	P[2].u = 1.0f;	P[2].v = 1.0f;
+	P[0].texture_position.u = 0.0f;	P[0].texture_position.v = 0.0f;
+	P[1].texture_position.u = 1.0f;	P[1].texture_position.v = 0.0f;
+	P[2].texture_position.u = 1.0f;	P[2].texture_position.v = 1.0f;
 
 	//tri 2
-	P[3].u = 0.0f;	P[3].v = 0.0f;
-	P[4].u = 1.0f;	P[4].v = 1.0f;
-	P[5].u = 0.0f;	P[5].v = 1.0f;
+	P[3].texture_position.u = 0.0f;	P[3].texture_position.v = 0.0f;
+	P[4].texture_position.u = 1.0f;	P[4].texture_position.v = 1.0f;
+	P[5].texture_position.u = 0.0f;	P[5].texture_position.v = 1.0f;
 
 	ubyte _color = (ubyte)(255.0f * intensity);
 
 	for(int i = 0; i < 6; i++){
 		P[i].r = P[i].g = P[i].b = P[i].a = _color;
+		R[i] = width;
 	}
 
 	n_to_render += 2;
+	use_radius = true;
 }
 
 float geometry_batcher::draw_laser(vec3d *p0, float width1, vec3d *p1, float width2, int r, int g, int b)
@@ -469,19 +509,19 @@ float geometry_batcher::draw_laser(vec3d *p0, float width1, vec3d *p1, float wid
 	g3_transfer_vertex( &pts[4], &vecs[2] );
 	g3_transfer_vertex( &pts[5], &vecs[3] );
 
-	pts[0].u = 1.0f;
-	pts[0].v = 0.0f;
-	pts[1].u = 0.0f;
-	pts[1].v = 0.0f;
-	pts[2].u = 0.0f;
-	pts[2].v = 1.0f;
+	pts[0].texture_position.u = 1.0f;
+	pts[0].texture_position.v = 0.0f;
+	pts[1].texture_position.u = 0.0f;
+	pts[1].texture_position.v = 0.0f;
+	pts[2].texture_position.u = 0.0f;
+	pts[2].texture_position.v = 1.0f;
 
-	pts[3].u = 1.0f;
-	pts[3].v = 0.0f;
-	pts[4].u = 0.0f;
-	pts[4].v = 1.0f;
-	pts[5].u = 1.0f;
-	pts[5].v = 1.0f;
+	pts[3].texture_position.u = 1.0f;
+	pts[3].texture_position.v = 0.0f;
+	pts[4].texture_position.u = 0.0f;
+	pts[4].texture_position.v = 1.0f;
+	pts[5].texture_position.u = 1.0f;
+	pts[5].texture_position.v = 1.0f;
 
 	pts[0].r = (ubyte)r;
 	pts[0].g = (ubyte)g;
@@ -510,14 +550,21 @@ float geometry_batcher::draw_laser(vec3d *p0, float width1, vec3d *p1, float wid
 
 
 	n_to_render += 2;
+	use_radius = false;
 
 	return center.xyz.z;
 }
 
-void geometry_batcher::render(int flags)
+void geometry_batcher::render(int flags, float radius)
 {
 	if (n_to_render) {
-		gr_render(n_to_render * 3, vert, flags | TMAP_FLAG_TRILIST);
+		if ( (((flags & TMAP_FLAG_SOFT_QUAD) && Cmdline_softparticles)) || (flags & TMAP_FLAG_DISTORTION) || (flags & TMAP_FLAG_DISTORTION_THRUSTER) && use_radius ) {
+			gr_render_effect(n_to_render * 3, vert, radius_list, flags | TMAP_FLAG_TRILIST);
+		} else {
+			gr_render(n_to_render * 3, vert, flags | TMAP_FLAG_TRILIST);
+		}
+
+		use_radius = true;
 		n_to_render = 0;
 	}
 }
@@ -539,6 +586,7 @@ struct batch_item {
 };
 
 static SCP_vector<batch_item> geometry_map;
+static SCP_vector<batch_item> distortion_map;
 
 static int find_good_batch_item(int texture)
 {
@@ -557,6 +605,25 @@ static int find_good_batch_item(int texture)
 	geometry_map.push_back(new_item);
 
 	return (int)(geometry_map.size() - 1);
+}
+
+static int find_good_distortion_item(int texture)
+{
+	uint max_size = distortion_map.size();
+
+	for (uint i = 0; i < max_size; i++) {
+		if (distortion_map[i].texture == texture)
+			return (int)i;
+	}
+
+	// don't have an existing match so add a new entry
+	batch_item new_item;
+
+	new_item.texture = texture;
+
+	distortion_map.push_back(new_item);
+
+	return (int)(distortion_map.size() - 1);
 }
 
 float batch_add_laser(int texture, vec3d *p0, float width1, vec3d *p1, float width2, int r, int g, int b)
@@ -599,17 +666,64 @@ int batch_add_bitmap(int texture, int tmap_flags, vertex *pnt, int orient, float
 	item->add_allocate(1);
 
 	item->draw_bitmap(pnt, orient, rad, depth);
+	//void geometry_batcher::draw_bitmap(vertex *pnt, int orient, float rad, float angle, float depth)
+
+	return 0;
+}
+
+int batch_add_bitmap_rotated(int texture, int tmap_flags, vertex *pnt, float angle, float rad, float alpha, float depth)
+{
+	if (texture < 0) {
+		Int3();
+		return 1;
+	}
+
+	geometry_batcher *item = NULL;
+	int index = find_good_batch_item(texture);
+	Assert( index >= 0 );
+
+	Assertion( (geometry_map[index].laser == false), "Particle effect %s used as laser glow or laser bitmap\n", bm_get_filename(texture) );
+
+	geometry_map[index].tmap_flags = tmap_flags;
+	geometry_map[index].alpha = alpha;
+
+	item = &geometry_map[index].batch;
+
+	item->add_allocate(1);
+
+	item->draw_bitmap(pnt, rad, angle, depth);
+
+	return 0;
+}
+
+int batch_add_beam(int texture, int tmap_flags, vec3d *start, vec3d *end, float width, float intensity)
+{
+	if (texture < 0) {
+		Int3();
+		return 1;
+	}
+
+	geometry_batcher *item = NULL;
+	int index = find_good_batch_item(texture);
+	Assert( index >= 0 );
+
+	Assertion( (geometry_map[index].laser == false), "Particle effect %s used as laser glow or laser bitmap\n", bm_get_filename(texture) );
+
+	geometry_map[index].tmap_flags = tmap_flags;
+	geometry_map[index].alpha = intensity;
+
+	item = &geometry_map[index].batch;
+
+	item->add_allocate(1);
+
+	item->draw_beam(start, end, width, intensity);
 
 	return 0;
 }
 
 void batch_render_lasers()
 {
-	uint map_size = geometry_map.size();
-	batch_item *bi;
-
-	for (uint i = 0; i < map_size; i++) {
-		bi = &geometry_map[i];
+	for (SCP_vector<batch_item>::iterator bi = geometry_map.begin(); bi != geometry_map.end(); ++bi) {
 
 		if ( !bi->laser )
 			continue;
@@ -625,11 +739,7 @@ void batch_render_lasers()
 
 void batch_render_bitmaps()
 {
-	uint map_size = geometry_map.size();
-	batch_item *bi;
-
-	for (uint i = 0; i < map_size; i++) {
-		bi = &geometry_map[i];
+	for (SCP_vector<batch_item>::iterator bi = geometry_map.begin(); bi != geometry_map.end(); ++bi) {
 
 		if ( bi->laser )
 			continue;
@@ -639,7 +749,7 @@ void batch_render_bitmaps()
 
 		Assert( bi->texture >= 0 );
 		gr_set_bitmap(bi->texture, GR_ALPHABLEND_FILTER, GR_BITBLT_MODE_NORMAL, bi->alpha);
-		bi->batch.render( bi->tmap_flags );
+		bi->batch.render( bi->tmap_flags);
 	}
 }
 
@@ -652,4 +762,74 @@ void batch_render_all()
 void batch_reset()
 {
 	geometry_map.clear();
+}
+
+int distortion_add_bitmap_rotated(int texture, int tmap_flags, vertex *pnt, float angle, float rad, float alpha, float depth)
+{
+	if (texture < 0) {
+		Int3();
+		return 1;
+	}
+
+	geometry_batcher *item = NULL;
+	int index = find_good_distortion_item(texture);
+	Assert( index >= 0 );
+
+	Assertion( (distortion_map[index].laser == false), "Distortion particle effect %s used as laser glow or laser bitmap\n", bm_get_filename(texture) );
+
+	distortion_map[index].tmap_flags = tmap_flags;
+	distortion_map[index].alpha = alpha;
+
+	item = &distortion_map[index].batch;
+
+	item->add_allocate(1);
+
+	item->draw_bitmap(pnt, rad, angle, depth);
+
+	return 0;
+}
+
+int distortion_add_beam(int texture, int tmap_flags, vec3d *start, vec3d *end, float width, float intensity)
+{
+	if (texture < 0) {
+		Int3();
+		return 1;
+	}
+
+	geometry_batcher *item = NULL;
+	int index = find_good_distortion_item(texture);
+	Assert( index >= 0 );
+
+	Assertion( (distortion_map[index].laser == false), "Distortion particle effect %s used as laser glow or laser bitmap\n", bm_get_filename(texture) );
+
+	distortion_map[index].tmap_flags = tmap_flags;
+	distortion_map[index].alpha = intensity;
+
+	item = &distortion_map[index].batch;
+
+	item->add_allocate(1);
+
+	item->draw_beam(start,end,width,intensity);
+
+	return 0;
+}
+
+void distortion_render_bitmaps()
+{
+	uint map_size = distortion_map.size();
+	batch_item *bi;
+
+	for (uint i = 0; i < map_size; i++) {
+		bi = &distortion_map[i];
+
+		if ( bi->laser )
+			continue;
+
+		if ( !bi->batch.need_to_render() )
+			continue;
+
+		Assert( bi->texture >= 0 );
+		gr_set_bitmap(bi->texture, GR_ALPHABLEND_NONE, GR_BITBLT_MODE_NORMAL, bi->alpha);
+		bi->batch.render( bi->tmap_flags);
+	}
 }

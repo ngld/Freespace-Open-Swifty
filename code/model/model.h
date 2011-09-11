@@ -82,12 +82,12 @@ typedef struct submodel_instance_info {
 } submodel_instance_info;
 
 typedef struct submodel_instance {
-	bool blown_off;
 	angles angs;
 	angles prev_angs;
-	//int num_arcs;
+	vec3d mc_base;
+	matrix mc_orient;
 	bool collision_checked;
-	//submodel_instance_info *sii;
+	bool blown_off;
 } submodel_instance;
 
 typedef struct polymodel_instance {
@@ -224,6 +224,10 @@ typedef struct model_subsystem {					/* contains rotation rate info */
 	float	favor_current_facing;
 
 	float	turret_rof_scaler;
+
+	//Per-turret ownage settings - SUSHI
+	int turret_max_bomb_ownage; 
+	int turret_max_target_ownage; 
 } model_subsystem;
 
 typedef struct model_special {
@@ -775,6 +779,7 @@ void model_set_detail_level(int n);
 #define MR_NO_GLOWMAPS				(1<<27)		// disable rendering of glowmaps - taylor
 #define MR_FULL_DETAIL				(1<<28)		// render all valid objects, particularly ones that are otherwise in/out of render boxes - taylor
 #define MR_FORCE_CLAMP				(1<<29)		// force clamp - Hery
+#define MR_ANIMATED_SHADER			(1<<30)		// Use a animated Shader - Valathil
 
 // old/obsolete flags
 //#define MR_SHOW_DAMAGE			(1<<4)		// Show the "destroyed" subobjects
@@ -969,6 +974,35 @@ typedef struct mc_info {
 	ubyte		*t_poly;				// pointer to tmap poly where we intersected
 		
 										// flags can be changed for the case of sphere check finds an edge hit
+	mc_info()
+	{
+		memset(this, 0, sizeof(this));
+	}
+
+	mc_info(const mc_info& other)
+	{
+		this->model_instance_num = other.model_instance_num;
+		this->model_num = other.model_num;
+		this->submodel_num = other.submodel_num;
+		this->orient = other.orient;
+		this->pos = other.pos;
+		this->p0 = other.p0;
+		this->p1 = other.p1;
+		this->flags = other.flags;
+		this->radius = other.radius;
+
+		this->num_hits = other.num_hits;
+		this->hit_dist = other.hit_dist;
+		this->hit_point = other.hit_point;
+		this->hit_point_world = other.hit_point_world;
+		this->hit_u = other.hit_u;
+		this->hit_v = other.hit_v;
+		this->shield_hit_tri = other.shield_hit_tri;
+		this->hit_normal = other.hit_normal;
+		this->edge_hit = other.edge_hit;
+		this->f_poly = other.f_poly;
+		this->t_poly = other.t_poly;
+	}
 } mc_info;
 
 
@@ -1038,6 +1072,8 @@ typedef struct mc_info {
 */
 
 int model_collide(mc_info * mc_info);
+
+void model_collide_preprocess(matrix *orient, int model_instance_num);
 
 // Sets the submodel instance data in a submodel
 // If show_damaged is true it shows only damaged submodels.
@@ -1112,21 +1148,31 @@ typedef struct mst_info {
 				{}
 } mst_info;
 
+
+//Valathil - Buffer struct for transparent object sorting
+typedef struct transparent_object {
+	int blend_filter;
+	float alpha;
+	int texture;
+	int glow_map;
+	int spec_map;
+	int norm_map;
+	int height_map;
+	vertex_buffer *buffer;
+	unsigned int tmap_flags;
+	int i;
+	vec3d scale;
+} transparent_object;
+
+typedef struct transparent_submodel {
+	bsp_info *model;
+	matrix orient;
+	bool is_submodel;
+	std::vector<transparent_object> transparent_objects;
+} transparent_submodel;
 // scale the engines thrusters by this much
 // Only enabled if MR_SHOW_THRUSTERS is on
 void model_set_thrust(int model_num = -1, mst_info *mst = NULL);
-
-//=========================================================
-// model caching
-
-// Call once to init the model caching stuff
-//void model_cache_init();
-
-// Call before every level to clean up the model caching stuff
-//void model_cache_reset();
-
-// If TRUE, then model caching is enabled
-//extern int Model_caching;
 
 
 //=======================================================================================

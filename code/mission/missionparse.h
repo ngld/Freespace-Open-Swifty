@@ -18,6 +18,7 @@
 #include "graphics/2d.h"
 #include "sound/sound.h"
 #include "parse/sexp.h"
+#include "io/keycontrol.h"
 
 //WMC - This should be here
 #define FS_MISSION_FILE_EXT				NOX(".fs2")
@@ -149,6 +150,8 @@ typedef struct mission {
 	int		skybox_flags;
 	int		contrail_threshold;
 	int		ambient_light_level;
+	float	neb_far_multi;
+	float	neb_near_multi;
 	sound_env	sound_environment;
 
 	// Goober5000
@@ -181,6 +184,7 @@ typedef struct mission {
 		num_players = 0;
 		num_respawns = 0;
 		max_respawn_delay = 0;
+		memset(&Ignored_keys, 0, sizeof(int)*CCFG_MAX);
 		memset( &support_ships, 0, sizeof( support_ships ) );
 		squad_filename[ 0 ] = '\0';
 		squad_name[ 0 ] = '\0';
@@ -404,15 +408,15 @@ typedef struct p_object {
 	object *created_object;					// Goober5000
 	int	group;								// group object is within or -1 if none.
 	int	persona_index;
-	float	kamikaze_damage;					// base damage for a kamikaze attack
+	int	kamikaze_damage;					// base damage for a kamikaze attack
 
 	bool use_special_explosion;				// new special explosion/hitpoints system 
-	float special_exp_damage;					// Changed from 'int' to 'float' by Zacam 10/2010
-	float special_exp_blast;					// Changed from 'int' to 'float' by Zacam 10/2010
-	float special_exp_inner;					// Changed from 'int' to 'float' by Zacam 10/2010
-	float special_exp_outer;					// Changed from 'int' to 'float' by Zacam 10/2010
+	int special_exp_damage;
+	int special_exp_blast;
+	int special_exp_inner;
+	int special_exp_outer;
 	bool use_shockwave;
-	float special_exp_shockwave_speed;		// Changed from 'int' to 'float' by Zacam 10/2010
+	int special_exp_shockwave_speed;
 	int special_exp_deathroll_time;
 
 	int	special_hitpoints;
@@ -500,7 +504,7 @@ typedef struct p_object {
 		created_object = NULL;
 		group = 0;
 		persona_index = 0;
-		kamikaze_damage = 0.;
+		kamikaze_damage = 0;
 		use_special_explosion = false;
 		special_exp_damage = -1;
 		special_exp_blast = -1;
@@ -584,7 +588,7 @@ typedef struct p_object {
 // same caveat: This list of bitfield indicators MUST correspond EXACTLY
 // (i.e., order and position must be the same) to its counterpart in MissionParse.cpp!!!!
 
-#define MAX_PARSE_OBJECT_FLAGS_2	19
+#define MAX_PARSE_OBJECT_FLAGS_2	20
 
 #define P2_SF2_PRIMITIVE_SENSORS			(1<<0)
 #define P2_SF2_NO_SUBSPACE_DRIVE			(1<<1)
@@ -605,6 +609,7 @@ typedef struct p_object {
 #define P2_OF_FORCE_SHIELDS_ON				(1<<16)
 #define P2_OF_IMMOBILE						(1<<17)
 #define P2_SF2_NO_ETS						(1<<18)
+#define P2_SF2_CLOAKED						(1<<19)
 
 // and again: these flags do not appear in the array
 //#define blah							(1<<29)

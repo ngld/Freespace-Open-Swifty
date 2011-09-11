@@ -339,6 +339,7 @@ int ai_good_time_to_rearm(object *objp)
 // this function is entry point from sexpression code to set internal data for use by ai code.
 void ai_good_secondary_time( int team, int weapon_index, int max_fire_count, char *shipname )
 {
+	Assert(shipname != NULL);
 	int index;
 	huge_fire_info new_info; 
 
@@ -346,7 +347,7 @@ void ai_good_secondary_time( int team, int weapon_index, int max_fire_count, cha
 	new_info.team = team;
 	new_info.max_fire_count = max_fire_count;
 
-	new_info.shipname = ai_get_goal_ship_name( shipname, &index );
+	new_info.shipname = ai_get_goal_target_name( shipname, &index );
 
 	Ai_huge_fire_info.push_back(new_info);
 }
@@ -359,9 +360,9 @@ void ai_good_secondary_time( int team, int weapon_index, int max_fire_count, cha
 //           which can be fired on target_objp
 int is_preferred_weapon(int weapon_num, object *firer_objp, object *target_objp)
 {
-	int i, firer_team, target_signature;
+	int firer_team, target_signature;
 	ship *firer_ship;
-	huge_fire_info *hfi = NULL;
+	SCP_vector<huge_fire_info>::iterator hfi;
 
 	Assert( firer_objp->type == OBJ_SHIP );
 	firer_ship = &Ships[firer_objp->instance];
@@ -369,10 +370,9 @@ int is_preferred_weapon(int weapon_num, object *firer_objp, object *target_objp)
 
 	// get target object's signature and try to find it in the list.
 	target_signature = target_objp->signature;
-	for ( i = 0; i < (int)Ai_huge_fire_info.size(); i++ ) {
+	for (hfi = Ai_huge_fire_info.begin();hfi != Ai_huge_fire_info.end(); ++hfi ) {
 		int ship_index, signature;
 
-		hfi = &Ai_huge_fire_info[i];
 		if ( hfi->weapon_index == -1 )
 			continue;
 
@@ -388,7 +388,7 @@ int is_preferred_weapon(int weapon_num, object *firer_objp, object *target_objp)
 	}
 
 	// return -1 if not found
-	if ( i == (int)Ai_huge_fire_info.size() )
+	if ( hfi == Ai_huge_fire_info.end() )
 		return -1;
 
 	// otherwise, we can return the max number of weapons we can fire against target_objps
@@ -1289,8 +1289,8 @@ matrix	objp_orient_copy;
 vel_in_copy = vel_in;
 objp_orient_copy = objp->orient;
 
-vel_in = vel_in_copy;	//	HERE
-objp->orient = objp_orient_copy;
+vel_in = vel_in_copy;	//	HERE //-V587
+objp->orient = objp_orient_copy; //-V587
 #endif
 	if (rvec != NULL) {
 		matrix	out_orient, goal_orient;
@@ -1303,8 +1303,7 @@ objp->orient = objp_orient_copy;
 	}
 #ifndef NDEBUG
 if (!((objp->type == OBJ_WEAPON) && (Weapon_info[Weapons[objp->instance].weapon_info_index].subtype == WP_MISSILE))) {
-	if (delta_time < 0.25f && vm_vec_dot(&objp->orient.vec.fvec, &tvec) < 0.1f)
-		Int3();	//	Get Andsager.  A ship has turned too far in one frame.
+	Assertion(!(delta_time < 0.25f && vm_vec_dot(&objp->orient.vec.fvec, &tvec) < 0.1f), "A ship rotated too far. Offending vessel is %s, please investigate.\n", Ships[objp->instance].ship_name);
 }
 #endif
 
@@ -2165,7 +2164,7 @@ int num_turrets_attacking(object *turret_parent, int target_objnum)
 	shipp = &Ships[turret_parent->instance];
 
 	Assert(turret_parent->type == OBJ_SHIP);
-	Assert(Objects[target_objnum].type == OBJ_SHIP);
+	//Assert(Objects[target_objnum].type == OBJ_SHIP); //SUSHI: Not needed, and undesirable since we want to use this for bombs too
 
 	for (ss=GET_FIRST(&shipp->subsys_list); ss!=END_OF_LIST(&shipp->subsys_list); ss=GET_NEXT(ss)) {
 		// check if subsys is alive
@@ -3100,7 +3099,7 @@ void ai_do_objects_undocked_stuff( object *docker, object *dockee )
 		docker_aip->support_ship_objnum = -1;
 		dockee_aip->support_ship_objnum = -1;
 		docker_aip->support_ship_signature = -1;
-		docker_aip->support_ship_signature = -1;
+		dockee_aip->support_ship_signature = -1;
 	}
 
 	// unlink the two objects
@@ -3232,17 +3231,23 @@ void ai_start_fly_to_ship(object *objp, int shipnum)
 //	Cause a ship to fly its waypoints.
 //	flags tells:
 //		WPF_REPEAT	Set -> repeat waypoints.
-void ai_start_waypoints(object *objp, int waypoint_list_index, int wp_flags)
+void ai_start_waypoints(object *objp, waypoint_list *wp_list, int wp_flags)
 {
 	ai_info	*aip;
-
-	Assert(waypoint_list_index < Num_waypoint_lists);
+	Assert(wp_list != NULL);
 
 	//nprintf(("AI", "Frame %i: Ship %s instructed to fly waypoint list #%i\n", AI_FrameCount, Ships[objp->instance].ship_name, waypoint_list_index));
 	aip = &Ai_info[Ships[objp->instance].ai_index];
 
-	if ( (aip->mode == AIM_WAYPOINTS) && (aip->wp_index == waypoint_list_index) )
+	if ( (aip->mode == AIM_WAYPOINTS) && (aip->wp_list == wp_list) )
+	{
+		if (aip->wp_index == INVALID_WAYPOINT_POSITION)
+		{
+			Warning(LOCATION, "aip->wp_index should have been assigned already!");
+			aip->wp_index = aip->wp_list->get_waypoints().begin();
+		}
 		return;
+	}
 
 	if (The_mission.flags & MISSION_FLAG_USE_AP_CINEMATICS && AutoPilotEngaged)
 	{
@@ -3255,8 +3260,8 @@ void ai_start_waypoints(object *objp, int waypoint_list_index, int wp_flags)
 		aip->ai_flags &= ~AIF_FORMATION_OBJECT;
 	}
 
-	aip->wp_list = waypoint_list_index;
-	aip->wp_index = 0;
+	aip->wp_list = wp_list;
+	aip->wp_index = wp_list->get_waypoints().begin();
 	aip->wp_flags = wp_flags;
 	aip->mode = AIM_WAYPOINTS;
 
@@ -3546,39 +3551,6 @@ void ai_update_aim(ai_info *aip, object* En_Objp)
 		//Update the position based on the velocity (assume no velocity vector change)
 		vm_vec_scale_add2(&aip->last_aim_enemy_pos, &aip->last_aim_enemy_vel, flFrametime);
 	}
-}
-
-//	--------------------------------------------------------------------------
-int find_nearest_waypoint(object *objp)
-{
-	int	i;
-	float	dist, min_dist, dot;
-	int	min_ind;
-	ship	*shipp;
-	int	wp_listnum;
-	waypoint_list	*wpl;
-
-	shipp = &Ships[objp->instance];
-	wp_listnum = Ai_info[Ships[objp->instance].ai_index].wp_list;
-	Assert(wp_listnum > 0);
-	wpl = &Waypoint_lists[wp_listnum];
-
-	min_dist = 999999.0f;
-	min_ind = -1;
-
-	for (i=0; i<wpl->count; i++) {
-		dist = vm_vec_dist_quick(&objp->pos, &wpl->waypoints[i]);
-		dot = vm_vec_dot_to_point(&objp->orient.vec.fvec, &objp->pos, &wpl->waypoints[i]);
-		dist = (float) (dist * (1.25 - dot));
-		if (dist < min_dist) {
-			min_dist = dist;
-			min_ind = i;
-		}
-	}
-
-	Assert(min_ind != -1);
-
-	return min_ind;
 }
 
 //	Given an ai_info struct, by reading current goal and path information,
@@ -4524,7 +4496,7 @@ void ai_fly_to_target_position(vec3d* target_pos, bool* pl_done_p=NULL, bool* pl
 
 		r = find_nearest_point_on_line(&nearest_point, &Pl_objp->last_pos, &Pl_objp->pos, target_pos);
 
-		if ( (vm_vec_dist_quick(&Pl_objp->pos, target_pos) < (MIN_DIST_TO_WAYPOINT_GOAL + fl_sqrt(Pl_objp->radius) + vm_vec_dist_quick(&Pl_objp->pos, &Pl_objp->last_pos)))
+		if ( (dist_to_goal < (MIN_DIST_TO_WAYPOINT_GOAL + fl_sqrt(Pl_objp->radius) + vm_vec_dist_quick(&Pl_objp->pos, &Pl_objp->last_pos)))
 			|| (((r >= 0.0f) && (r <= 1.0f)) && (vm_vec_dist_quick(&nearest_point, target_pos) < (MIN_DIST_TO_WAYPOINT_GOAL + fl_sqrt(Pl_objp->radius)))))
 		{
 				int treat_as_ship;
@@ -4565,45 +4537,46 @@ void ai_fly_to_target_position(vec3d* target_pos, bool* pl_done_p=NULL, bool* pl
 //	make Pl_objp fly waypoints.
 void ai_waypoints()
 {
-	int		wp_index;
-	ai_info	*aip;
-	waypoint_list	*wpl;
+	ai_info	*aip = &Ai_info[Ships[Pl_objp->instance].ai_index];
 
-	aip = &Ai_info[Ships[Pl_objp->instance].ai_index];
-
-	wp_index = aip->wp_index;
-
-	if (wp_index == -1) {
-		ai_start_waypoints(Pl_objp, 0, WPF_REPEAT);
-		wp_index = aip->wp_index;
-		aip->wp_dir = 1;
+	// sanity checking for stuff that should never happen
+	if (aip->wp_index == INVALID_WAYPOINT_POSITION) {
+		if (aip->wp_list == NULL) {
+			Warning(LOCATION, "Waypoints should have been assigned already!");
+			ai_start_waypoints(Pl_objp, &Waypoint_lists.front(), WPF_REPEAT);
+		} else {
+			Warning(LOCATION, "Waypoints should have been started already!");
+			ai_start_waypoints(Pl_objp, aip->wp_list, WPF_REPEAT);
+		}
 	}
-
-	wpl = &Waypoint_lists[aip->wp_list];
-
-	Assert(wpl->count > 0);	// What? Is this zero? Probably wp_index never got initialized!
+	Assert(!aip->wp_list->get_waypoints().empty());	// What? Is this zero? Probably never got initialized!
 
 	bool done, treat_as_ship;
-	ai_fly_to_target_position(&(wpl->waypoints[wp_index]), &done, &treat_as_ship);
+	ai_fly_to_target_position(aip->wp_index->get_pos(), &done, &treat_as_ship);
 
 	if ( done ) {
-		aip->wp_index++; // go on to next waypoint in path
-		if ( (aip->wp_index >= wpl->count) ) {
-			// have reached the last waypoint.  Do I?
-			if ( ((aip->wp_flags & WPF_REPEAT) > 0) ) {
-				aip->wp_index = 0; // go back to the start.
+		// go on to next waypoint in path
+		++aip->wp_index;
+
+		if ( aip->wp_index == aip->wp_list->get_waypoints().end() ) {
+			// have reached the last waypoint.  Do I repeat?
+			if ( aip->wp_flags & WPF_REPEAT ) {
+				 // go back to the start.
+				aip->wp_index = aip->wp_list->get_waypoints().begin();
 			} else {
-				aip->wp_index = (wpl->count - 1); // stay on the last waypoint
+				// stay on the last waypoint.
+				--aip->wp_index;
+
 				// Log a message that the wing or ship reached his waypoint and
 				// remove the goal from the AI goals of the ship pr wing, respectively.
-				// Wether or not we should treat this as a ship or a wing is determined by
+				// Whether we should treat this as a ship or a wing is determined by
 				// ai_fly_to_target_position when it marks the AI directive as complete
 				if ( treat_as_ship ) {
 					ai_mission_goal_complete( aip );					// this call should reset the AI mode
-					mission_log_add_entry( LOG_WAYPOINTS_DONE, Ships[Pl_objp->instance].ship_name, wpl->name, -1 );
+					mission_log_add_entry( LOG_WAYPOINTS_DONE, Ships[Pl_objp->instance].ship_name, aip->wp_list->get_name(), -1 );
 				} else {
 					ai_mission_wing_goal_complete( Ships[Pl_objp->instance].wingnum, &(aip->goals[aip->active_goal]) );
-					mission_log_add_entry( LOG_WAYPOINTS_DONE, Wings[Ships[Pl_objp->instance].wingnum].name, wpl->name, -1 );
+					mission_log_add_entry( LOG_WAYPOINTS_DONE, Wings[Ships[Pl_objp->instance].wingnum].name, aip->wp_list->get_name(), -1 );
 				}
 			}
 		}
@@ -4636,11 +4609,9 @@ void ai_fly_to_ship()
 		aip->mode = AIM_NONE;
 		return;
 	}
-	Assert( aip->goals[aip->active_goal].ship_name != NULL );
-	if ( strlen(aip->goals[aip->active_goal].ship_name) == 0 ) {
-		Warning(LOCATION,
-			"'%s' is trying to fly-to a ship without a name for the ship",
-			Ships[Pl_objp->instance].ship_name);
+	Assert( aip->goals[aip->active_goal].target_name != NULL );
+	if ( aip->goals[aip->active_goal].target_name[0] == '\0' ) {
+		Warning(LOCATION, "'%s' is trying to fly-to-ship without a name for the ship", Ships[Pl_objp->instance].ship_name);
 		aip->mode = AIM_NONE;
 		ai_remove_ship_goal( aip, aip->active_goal ); // function sets aip->active_goal to NONE for me
 		return;
@@ -4648,7 +4619,7 @@ void ai_fly_to_ship()
 
 	for (int j = 0; j < MAX_SHIPS; j++)
 	{
-		if (Ships[j].objnum != -1 && !stricmp(aip->goals[aip->active_goal].ship_name, Ships[j].ship_name))
+		if (Ships[j].objnum != -1 && !stricmp(aip->goals[aip->active_goal].target_name, Ships[j].ship_name))
 		{
 			target_p = &Objects[Ships[j].objnum];
 			break;
@@ -4663,7 +4634,7 @@ void ai_fly_to_ship()
 			{
 				mprintf(("Ship '%s' told to fly to target ship '%s'",
 					Ships[Pl_objp->instance].ship_name,
-					aip->goals[i].ship_name));
+					aip->goals[i].target_name));
 			}
 		}
 		#endif
@@ -5768,9 +5739,7 @@ int ai_fire_primary_weapon(object *objp)
 
 //	if (!IS_VEC_NULL(&G_predicted_pos)) {
 	if (!( vm_vec_mag_quick(&G_predicted_pos) < AICODE_SMALL_MAGNITUDE )) {
-		if ( !vm_vec_cmp(&G_predicted_pos, &G_fire_pos) ) {
-			nprintf(("Warning", "Avoid NULL vector assert.. why are G_predicted_pos and G_fire_pos the same?\n"));
-		} else {
+		if ( vm_vec_cmp(&G_predicted_pos, &G_fire_pos) ) {
 			vm_vec_normalized_dir(&v2t, &G_predicted_pos, &G_fire_pos);
 			dot = vm_vec_dot(&v2t, &objp->orient.vec.fvec);
 			if (dot > .998629534f){	//	if within 3.0 degrees of desired heading, bash
@@ -7394,7 +7363,6 @@ void ai_chase_es(ai_info *aip, ship_info *sip)
 	vec3d	tvec;
 	fix		timeslice;
 	fix		scale;
-	float		bank_override = 0.0f;
 
 	tvec = Pl_objp->pos;
 
@@ -7415,7 +7383,7 @@ void ai_chase_es(ai_info *aip, ship_info *sip)
 		tvec.xyz.y += frand();
 	}
 
-	bank_override = Pl_objp->phys_info.speed;
+	float bank_override = Pl_objp->phys_info.speed;
 
 	ai_turn_towards_vector(&tvec, Pl_objp, flFrametime/2, sip->srotation_time, NULL, NULL, bank_override, 0);
 	accelerate_ship(aip, 1.0f);
@@ -8213,7 +8181,7 @@ void ai_cruiser_chase()
 						// get separation
 						ai_chase_big_get_separations(Pl_objp, En_objp, &temp, &desired_sep, &cur_sep);
 						// and the separation is > 0.9 desired
-						if (cur_sep > 0.9 * desired_sep) {
+						if (cur_sep > (0.9f * desired_sep)) {
 							aip->submode = SM_BIG_PARALLEL;
 							aip->submode_start_time = Missiontime;
 						}
@@ -8229,8 +8197,8 @@ void ai_cruiser_chase()
 					if (vm_vec_dotprod(&En_objp->orient.vec.fvec, &Pl_objp->orient.vec.fvec) > 0) {
 						// get separation
 						ai_chase_big_get_separations(Pl_objp, En_objp, &temp, &desired_sep, &cur_sep);
-						//and the separation is [0.9 to 1.1] desired
-						if ( (cur_sep > 0.9f * desired_sep) ) {
+						// and the separation is > 0.9 desired
+						if (cur_sep > (0.9f * desired_sep)) {
 							aip->submode = SM_BIG_PARALLEL;
 							aip->submode_start_time = Missiontime;
 						}
@@ -8242,8 +8210,8 @@ void ai_cruiser_chase()
 					if (vm_vec_dotprod(&En_objp->orient.vec.fvec, &Pl_objp->orient.vec.fvec) < 0) {
 						// get separation
 						ai_chase_big_get_separations(Pl_objp, En_objp, &temp, &desired_sep, &cur_sep);
-						//and the separation is [0.9 to 1.1] desired
-						if ( (cur_sep > 0.9f * desired_sep) ) {
+						// and the separation is > 0.9 desired
+						if (cur_sep > (0.9f * desired_sep)) {
 							aip->submode = SM_BIG_PARALLEL;
 							aip->submode_start_time = Missiontime;
 						}
@@ -11896,12 +11864,11 @@ int ai_formation()
 	
 	if (aip->mode == AIM_WAYPOINTS) {
 		aip->wp_list = laip->wp_list;
-		if (laip->wp_index < Waypoint_lists[laip->wp_list].count)
-			aip->wp_index = laip->wp_index;
-		else
-			aip->wp_index = Waypoint_lists[laip->wp_list].count - 1;
+		aip->wp_index = laip->wp_index;
 		aip->wp_flags = laip->wp_flags;
-		aip->wp_dir = laip->wp_dir;
+
+		if ((aip->wp_list != NULL) && (aip->wp_index == aip->wp_list->get_waypoints().end()))
+			--aip->wp_index;
 	}
 
 	#ifndef NDEBUG
@@ -12782,8 +12749,6 @@ int ai_acquire_emerge_path(object *pl_objp, int parent_objnum, int allowed_path_
 	}
 
 	// try to find a bay path that is not taken
-	path_index = -1;
-
 	// Goober5000 - choose from among allowed paths
 	if (allowed_path_mask != 0)
 	{
@@ -14505,11 +14470,9 @@ void ai_process( object * obj, int ai_index, float frametime )
 		break;
 	}
 
-	// Wanderer - sexp based override goes here - only if rfc is valid though
-	if (rfc == 1)
-		ai_control_info_check(obj, aip);
-
 	if (rfc == 1) {
+		// Wanderer - sexp based override goes here - only if rfc is valid though
+		ai_control_info_check(obj, aip);
 		vec3d copy_desired_rotvel = obj->phys_info.rotvel;
 		physics_read_flying_controls( &obj->orient, &obj->phys_info, &AI_ci, frametime);
 		// if obj is in formation and not flight leader, don't update rotvel
@@ -14600,8 +14563,8 @@ void init_ai_object(int objnum)
 	//Init stuff from ai class and ai profiles
 	init_aip_from_class_and_profile(aip, &Ai_classes[Ship_info[ship_type].ai_class], The_mission.ai_profile);
 
-	aip->wp_index = -1;
-	aip->wp_list = -1;
+	aip->wp_list = NULL;
+	aip->wp_index = INVALID_WAYPOINT_POSITION;
 
 	aip->attacker_objnum = -1;
 	aip->goal_signature = -1;
@@ -15231,7 +15194,10 @@ void ai_ship_hit(object *objp_ship, object *hit_objp, vec3d *hitpos, int shield_
 		// Added OBJ_BEAM for traitor detection - FUBAR
 		if ((hit_objp->type == OBJ_WEAPON) || (hit_objp->type == OBJ_BEAM)) {
 			hitter_objnum = hit_objp->parent;
-			Assert((hitter_objnum >= 0) && (hitter_objnum < MAX_OBJECTS));
+			Assert((hitter_objnum < MAX_OBJECTS));
+			if (hitter_objnum == -1) {
+				return; // Possible SSM, bail while we still can.
+			}
 			objp_hitter = &Objects[hitter_objnum];
 		} else if (hit_objp->type == OBJ_SHIP) {
 			objp_hitter = hit_objp;

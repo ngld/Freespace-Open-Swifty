@@ -46,7 +46,7 @@
 #include "network/multiteamselect.h"
 #include "network/multiutil.h"
 #include "ai/aigoals.h"
-
+#include "io/timer.h"
 
 
 //////////////////////////////////////////////////////
@@ -72,6 +72,7 @@ static int Ss_delta_x, Ss_delta_y;	// used to offset the carried icon to make it
 float ShipSelectScreenShipRot = 0.0f;
 int ShipSelectModelNum = -1;
 
+int anim_timer_start = 0;
 //static matrix ShipScreenOrient = IDENTITY_MATRIX;
 
 //////////////////////////////////////////////////////
@@ -146,11 +147,7 @@ static int Ship_info_coords[GR_NUM_RESOLUTIONS][2] = {
 
 
 // NK: changed from 37 to 51 for new FS2 animations
-#ifdef FS2_DEMO
-#define SHIP_ANIM_LOOP_FRAME	0
-#else
 #define SHIP_ANIM_LOOP_FRAME	51
-#endif
 
 #define MAX_ICONS_ON_SCREEN	4
 
@@ -1251,7 +1248,7 @@ void ship_select_blit_ship_info()
 		}
 	}
 	
-	if(strlen(Ship_select_ship_info_text) > 0){
+	if(Ship_select_ship_info_text[0] != '\0'){
 		// split the string into multiple lines
 		n_lines = split_str(Ship_select_ship_info_text, gr_screen.res == GR_640 ? 128 : 350, n_chars, p_str, MAX_NUM_SHIP_DESC_LINES, 0);
 
@@ -1555,7 +1552,10 @@ void ship_select_do(float frametime)
 				&ShipSelectScreenShipRot,
 				&sip->closeup_pos,
 				sip->closeup_zoom * 1.3f,
-				rev_rate);
+				rev_rate,
+				MR_LOCK_DETAIL | MR_AUTOCENTER | MR_NO_FOGGING,
+				true,
+				sip->selection_effect);
 		}
 	}
 
@@ -1758,6 +1758,8 @@ void start_ship_animation(int ship_class, int play_sound)
 	ship_info *sip = &Ship_info[ship_class];
 	char *p;
 	char animation_filename[CF_MAX_FILENAME_LENGTH+4];
+
+	anim_timer_start = timer_get_milliseconds();
 
 	if ( Cmdline_ship_choice_3d || !strlen(sip->anim_filename) ) {
 		if (ship_class < 0) {
@@ -2803,8 +2805,6 @@ void ss_load_icons(int ship_class)
 // load all the icons for ships in the pool
 void ss_load_all_icons()
 {
-	#ifndef DEMO // not for FS2_DEMO
-
 	int i, j;
 
 	Assert( (Ss_pool != NULL) && (Ss_icons != NULL) );
@@ -2821,8 +2821,6 @@ void ss_load_all_icons()
 			ss_load_icons(i);
 		}
 	}
-
-	#endif
 }
 
 // determine if the slot is disabled

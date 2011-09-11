@@ -38,7 +38,7 @@ inline bool sorted_obj::operator < (const sorted_obj &other)
 
 
 std::list<sorted_obj> Sorted_objects;
-
+std::vector<object*> effect_ships; 
 
 // Used to (fairly) quicky find the 8 extreme
 // points around an object.
@@ -211,7 +211,7 @@ void obj_render_all(void (*render_function)(object *objp), bool *draw_viewer_las
 		// if we're fullneb, fire up the fog - this also generates a fog table
 		if((The_mission.flags & MISSION_FLAG_FULLNEB) && (Neb2_render_mode != NEB2_RENDER_NONE) && !Fred_running){
 			// get the fog values
-			neb2_get_fog_values(&fog_near, &fog_far, obj);
+			neb2_get_adjusted_fog_values(&fog_near, &fog_far, obj);
 
 			// only reset fog if the fog mode has changed - since regenerating a fog table takes
 			// a bit of time
@@ -224,8 +224,10 @@ void obj_render_all(void (*render_function)(object *objp), bool *draw_viewer_las
 				continue;
 			}
 		}
-
-		(*render_function)(obj);
+		if( (obj->type == OBJ_SHIP) && Ships[obj->instance].shader_effect_active )
+			effect_ships.push_back(obj);
+		else
+			(*render_function)(obj);
 	}
 
 	Sorted_objects.clear();
@@ -242,7 +244,8 @@ void obj_render_all(void (*render_function)(object *objp), bool *draw_viewer_las
 //	if(!Cmdline_nohtl)gr_set_lighting(false,false);
 	// lasers have to be drawn without fog! - taylor
 	batch_render_lasers();
-
+	batch_render_bitmaps();
+	distortion_render_bitmaps();
 /*	Show spheres where wingmen should be flying
 	{
 		extern void render_wing_phantoms_all();

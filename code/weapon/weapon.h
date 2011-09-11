@@ -140,6 +140,7 @@ extern int Num_weapon_subtypes;
 #define PSPEW_PLUME		4			//spewers arrayed within a radius for thruster style effects, may converge or scatter
 
 #define MAX_PARTICLE_SPEWERS	4	//i figure 4 spewers should be enough for now -nuke
+#define MAX_WEP_DAMAGE_SLOTS	32		//Maximum number of ships which can be counted as killer or assits on destroying this weapon
 
 typedef struct weapon {
 	int		weapon_info_index;			// index into weapon_info array
@@ -205,6 +206,13 @@ typedef struct weapon {
 	float alpha_current;		// the current alpha value
 
 	float weapon_max_vel;		// might just as well store the data here
+
+	bool collisionOccured;
+	mc_info collisionInfo; // The last collision of this weapon or NULL if it had none
+	//Scoring stuff
+	float total_damage_received;        // total damage received (for scoring purposes)
+	float damage_ship[MAX_WEP_DAMAGE_SLOTS];    // damage applied from each player
+	int   damage_ship_id[MAX_WEP_DAMAGE_SLOTS]; // signature of the damager (corresponds to each entry in damage_ship)
 
 } weapon;
 
@@ -378,6 +386,7 @@ typedef struct weapon_info {
 
 	char	icon_filename[MAX_FILENAME_LEN];	// filename for icon that is displayed in weapon selection
 	char	anim_filename[MAX_FILENAME_LEN];	// filename for animation that plays in weapon selection
+	int 	selection_effect;
 
 	int	impact_weapon_expl_index;		// Index into Weapon_expl_info of which ANI should play when this thing impacts something
 	float	impact_explosion_radius;		// How big the explosion should be
@@ -494,6 +503,8 @@ typedef struct weapon_info {
 	SCP_vector<int> weapon_substitution_pattern; //weapon_indexs
 	SCP_vector<SCP_string> weapon_substitution_pattern_names; // weapon names so that we can generate the indexs after sort
 
+	int			score; //Optional score for destroying the weapon
+
 } weapon_info;
 
 // Data structure to track the active missiles
@@ -550,6 +561,8 @@ extern int Default_cmeasure_index;
 extern int Num_player_weapon_precedence;				// Number of weapon types in Player_weapon_precedence
 extern int Player_weapon_precedence[MAX_WEAPON_TYPES];	// Array of weapon types, precedence list for player weapon selection
 extern char	*Weapon_names[MAX_WEAPON_TYPES];
+
+extern int Default_weapon_select_effect;
 
 #define WEAPON_INDEX(wp)				(wp-Weapons)
 #define WEAPON_INFO_INDEX(wip)		(wip-Weapon_info)
