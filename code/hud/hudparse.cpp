@@ -4004,10 +4004,16 @@ void load_gauge_wingman_status(int base_w, int base_h, int font, int ship_index)
 	if(optional_string("Left Background Filename:")) {
 		stuff_string(fname_left, F_NAME, MAX_FILENAME_LEN);
 	}
+	if(optional_string("First Background Filename:")) {
+		stuff_string(fname_left, F_NAME, MAX_FILENAME_LEN);
+	}
 	if(optional_string("Entry Background Filename:")) {
 		stuff_string(fname_middle, F_NAME, MAX_FILENAME_LEN);
 	}
 	if(optional_string("Right Background Filename:")) {
+		stuff_string(fname_right, F_NAME, MAX_FILENAME_LEN);
+	}
+	if(optional_string("Last Background Filename:")) {
 		stuff_string(fname_right, F_NAME, MAX_FILENAME_LEN);
 	}
 	if(optional_string("Dot Filename:")) {
@@ -4019,7 +4025,13 @@ void load_gauge_wingman_status(int base_w, int base_h, int font, int ship_index)
 	if(optional_string("Left Background Width:")) {
 		stuff_int(&left_frame_end_x);
 	}
+	if(optional_string("First Background Size:")) {
+		stuff_int(&left_frame_end_x);
+	}
 	if(optional_string("Entry Width:")) {
+		stuff_int(&wing_width);
+	}
+	if(optional_string("Entry Size:")) {
 		stuff_int(&wing_width);
 	}
 	if(optional_string("Single Wing Offsets:")) {
@@ -4043,8 +4055,10 @@ void load_gauge_wingman_status(int base_w, int base_h, int font, int ship_index)
 	int grow_mode = 0; //By default, expand the gauge to the left (in -x direction)
 
 	if(optional_string("Expansion Mode:")) {
-		if(required_string("Right")) 
+		if(optional_string("Right")) 
 			grow_mode = 1;
+		else if(optional_string("Down"))
+			grow_mode = 2;
 	}
 
 	HudGaugeWingmanStatus* hud_gauge = new HudGaugeWingmanStatus();

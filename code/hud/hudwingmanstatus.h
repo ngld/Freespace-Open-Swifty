@@ -43,7 +43,7 @@ protected:
 	int wing_width;
 	int wing_name_offsets[2];
 
-	enum {GROW_LEFT, GROW_RIGHT};
+	enum {GROW_LEFT, GROW_RIGHT, GROW_DOWN};
 	int grow_mode;
 
 	int wingmate_offsets[MAX_SHIPS_PER_WING][2];

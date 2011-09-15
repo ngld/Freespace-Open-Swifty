@@ -3875,8 +3875,8 @@ void HudGaugeFlightPath::render(float frametime)
 
 		if (!(v0.flags & PF_OVERFLOW)) {
 			if ( Marker.first_frame >= 0 ) {
-				sx = fl2i(v0.sx);
-				sy = fl2i(v0.sy);
+				sx = fl2i(v0.screen.xyw.x);
+				sy = fl2i(v0.screen.xyw.y);
 
 				unsize(&sx, &sy);
 				renderBitmap(Marker.first_frame, sx - Marker_half[0], sy - Marker_half[1]);
