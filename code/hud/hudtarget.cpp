@@ -6950,3 +6950,222 @@ void HudGaugeWarheadCount::render(float frametime)
 		renderBitmap(Warhead.first_frame, position[0] + Warhead_count_offsets[0] + column * delta_x, position[1] + Warhead_count_offsets[1] + delta_y);
 	}
 }
+
+void HudGaugeWeaponList::initBitmaps(char *fname_first, char *fname_entry, char *fname_last)
+{
+	_background_first.first_frame = bm_load_animation(fname_first, &_background_first.num_frames);
+	if(_background_first.first_frame < 0) {
+		Warning(LOCATION,"Cannot load hud ani: %s\n", fname_first);
+	}
+
+	_background_entry.first_frame = bm_load_animation(fname_entry, &_background_entry.num_frames);
+	if(_background_entry.first_frame < 0) {
+		Warning(LOCATION,"Cannot load hud ani: %s\n", fname_entry);
+	}
+
+	_background_last.first_frame = bm_load_animation(fname_last, &_background_last.num_frames);
+	if(_background_last.first_frame < 0) {
+		Warning(LOCATION,"Cannot load hud ani: %s\n", fname_last);
+	}
+}
+
+void HudGaugeWeaponList::initBgFirstOffsetX(int x)
+{
+	_bg_first_offset_x = x;
+}
+
+void HudGaugeWeaponList::initBgEntryOffsetX(int x)
+{
+	_bg_entry_offset_x = x;
+}
+
+void HudGaugeWeaponList::initBgLastOffsetX(int x)
+{
+	_bg_last_offset_x = x;
+}
+
+void HudGaugeWeaponList::initBgFirstHeight(int h)
+{
+	_background_first_h = h;
+}
+
+void HudGaugeWeaponList::initBgEntryHeight(int h)
+{
+	_background_entry_h = h;
+}
+
+void HudGaugeWeaponList::initHeaderOffsets(int x, int y)
+{
+	_header_offsets[0] = x;
+	_header_offsets[1] = y;
+}
+
+void HudGaugeWeaponList::initEntryStartY(int y)
+{
+	_entry_start_y = y;
+}
+
+void HudGaugeWeaponList::initEntryHeight(int h)
+{
+	_entry_h = h;
+}
+
+void HudGaugeWeaponList::pageIn()
+{
+	if ( _background_first.first_frame >= 0 ) {
+		bm_page_in_aabitmap(_background_first.first_frame, _background_first.num_frames);
+	}
+	
+	if ( _background_entry.first_frame >= 0 ) {
+		bm_page_in_aabitmap(_background_entry.first_frame, _background_entry.num_frames);
+	}
+
+	if ( _background_last.first_frame >= 0 ) {
+		bm_page_in_aabitmap(_background_last.first_frame, _background_last.num_frames);
+	}
+}
+
+void HudGaugeWeaponList::maybeFlashWeapon(int index)
+{
+	if ( index >= MAX_WEAPON_FLASH_LINES ) {
+		Int3();	// Get Alan
+		return;
+	}
+
+	// hud_set_default_color();
+	setGaugeColor();
+	if ( !timestamp_elapsed(Weapon_flash_info.flash_duration[index]) ) {
+		if ( Weapon_flash_info.is_bright & (1<<index) ) {
+			setGaugeColor(HUD_C_BRIGHT);
+			// hud_set_bright_color();
+		} else {
+			setGaugeColor(HUD_C_DIM);
+			// hud_set_dim_color();
+		}
+	}
+}
+
+void HudGaugeWeaponList::render(float frametime)
+{
+
+}
+
+void HudGaugePrimaryWeapons::render(float frametime)
+{
+	ship_weapon	*sw;
+	int ship_is_ballistic;
+
+	int		num_primaries;		// np == num primary
+	char	name[NAME_LENGTH];	
+
+	if(Player_obj->type == OBJ_OBSERVER)
+		return;
+
+	Assert(Player_obj->type == OBJ_SHIP);
+	Assert(Player_obj->instance >= 0 && Player_obj->instance < MAX_SHIPS);
+
+	sw = &Ships[Player_obj->instance].weapons;
+	ship_is_ballistic = (Ship_info[Ships[Player_obj->instance].ship_info_index].flags & SIF_BALLISTIC_PRIMARIES);
+
+	num_primaries = sw->num_primary_banks;
+
+	setGaugeColor();
+
+	renderBitmap(_background_first.first_frame, position[0], position[1]);
+
+	// render the header of this gauge
+	renderString(position[0] + _header_offsets[0], position[1] + _header_offsets[1], EG_WEAPON_TITLE, XSTR( "Primary Weapons", 328));
+
+	char ammo_str[32];
+	int i, w, h;
+	int bg_y_offset = _background_first_h;
+	int text_y_offset = _entry_start_y;
+
+	for ( i = 0; i < num_primaries; ++i ) {
+		setGaugeColor();
+
+		renderBitmap(_background_entry.first_frame, position[0], position[1] + bg_y_offset);
+
+		strcpy_s(name, (Weapon_info[sw->primary_bank_weapons[i]].alt_name[0]) ? Weapon_info[sw->primary_bank_weapons[i]].alt_name : Weapon_info[sw->primary_bank_weapons[i]].name);
+		
+		if (Lcl_gr) {
+			lcl_translate_wep_name(name);
+		}
+
+		if (HudGauge::maybeFlashSexp() == i ) {
+			setGaugeColor(HUD_C_BRIGHT);
+		} else {
+			maybeFlashWeapon(i);
+		}
+
+		// indicate if this is linked or currently armed
+		if ( (sw->current_primary_bank == i) || (Player_ship->flags & SF_PRIMARY_LINKED) ) {
+			renderPrintf(position[0] + _plink_offset_x, position[1] + text_y_offset, EG_NULL, "%c", Lcl_special_chars + 2);
+		}
+
+		// either render this primary's image or its name
+		if(Weapon_info[sw->primary_bank_weapons[0]].hud_image_index != -1) {
+			renderBitmap(Weapon_info[sw->primary_bank_weapons[i]].hud_image_index, position[0] + _pname_offset_x, text_y_offset);
+		} else {
+			renderPrintf(position[0] + _pname_offset_x, position[1] + text_y_offset, EG_WEAPON_P2, "%s", name);
+		}
+
+		// if this is a ballistic primary with ammo, render the ammo count
+		if (Weapon_info[sw->primary_bank_weapons[i]].wi_flags2 & WIF2_BALLISTIC) {
+			// print out the ammo right justified
+			sprintf(ammo_str, "%d", sw->primary_bank_ammo[i]);
+
+			// get rid of #
+			end_string_at_first_hash_symbol(ammo_str);
+
+			hud_num_make_mono(ammo_str);
+			gr_get_string_size(&w, &h, ammo_str);
+
+			renderString(position[0] + _pammo_offset_x - w, position[1] + text_y_offset, EG_NULL, ammo_str);
+		}
+
+		text_y_offset += _entry_h;
+		bg_y_offset += _background_entry_h;
+	}
+
+	renderBitmap(_background_last.first_frame, position[0], position[1] + bg_y_offset);
+}
+
+void HudGaugeSecondaryWeapons::render(float frametime)
+{
+	ship_weapon	*sw;
+	int ship_is_ballistic;
+
+	int num_secondaries;
+	char name[NAME_LENGTH];
+
+	Assert(Player_obj->type == OBJ_SHIP);
+	Assert(Player_obj->instance >= 0 && Player_obj->instance < MAX_SHIPS);
+
+	sw = &Ships[Player_obj->instance].weapons;
+	ship_is_ballistic = (Ship_info[Ships[Player_obj->instance].ship_info_index].flags & SIF_BALLISTIC_PRIMARIES);
+
+	num_secondaries = sw->num_secondary_banks;
+
+	setGaugeColor();
+
+	renderBitmap(_background_first.first_frame, position[0], position[1]);
+
+	// render the header of this gauge
+	renderString(position[0] + _header_offsets[0], position[1] + _header_offsets[1], EG_WEAPON_TITLE, XSTR( "Secondary Weapons", 328));
+
+	weapon_info	*wip;
+	char ammo_str[32];
+	int i, w, h;
+	int bg_y_offset = _background_first_h;
+	int text_y_offset = _entry_start_y;
+
+	for ( i = 0; i < num_secondaries; ++i ) {
+		setGaugeColor();
+		wip = &Weapon_info[sw->secondary_bank_weapons[i]];
+
+		renderBitmap(_background_entry.first_frame, position[0], bg_y_offset);
+
+		maybeFlashWeapon(np+i);
+	}
+}
