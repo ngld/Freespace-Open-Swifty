@@ -7136,7 +7136,7 @@ void HudGaugeSecondaryWeapons::render(float frametime)
 	ship_weapon	*sw;
 	int ship_is_ballistic;
 
-	int num_secondaries;
+	int num_primaries, num_secondaries;
 	char name[NAME_LENGTH];
 
 	Assert(Player_obj->type == OBJ_SHIP);
@@ -7145,6 +7145,7 @@ void HudGaugeSecondaryWeapons::render(float frametime)
 	sw = &Ships[Player_obj->instance].weapons;
 	ship_is_ballistic = (Ship_info[Ships[Player_obj->instance].ship_info_index].flags & SIF_BALLISTIC_PRIMARIES);
 
+	num_primaries = sw->num_primary_banks;
 	num_secondaries = sw->num_secondary_banks;
 
 	setGaugeColor();
@@ -7155,6 +7156,7 @@ void HudGaugeSecondaryWeapons::render(float frametime)
 	renderString(position[0] + _header_offsets[0], position[1] + _header_offsets[1], EG_WEAPON_TITLE, XSTR( "Secondary Weapons", 328));
 
 	weapon_info	*wip;
+	char weapon_name[NAME_LENGTH + 10];
 	char ammo_str[32];
 	int i, w, h;
 	int bg_y_offset = _background_first_h;
@@ -7164,8 +7166,60 @@ void HudGaugeSecondaryWeapons::render(float frametime)
 		setGaugeColor();
 		wip = &Weapon_info[sw->secondary_bank_weapons[i]];
 
-		renderBitmap(_background_entry.first_frame, position[0], bg_y_offset);
+		renderBitmap(_background_entry.first_frame, position[0], position[1] + bg_y_offset);
 
-		maybeFlashWeapon(np+i);
+		maybeFlashWeapon(num_primaries+i);
+
+		strcpy_s(weapon_name, (wip->alt_name[0]) ? wip->alt_name : wip->name);
+		end_string_at_first_hash_symbol(weapon_name);
+
+		if ( sw->current_secondary_bank == i ) {
+			// show that this is the current secondary armed
+			renderPrintf(position[0] + _sunlinked_offset_x, position[1] + text_y_offset, EG_NULL, "%c", Lcl_special_chars + 2);
+
+			// indicate if this is linked
+			if ( Player_ship->flags & SF_SECONDARY_DUAL_FIRE ) {
+				renderPrintf(position[0] + _slinked_offset_x, position[1] + text_y_offset, EG_NULL, "%c", Lcl_special_chars + 2);				
+			}
+
+			// show secondary weapon's image or print its name
+			if(wip->hud_image_index != -1) {
+				renderBitmap(wip->hud_image_index, position[0] + _sname_offset_x, position[1] + text_y_offset);
+			} else {
+				renderString(position[0] + _sname_offset_x, position[1] + text_y_offset, i ? EG_WEAPON_S1 : EG_WEAPON_S2, weapon_name);
+			}
+
+			// show the cooldown time
+			if ( (sw->secondary_bank_ammo[i] > 0) && (sw->current_secondary_bank >= 0) ) {
+				int ms_till_fire = timestamp_until(sw->next_secondary_fire_stamp[sw->current_secondary_bank]);
+				if ( (ms_till_fire >= 500) && ((wip->fire_wait >= 1 ) || (ms_till_fire > wip->fire_wait*1000)) ) {
+					renderPrintf(position[0] + _sreload_offset_x, position[1] + text_y_offset, EG_NULL, "%d", fl2i(ms_till_fire/1000.0f +0.5f));					
+				}
+			}
+		} else {
+			renderString(position[0] + _sname_offset_x, position[1] + text_y_offset, i ? EG_WEAPON_S1 : EG_WEAPON_S2, weapon_name);		
+		}
+
+		int ammo = sw->secondary_bank_ammo[i];
+
+		// print out the ammo right justified
+		sprintf(ammo_str, "%d", ammo);
+		hud_num_make_mono(ammo_str);
+		gr_get_string_size(&w, &h, ammo_str);
+
+		renderString(position[0] + _sammo_offset_x - w, position[1] + text_y_offset, EG_NULL, ammo_str);
+
+		bg_y_offset += _background_entry_h;
+		text_y_offset += _entry_h;
 	}
+
+	if ( num_secondaries == 0 ) {
+		renderBitmap(_background_entry.first_frame, position[0], position[1] + bg_y_offset);
+		renderString(position[0] + _sname_offset_x, position[1] + text_y_offset, EG_WEAPON_S1, XSTR( "<none>", 329));
+
+		bg_y_offset += _background_entry_h;
+	}
+
+	// finish drawing the background
+	renderBitmap(_background_last.first_frame, position[0], position[1] + bg_y_offset);
 }

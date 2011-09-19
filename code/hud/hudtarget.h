@@ -339,7 +339,7 @@ protected:
 	int _header_offsets[2];
 	int _entry_start_y;
 	int _entry_h;
-private:
+public:
 	void initBitmaps(char *fname_first, char *fname_entry, char *fname_last);
 	void initBgFirstOffsetX(int x);
 	void initBgEntryOffsetX(int x);
