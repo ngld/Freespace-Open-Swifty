@@ -387,6 +387,13 @@ public:
 	void render(float frametime);
 };
 
+class HudGaugeHardpoints: public HudGauge
+{
+public:
+	HudGaugeHardpoints();
+	void render(float frametime);
+};
+
 class HudGaugeWarheadCount: public HudGauge
 {
 	hud_frames Warhead;

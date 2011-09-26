@@ -764,6 +764,9 @@ int parse_gauge_type()
 	if ( optional_string("+Warhead Count:") )
 		return HUD_OBJECT_WARHEAD_COUNT;
 
+	if ( optional_string("+Hardpoints:") )
+		return HUD_OBJECT_HARDPOINTS;
+
 	return -1;
 }
 
@@ -925,6 +928,9 @@ void load_gauge(int gauge, int base_w, int base_h, int font, int ship_idx)
 		break;
 	case HUD_OBJECT_WARHEAD_COUNT:
 		load_gauge_warhead_count(base_w, base_h, font, ship_idx);
+		break;
+	case HUD_OBJECT_HARDPOINTS:
+		load_gauge_hardpoints(base_w, base_h, font, ship_idx);
 		break;
 	default:
 		Warning(LOCATION, "Invalid gauge found in hud_gauges.tbl");
@@ -5719,6 +5725,67 @@ void load_gauge_warhead_count(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initMaxSymbols(max_icons);
 	hud_gauge->initMaxColumns(max_columns);
 	hud_gauge->initTextAlign(alignment);
+	hud_gauge->initSlew(slew);
+	hud_gauge->initFont(font_num);
+
+	if(ship_index >= 0) {
+		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
+	} else {
+		default_hud_gauges.push_back(hud_gauge);
+	}
+}
+
+void load_gauge_hardpoints(int base_w, int base_h, int font, int ship_index)
+{
+	int coords[2];
+	int base_res[2];
+	int warhead_name_offsets[2] = {6, 4};
+	int warhead_count_offsets[2] = {74, 4};
+	int icon_width;
+	int icon_height;
+	int max_icons;
+	int max_columns;
+	int alignment = 0;
+	bool slew = true;
+	int font_num = FONT1;
+
+	if(gr_screen.res == GR_640) {
+		coords[0] = 396;
+		coords[1] = 379;
+
+		base_res[0] = 640;
+		base_res[1] = 480;
+	} else {
+		coords[0] = 634;
+		coords[1] = 670;
+
+		base_res[0] = 1024;
+		base_res[1] = 768;
+	}
+
+	if( check_base_res(base_w, base_h) ) {
+		base_res[0] = base_w;
+		base_res[1] = base_h;
+
+		if ( optional_string("Position:") ) {
+			stuff_int_list(coords, 2);
+		}
+	}
+
+	if ( optional_string("Font:") ) {
+		stuff_int(&font_num);
+	} else {
+		if ( font >=0 ) {
+			font_num = font;
+		}
+	}
+	if ( optional_string("Slew:") ) {
+		stuff_boolean(&slew);
+	}
+
+	HudGaugeHardpoints* hud_gauge = new HudGaugeHardpoints();
+	hud_gauge->initPosition(coords[0], coords[1]);
+	hud_gauge->initBaseResolution(base_res[0], base_res[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
 
