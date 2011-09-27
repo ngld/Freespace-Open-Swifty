@@ -7244,8 +7244,8 @@ void HudGaugeHardpoints::render(float frametime)
 	sy = position[1];
 
 	bool g3_yourself = !g3_in_frame();
-	angles rot_angles = {-PI_2,0.0f,0.0f};
-	//angles rot_angles = {PI_2*2.0f,PI_2*2.0f,0.0f};
+	//angles rot_angles = {-PI_2,0.0f,0.0f};
+	angles rot_angles = {PI_2*2.0f,PI_2*2.0f,0.0f};
 	matrix	object_orient;
 
 	vm_angles_2_matrix(&object_orient, &rot_angles);
@@ -7257,8 +7257,8 @@ void HudGaugeHardpoints::render(float frametime)
 	if(g3_yourself)
 		g3_start_frame(1);
 	hud_save_restore_camera_data(1);
-	setClip(5, 5, 250, 250);
-	model_set_detail_level(0);
+	setClip(5, 5, 200, 200);
+	model_set_detail_level(1);
 
 	g3_set_view_matrix( &sip->closeup_pos, &vmd_identity_matrix, sip->closeup_zoom*2.5f);
 
@@ -7268,27 +7268,39 @@ void HudGaugeHardpoints::render(float frametime)
 		//gr_set_view_matrix(&Eye_position, &vmd_identity_matrix);
 	}
 
-	//setGaugeColor(HUD_C_DIM);
-	gr_set_color_fast(&Color_bright_red);
-
-	gr_set_line_width(1.0f);
+	setGaugeColor(HUD_C_DIM);
 
 	//We're ready to show stuff
 	ship_model_start(objp);
 
-	model_render( sip->model_num, &object_orient, &vmd_zero_vector, MR_NO_LIGHTING | MR_LOCK_DETAIL | MR_AUTOCENTER | MR_NO_FOGGING | MR_NO_TEXTURING, -1, -1, sp->ship_replacement_textures);
+	
+	gr_stencil_clear();
 
+	int cull = gr_set_cull(0);
+	int stencil = gr_stencil_set(GR_STENCIL_WRITE);
+	int zbuffer = gr_zbuffer_set(GR_ZBUFF_NONE);
+	gr_set_color_buffer(0);
+	model_render( sip->model_num, &object_orient, &vmd_zero_vector, MR_NO_LIGHTING | MR_LOCK_DETAIL | MR_AUTOCENTER | MR_NO_FOGGING | MR_NO_TEXTURING | MR_NO_CULL);
+	gr_set_color_buffer(1);
+	gr_stencil_set(GR_STENCIL_READ);
+	gr_set_cull(cull);
+	gr_set_line_width(2.0f);
+	model_render( sip->model_num, &object_orient, &vmd_zero_vector, MR_NO_LIGHTING | MR_LOCK_DETAIL | MR_AUTOCENTER | MR_NO_FOGGING | MR_NO_TEXTURING | MR_SHOW_OUTLINE_HTL | MR_NO_POLYS | MR_NO_ZBUFFER | MR_NO_CULL);
+	gr_stencil_set(GR_STENCIL_NONE);
 	ship_model_stop( objp );
+	gr_zbuffer_set(zbuffer);
+	gr_set_line_width(1.0f);
 
 	setGaugeColor(HUD_C_BRIGHT);
-
+	//gr_set_color_fast(&Color_bright_red);
+	
 	//draw weapon models
 	if ( sip->draw_models ) {
 		int i,k;
 		ship_weapon *swp = &sp->weapons;
 		g3_start_instance_matrix(&vmd_zero_vector, &object_orient, true);
 
-		int render_flags = MR_NO_LIGHTING | MR_LOCK_DETAIL | MR_AUTOCENTER | MR_NO_FOGGING | MR_NO_TEXTURING | MR_NO_ZBUFFER;// | MR_SHOW_OUTLINE_HTL;
+		int render_flags = MR_NO_LIGHTING | MR_LOCK_DETAIL | MR_AUTOCENTER | MR_NO_FOGGING | MR_NO_TEXTURING | MR_NO_ZBUFFER;
 
 		//primary weapons
 		for ( i = 0; i < swp->num_primary_banks; i++ ) {
@@ -7342,7 +7354,7 @@ void HudGaugeHardpoints::render(float frametime)
 		}
 		g3_done_instance(true);
 	}
-
+	
 	//We're done
 	if(!Cmdline_nohtl)
 	{

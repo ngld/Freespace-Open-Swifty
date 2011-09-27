@@ -280,6 +280,11 @@ int gr_stub_set_cull(int cull)
 	return 0;
 }
 
+int gr_stub_set_color_buffer(int mode)
+{
+	return 0;
+}
+
 void gr_stub_set_gamma(float gamma)
 {
 }
@@ -357,6 +362,15 @@ void gr_stub_zbias_stub(int bias)
 }
 
 void gr_stub_zbuffer_clear(int mode)
+{
+}
+
+int gr_stub_stencil_set(int mode)
+{
+	return 0;
+}
+
+void gr_stub_stencil_clear()
 {
 }
 
@@ -710,6 +724,9 @@ bool gr_stub_init()
 	gr_screen.gf_zbuffer_get		= gr_stub_zbuffer_get;
 	gr_screen.gf_zbuffer_set		= gr_stub_zbuffer_set;
 	gr_screen.gf_zbuffer_clear		= gr_stub_zbuffer_clear;
+
+	gr_screen.gf_stencil_set		= gr_stub_stencil_set;
+	gr_screen.gf_stencil_clear		= gr_stub_stencil_clear;
 	
 	gr_screen.gf_save_screen		= gr_stub_save_screen;
 	gr_screen.gf_restore_screen		= gr_stub_restore_screen;
@@ -737,6 +754,7 @@ bool gr_stub_init()
 	gr_screen.gf_bm_set_render_target	= gr_stub_bm_set_render_target;
 
 	gr_screen.gf_set_cull			= gr_stub_set_cull;
+	gr_screen.gf_set_color_buffer	= gr_stub_set_color_buffer;
 
 	gr_screen.gf_cross_fade			= gr_stub_cross_fade;
 

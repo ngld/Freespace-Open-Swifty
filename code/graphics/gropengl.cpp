@@ -717,6 +717,21 @@ void gr_opengl_set_clear_color(int r, int g, int b)
 	gr_init_color(&gr_screen.current_clear_color, r, g, b);
 }
 
+int gr_opengl_set_color_buffer(int mode)
+{
+	GLboolean enabled = GL_FALSE;
+
+	if ( mode ) {
+		enabled = GL_state.ColorMask(GL_TRUE);
+	} else {
+		enabled = GL_state.ColorMask(GL_FALSE);
+	}
+
+	GL_state.SetAlphaBlendMode(ALPHA_BLEND_ALPHA_BLEND_ALPHA);
+
+	return (enabled) ? 1 : 0;
+}
+
 int gr_opengl_zbuffer_get()
 {
 	if ( !gr_global_zbuffering ) {
@@ -765,6 +780,31 @@ void gr_opengl_zbuffer_clear(int mode)
 
 		GL_state.DepthTest(GL_FALSE);
 	}
+}
+
+int gr_opengl_stencil_set(int mode)
+{
+	int tmp = gr_stencil_mode;
+
+	gr_stencil_mode = mode;
+
+	if ( mode == GR_STENCIL_READ ) {
+		GL_state.StencilTest(1);
+		GL_state.SetStencilType(STENCIL_TYPE_READ);
+	} else if ( mode = GR_STENCIL_WRITE ) {
+		GL_state.StencilTest(1);
+		GL_state.SetStencilType(STENCIL_TYPE_WRITE);
+	} else {
+		GL_state.StencilTest(0);
+		GL_state.SetStencilType(STENCIL_TYPE_NONE);
+	}
+
+	return tmp;
+}
+
+void gr_opengl_stencil_clear()
+{
+	glClear(GL_STENCIL_BUFFER_BIT);
 }
 
 // I feel dirty...
@@ -1739,6 +1779,9 @@ void opengl_setup_function_pointers()
 	gr_screen.gf_zbuffer_get		= gr_opengl_zbuffer_get;
 	gr_screen.gf_zbuffer_set		= gr_opengl_zbuffer_set;
 	gr_screen.gf_zbuffer_clear		= gr_opengl_zbuffer_clear;
+
+	gr_screen.gf_stencil_set		= gr_opengl_stencil_set;
+	gr_screen.gf_stencil_clear		= gr_opengl_stencil_clear;
 	
 	gr_screen.gf_save_screen		= gr_opengl_save_screen;
 	gr_screen.gf_restore_screen		= gr_opengl_restore_screen;
@@ -1766,6 +1809,7 @@ void opengl_setup_function_pointers()
 	gr_screen.gf_bm_set_render_target	= gr_opengl_bm_set_render_target;
 
 	gr_screen.gf_set_cull			= gr_opengl_set_cull;
+	gr_screen.gf_set_color_buffer	= gr_opengl_set_color_buffer;
 
 	gr_screen.gf_cross_fade			= gr_opengl_cross_fade;
 
