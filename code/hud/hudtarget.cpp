@@ -7230,6 +7230,28 @@ HudGauge(HUD_OBJECT_HARDPOINTS, HUD_WEAPONS_GAUGE, true, false, false, VM_EXTERN
 
 }
 
+void HudGaugeHardpoints::initSizes(int w, int h)
+{
+	_size[0] = w;
+	_size[1] = h;
+}
+
+void HudGaugeHardpoints::initLineWidth(float w)
+{
+	_line_width = w;
+}
+
+void HudGaugeHardpoints::initViewDir(int dir)
+{
+	_view_direction = dir;
+}
+
+void HudGaugeHardpoints::initDrawOptions(bool primary_models, bool secondary_models)
+{
+	draw_primary_models = primary_models;
+	draw_secondary_models = secondary_models;
+}
+
 void HudGaugeHardpoints::render(float frametime)
 {
 	int			sx, sy;
@@ -7244,20 +7266,24 @@ void HudGaugeHardpoints::render(float frametime)
 	sy = position[1];
 
 	bool g3_yourself = !g3_in_frame();
-	//angles rot_angles = {-PI_2,0.0f,0.0f};
-	angles rot_angles = {PI_2*2.0f,PI_2*2.0f,0.0f};
+	angles top_view = {-PI_2,0.0f,0.0f};
+	angles front_view = {PI_2*2.0f,PI_2*2.0f,0.0f};
 	matrix	object_orient;
 
-	vm_angles_2_matrix(&object_orient, &rot_angles);
-
-	//gr_screen.clip_width = 300;
-	//gr_screen.clip_height = 300;
+	switch ( _view_direction ) {
+		case TOP:
+			vm_angles_2_matrix(&object_orient, &top_view);
+			break;
+		case FRONT:
+			vm_angles_2_matrix(&object_orient, &front_view);
+			break;
+	}
 
 	//Fire it up
 	if(g3_yourself)
 		g3_start_frame(1);
 	hud_save_restore_camera_data(1);
-	setClip(5, 5, 200, 200);
+	setClip(sx, sy, _size[0], _size[1]);
 	model_set_detail_level(1);
 
 	g3_set_view_matrix( &sip->closeup_pos, &vmd_identity_matrix, sip->closeup_zoom*2.5f);
@@ -7265,94 +7291,131 @@ void HudGaugeHardpoints::render(float frametime)
 	if (!Cmdline_nohtl) {
 		gr_set_proj_matrix(0.625f*PI_2, gr_screen.clip_aspect, Min_draw_distance, Max_draw_distance);
 		gr_set_view_matrix(&Eye_position, &Eye_matrix);
-		//gr_set_view_matrix(&Eye_position, &vmd_identity_matrix);
 	}
 
 	setGaugeColor(HUD_C_DIM);
 
 	//We're ready to show stuff
-	ship_model_start(objp);
-
 	
-	gr_stencil_clear();
-
 	int cull = gr_set_cull(0);
+	gr_stencil_clear();
 	int stencil = gr_stencil_set(GR_STENCIL_WRITE);
 	int zbuffer = gr_zbuffer_set(GR_ZBUFF_NONE);
 	gr_set_color_buffer(0);
+
+	ship_model_start(objp);
 	model_render( sip->model_num, &object_orient, &vmd_zero_vector, MR_NO_LIGHTING | MR_LOCK_DETAIL | MR_AUTOCENTER | MR_NO_FOGGING | MR_NO_TEXTURING | MR_NO_CULL);
+
 	gr_set_color_buffer(1);
 	gr_stencil_set(GR_STENCIL_READ);
 	gr_set_cull(cull);
-	gr_set_line_width(2.0f);
+	gr_set_line_width(_line_width*2.0f);
+
 	model_render( sip->model_num, &object_orient, &vmd_zero_vector, MR_NO_LIGHTING | MR_LOCK_DETAIL | MR_AUTOCENTER | MR_NO_FOGGING | MR_NO_TEXTURING | MR_SHOW_OUTLINE_HTL | MR_NO_POLYS | MR_NO_ZBUFFER | MR_NO_CULL);
-	gr_stencil_set(GR_STENCIL_NONE);
 	ship_model_stop( objp );
+
+	gr_stencil_set(GR_STENCIL_NONE);
 	gr_zbuffer_set(zbuffer);
 	gr_set_line_width(1.0f);
 
 	setGaugeColor(HUD_C_BRIGHT);
 	//gr_set_color_fast(&Color_bright_red);
 	
-	//draw weapon models
-	if ( sip->draw_models ) {
-		int i,k;
-		ship_weapon *swp = &sp->weapons;
-		g3_start_instance_matrix(&vmd_zero_vector, &object_orient, true);
+	// draw weapon models
+	int i, k;
+	ship_weapon *swp = &sp->weapons;
+	vertex draw_point;
+	vec3d subobj_pos;
+	g3_start_instance_matrix(&vmd_zero_vector, &object_orient, true);
 
-		int render_flags = MR_NO_LIGHTING | MR_LOCK_DETAIL | MR_AUTOCENTER | MR_NO_FOGGING | MR_NO_TEXTURING | MR_NO_ZBUFFER;
+	int render_flags = MR_NO_LIGHTING | MR_LOCK_DETAIL | MR_AUTOCENTER | MR_NO_FOGGING | MR_NO_TEXTURING | MR_NO_ZBUFFER;
 
-		//primary weapons
-		for ( i = 0; i < swp->num_primary_banks; i++ ) {
-			if (Weapon_info[swp->primary_bank_weapons[i]].external_model_num == -1 || !sip->draw_primary_models[i])
-				continue;
+	setGaugeColor(HUD_C_BRIGHT);
 
-			w_bank *bank = &model_get(sip->model_num)->gun_banks[i];
-			for(k = 0; k < bank->num_slots; k++) {	
+	//secondary weapons
+	int num_secondaries_rendered = 0;
+	vec3d secondary_weapon_pos;
+	w_bank* bank;
+
+	for (i = 0; i < swp->num_secondary_banks; i++) {
+		if (Weapon_info[swp->secondary_bank_weapons[i]].external_model_num == -1 || !sip->draw_secondary_models[i])
+			continue;
+
+		bank = &(model_get(sip->model_num))->missile_banks[i];
+
+		if (Weapon_info[swp->secondary_bank_weapons[i]].wi_flags2 & WIF2_EXTERNAL_WEAPON_LNCH) {
+			for(k = 0; k < bank->num_slots; k++) {
+				model_render(Weapon_info[swp->secondary_bank_weapons[i]].external_model_num, &vmd_identity_matrix, &bank->pnt[k], render_flags);
+			}
+		} else {
+			num_secondaries_rendered = 0;
+
+			for(k = 0; k < bank->num_slots; k++)
+			{
+				secondary_weapon_pos = bank->pnt[k];
+
+				if (num_secondaries_rendered >= sp->weapons.secondary_bank_ammo[i])
+					break;
+
+				if(sp->secondary_point_reload_pct[i][k] <= 0.0)
+					continue;
+
+				num_secondaries_rendered++;
+
+				vm_vec_scale_add2(&secondary_weapon_pos, &vmd_z_vector, -(1.0f-sp->secondary_point_reload_pct[i][k]) * model_get(Weapon_info[swp->secondary_bank_weapons[i]].external_model_num)->rad);
+
+				model_render(Weapon_info[swp->secondary_bank_weapons[i]].external_model_num, &vmd_identity_matrix, &secondary_weapon_pos, render_flags);
+			}
+		}
+	}
+	g3_done_instance(true);
+	resetClip();
+
+	gr_set_color_fast(&Color_bright_red);
+
+	//primary weapons
+	for ( i = 0; i < swp->num_primary_banks; i++ ) {
+		w_bank *bank = &model_get(sip->model_num)->gun_banks[i];
+
+		for ( k = 0; k < bank->num_slots; k++ ) {	
+			if ( ( Weapon_info[swp->primary_bank_weapons[i]].external_model_num == -1 || !sip->draw_primary_models[i] ) ) {
+				vm_vec_unrotate(&subobj_pos, &bank->pnt[k], &object_orient);
+				//g3_rotate_vertex(&draw_point, &bank->pnt[k]);
+				g3_rotate_vertex(&draw_point, &subobj_pos);
+				g3_project_vertex(&draw_point);
+
+				//unsize(&draw_point.screen.xyw.x, &draw_point.screen.xyw.y);
+				float width = _size[0];
+				float height = _size[1];
+
+				//resize(&width, &height);
+
+				//float w = 1.0f / draw_point.world.xyz.z;
+				//draw_point.screen.xyw.x = (width + (draw_point.world.xyz.x*width*w))*0.5f;
+				//draw_point.screen.xyw.y = (height - (draw_point.world.xyz.y*height*w))*0.5f;
+
+				int x0 = position[0];
+				int y0 = position[1];
+
+				//resize(&x0, &y0);
+
+				//draw_point.screen.xyw.x / gr_screen.max_w * _;
+				//	draw_point.screen.xyw.y / gr_screen.max_h;
+
+				int xc = fl2i(draw_point.screen.xyw.x - Canvas_width*0.5 + width*0.5 + x0);
+				int yc = fl2i(draw_point.screen.xyw.y - Canvas_height*0.5 + height*0.5 + y0);
+
+				//unsize(&xc, &yc);
+
+				renderCircle(draw_point.screen.xyw.x, draw_point.screen.xyw.y, 25);
+				renderCircle(xc, yc, 25);
+			} else {
 				polymodel* pm = model_get(Weapon_info[swp->primary_bank_weapons[i]].external_model_num);
 				pm->gun_submodel_rotation = sp->primary_rotate_ang[i];
 				model_render(Weapon_info[swp->primary_bank_weapons[i]].external_model_num, &vmd_identity_matrix, &bank->pnt[k], render_flags);
 				pm->gun_submodel_rotation = 0.0f;
 			}
 		}
-
-		//secondary weapons
-		int num_secondaries_rendered = 0;
-		vec3d secondary_weapon_pos;
-		w_bank* bank;
-
-		for (i = 0; i < swp->num_secondary_banks; i++) {
-			if (Weapon_info[swp->secondary_bank_weapons[i]].external_model_num == -1 || !sip->draw_secondary_models[i])
-				continue;
-
-			bank = &(model_get(sip->model_num))->missile_banks[i];
-
-			if (Weapon_info[swp->secondary_bank_weapons[i]].wi_flags2 & WIF2_EXTERNAL_WEAPON_LNCH) {
-				for(k = 0; k < bank->num_slots; k++) {
-					model_render(Weapon_info[swp->secondary_bank_weapons[i]].external_model_num, &vmd_identity_matrix, &bank->pnt[k], render_flags);
-				}
-			} else {
-				num_secondaries_rendered = 0;
-
-				for(k = 0; k < bank->num_slots; k++)
-				{
-					secondary_weapon_pos = bank->pnt[k];
-
-					if (num_secondaries_rendered >= sp->weapons.secondary_bank_ammo[i])
-						break;
-
-					if(sp->secondary_point_reload_pct[i][k] <= 0.0)
-						continue;
-
-					num_secondaries_rendered++;
-
-					vm_vec_scale_add2(&secondary_weapon_pos, &vmd_z_vector, -(1.0f-sp->secondary_point_reload_pct[i][k]) * model_get(Weapon_info[swp->secondary_bank_weapons[i]].external_model_num)->rad);
-
-					model_render(Weapon_info[swp->secondary_bank_weapons[i]].external_model_num, &vmd_identity_matrix, &secondary_weapon_pos, render_flags);
-				}
-			}
-		}
-		g3_done_instance(true);
 	}
 	
 	//We're done
@@ -7364,6 +7427,4 @@ void HudGaugeHardpoints::render(float frametime)
 	if(g3_yourself)
 		g3_end_frame();
 	hud_save_restore_camera_data(0);
-
-	resetClip();
 }

@@ -5739,15 +5739,12 @@ void load_gauge_hardpoints(int base_w, int base_h, int font, int ship_index)
 {
 	int coords[2];
 	int base_res[2];
-	int warhead_name_offsets[2] = {6, 4};
-	int warhead_count_offsets[2] = {74, 4};
-	int icon_width;
-	int icon_height;
-	int max_icons;
-	int max_columns;
-	int alignment = 0;
 	bool slew = true;
 	int font_num = FONT1;
+
+	int sizes[2] = {150, 150};
+	float line_width = 1.0f;
+	int view_dir = HudGaugeHardpoints::TOP;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 396;
@@ -5783,11 +5780,30 @@ void load_gauge_hardpoints(int base_w, int base_h, int font, int ship_index)
 		stuff_boolean(&slew);
 	}
 
+	if ( optional_string("Size:") ) {
+		stuff_int_list(sizes, 2);
+	}
+
+	if ( optional_string("Line Width:") ) {
+		stuff_float(&line_width);
+	}
+
+	if ( optional_string("View Direction:") ) {
+		if ( optional_string("Top") ) {
+			view_dir = HudGaugeHardpoints::TOP;
+		} else if ( optional_string("Front") ) {
+			view_dir = HudGaugeHardpoints::FRONT;
+		}
+	}
+
 	HudGaugeHardpoints* hud_gauge = new HudGaugeHardpoints();
 	hud_gauge->initPosition(coords[0], coords[1]);
 	hud_gauge->initBaseResolution(base_res[0], base_res[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->initSizes(sizes[0], sizes[1]);
+	hud_gauge->initLineWidth(line_width);
+	hud_gauge->initViewDir(view_dir);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
