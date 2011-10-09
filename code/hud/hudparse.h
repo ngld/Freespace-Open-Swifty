@@ -27,7 +27,7 @@ void set_current_hud();
 void init_hud();
 void load_missing_retail_gauges();
 
-#define NUM_HUD_OBJECT_ENTRIES			54
+#define NUM_HUD_OBJECT_ENTRIES			55
 int parse_gauge_type();
 void load_gauge(int gauge, int base_w = -1, int base_h = -1, int font = -1, int ship_idx = -1);
 
@@ -189,5 +189,11 @@ void load_gauge_warhead_count(int base_w, int base_h, int font, int ship_idx = -
 
 #define HUD_OBJECT_HARDPOINTS			52
 void load_gauge_hardpoints(int base_w, int base_h, int font, int ship_idx = -1);
+
+#define HUD_OBJECT_PRIMARY_WEAPONS		53
+void load_gauge_primary_weapons(int base_w, int base_h, int font, int ship_idx = -1);
+
+#define HUD_OBJECT_SECONDARY_WEAPONS	54
+void load_gauge_secondary_weapons(int base_w, int base_h, int font, int ship_idx = -1);
 
 #endif // _HUDPARSE_H

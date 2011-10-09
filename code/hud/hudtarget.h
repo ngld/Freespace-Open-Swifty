@@ -340,6 +340,7 @@ protected:
 	int _entry_start_y;
 	int _entry_h;
 public:
+	HudGaugeWeaponList(int gauge_object);
 	void initBitmaps(char *fname_first, char *fname_entry, char *fname_last);
 	void initBgFirstOffsetX(int x);
 	void initBgEntryOffsetX(int x);
@@ -362,6 +363,7 @@ protected:
 	int _pname_offset_x; 
 	int _pammo_offset_x; 
 public:
+	HudGaugePrimaryWeapons();
 	void initPrimaryLinkOffsetX(int x);
 	void initPrimaryNameOffsetX(int x);
 	void initPrimaryAmmoOffsetX(int x);
@@ -378,6 +380,7 @@ protected:
 	int _slinked_offset_x;
 	int _sunlinked_offset_x;
 public:
+	HudGaugeSecondaryWeapons();
 	void initSecondaryAmmoOffsetX(int x);
 	void initSecondaryNameOffsetX(int x);
 	void initSecondaryReloadOffsetX(int x);
