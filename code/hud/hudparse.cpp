@@ -5787,6 +5787,8 @@ void load_gauge_hardpoints(int base_w, int base_h, int font, int ship_index)
 	int sizes[2] = {150, 150};
 	float line_width = 1.0f;
 	int view_dir = HudGaugeHardpoints::TOP;
+	bool show_primary = false;
+	bool show_secondary = true;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 396;
@@ -5838,6 +5840,14 @@ void load_gauge_hardpoints(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Show Primary Weapons:") ) {
+		stuff_boolean(&show_primary);
+	}
+
+	if ( optional_string("Show Secondary Weapons:") ) {
+		stuff_boolean(&show_secondary);
+	}
+
 	HudGaugeHardpoints* hud_gauge = new HudGaugeHardpoints();
 	hud_gauge->initPosition(coords[0], coords[1]);
 	hud_gauge->initBaseResolution(base_res[0], base_res[1]);
@@ -5846,6 +5856,7 @@ void load_gauge_hardpoints(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initSizes(sizes[0], sizes[1]);
 	hud_gauge->initLineWidth(line_width);
 	hud_gauge->initViewDir(view_dir);
+	hud_gauge->initDrawOptions(show_primary, show_secondary);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
