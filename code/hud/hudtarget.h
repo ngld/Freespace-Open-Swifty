@@ -177,11 +177,18 @@ protected:
 
 	int Auto_text_offsets[2];
 	int Target_text_offsets[2];
+
+	color On_color;
+	bool Use_on_color;
+	color Off_color;
+	bool Use_off_color;
 public:
 	HudGaugeAutoTarget();
 	void initAutoTextOffsets(int x, int y);
 	void initTargetTextOffsets(int x, int y);
 	void initBitmaps(char *fname);
+	void initOnColor(int r, int g, int b, int a);
+	void initOffColor(int r, int g, int b, int a);
 	void render(float frametime);
 	void pageIn();
 };
@@ -193,11 +200,18 @@ protected:
 
 	int Auto_text_offsets[2];
 	int Speed_text_offsets[2];
+
+	color On_color;
+	bool Use_on_color;
+	color Off_color;
+	bool Use_off_color;
 public:
 	HudGaugeAutoSpeed();
 	void initAutoTextOffsets(int x, int y);
 	void initSpeedTextOffsets(int x, int y);
 	void initBitmaps(char *fname);
+	void initOnColor(int r, int g, int b, int a);
+	void initOffColor(int r, int g, int b, int a);
 	void render(float frametime);
 	void pageIn();
 };
@@ -339,6 +353,8 @@ protected:
 	int _header_offsets[2];
 	int _entry_start_y;
 	int _entry_h;
+
+	char header_text[NAME_LENGTH];
 public:
 	HudGaugeWeaponList(int gauge_object);
 	void initBitmaps(char *fname_first, char *fname_entry, char *fname_last);
@@ -347,6 +363,7 @@ public:
 	void initBgLastOffsetX(int x);
 	void initBgFirstHeight(int h);
 	void initBgEntryHeight(int h);
+	void initHeaderText(char *text);
 	void initHeaderOffsets(int x, int y);
 	void initEntryStartY(int y);
 	void initEntryHeight(int h);

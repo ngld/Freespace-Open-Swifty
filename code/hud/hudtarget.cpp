@@ -5038,6 +5038,30 @@ void HudGaugeAutoTarget::initBitmaps(char *fname)
 	}
 }
 
+void HudGaugeAutoTarget::initOnColor(int r, int g, int b, int a)
+{
+	if ( r == -1 || g == -1 || b == -1 || a == -1 ) {
+		Use_on_color = false;
+		gr_init_alphacolor(&On_color, 0, 0, 0, 0);
+		return;
+	}
+
+	Use_on_color = true;
+	gr_init_alphacolor(&On_color, r, g, b, a);
+}
+
+void HudGaugeAutoTarget::initOffColor(int r, int g, int b, int a)
+{
+	if ( r == -1 || g == -1 || b == -1 || a == -1 ) {
+		Use_off_color = false;
+		gr_init_alphacolor(&Off_color, 0, 0, 0, 0);
+		return;
+	}
+
+	Use_off_color = true;
+	gr_init_alphacolor(&Off_color, r, g, b, a);
+}
+
 void HudGaugeAutoTarget::render(float frametime)
 {
 	if (Player_ship->flags2 & SF2_PRIMITIVE_SENSORS)
@@ -5057,9 +5081,13 @@ void HudGaugeAutoTarget::render(float frametime)
 
 	// draw the text on top
 	if (frame_offset == 1) {
-		static color text_color;
-		gr_init_alphacolor(&text_color, 0, 0, 0, Toggle_text_alpha);
-		gr_set_color_fast(&text_color);
+		//static color text_color;
+		//gr_init_alphacolor(&text_color, 0, 0, 0, Toggle_text_alpha);
+		if ( Use_on_color ) {
+			gr_set_color_fast(&On_color);
+		}
+	} else if ( Use_off_color ) {
+		gr_set_color_fast(&Off_color);
 	}
 
 	renderString(position[0] + Auto_text_offsets[0], position[1] + Auto_text_offsets[1], XSTR("auto", 1463));
@@ -5096,6 +5124,30 @@ void HudGaugeAutoSpeed::initBitmaps(char *fname)
 	}
 }
 
+void HudGaugeAutoSpeed::initOnColor(int r, int g, int b, int a)
+{
+	if ( r == -1 || g == -1 || b == -1 || a == -1 ) {
+		Use_on_color = false;
+		gr_init_alphacolor(&On_color, 0, 0, 0, 0);
+		return;
+	}
+
+	Use_on_color = true;
+	gr_init_alphacolor(&On_color, r, g, b, a);
+}
+
+void HudGaugeAutoSpeed::initOffColor(int r, int g, int b, int a)
+{
+	if ( r == -1 || g == -1 || b == -1 || a == -1 ) {
+		Use_off_color = false;
+		gr_init_alphacolor(&Off_color, 0, 0, 0, 0);
+		return;
+	}
+
+	Use_off_color = true;
+	gr_init_alphacolor(&Off_color, r, g, b, a);
+}
+
 void HudGaugeAutoSpeed::render(float frametime)
 {
 	if (Player_ship->flags2 & SF2_PRIMITIVE_SENSORS)
@@ -5115,9 +5167,13 @@ void HudGaugeAutoSpeed::render(float frametime)
 
 	// draw the text on top
 	if (frame_offset == 3) {
-		static color text_color;
-		gr_init_alphacolor(&text_color, 0, 0, 0, Toggle_text_alpha);
-		gr_set_color_fast(&text_color);
+		//static color text_color;
+		//gr_init_alphacolor(&text_color, 0, 0, 0, Toggle_text_alpha);
+		if ( Use_on_color ) {
+			gr_set_color_fast(&On_color);
+		}
+	} else if ( Use_off_color ) {
+		gr_set_color_fast(&Off_color);
 	}
 	renderString(position[0] + Auto_text_offsets[0], position[1] + Auto_text_offsets[1], XSTR("auto", 1463));
 	renderString(position[0] + Speed_text_offsets[0], position[1] + Speed_text_offsets[1], XSTR("speed", 1464));
@@ -6904,7 +6960,7 @@ void HudGaugeWarheadCount::render(float frametime)
 	strcpy_s(weapon_name, (wip->alt_name[0]) ? wip->alt_name : wip->name);
 	end_string_at_first_hash_symbol(weapon_name);
 
-	setGaugeColor(HUD_C_BRIGHT);
+	setGaugeColor();
 
 	// display the weapon name
 	if ( Text_align ) {
@@ -6915,6 +6971,8 @@ void HudGaugeWarheadCount::render(float frametime)
 	} else {
 		renderString(position[0] + Warhead_name_offsets[0], position[1] + Warhead_name_offsets[1], weapon_name);
 	}
+
+	setGaugeColor(HUD_C_BRIGHT);
 
 	// if ammo is greater than the icon display limit, just show a numeric
 	if ( ammo > Max_symbols ) {
@@ -7004,6 +7062,11 @@ void HudGaugeWeaponList::initBgEntryHeight(int h)
 	_background_entry_h = h;
 }
 
+void HudGaugeWeaponList::initHeaderText(char *text)
+{
+	strcpy_s(header_text, text);
+}
+
 void HudGaugeWeaponList::initHeaderOffsets(int x, int y)
 {
 	_header_offsets[0] = x;
@@ -7066,6 +7129,21 @@ HudGaugeWeaponList(HUD_OBJECT_PRIMARY_WEAPONS)
 
 }
 
+void HudGaugePrimaryWeapons::initPrimaryLinkOffsetX(int x)
+{
+	_plink_offset_x = x;
+}
+
+void HudGaugePrimaryWeapons::initPrimaryNameOffsetX(int x)
+{
+	_pname_offset_x = x;
+}
+
+void HudGaugePrimaryWeapons::initPrimaryAmmoOffsetX(int x)
+{
+	_pammo_offset_x = x;
+}
+
 void HudGaugePrimaryWeapons::render(float frametime)
 {
 	ship_weapon	*sw;
@@ -7090,7 +7168,7 @@ void HudGaugePrimaryWeapons::render(float frametime)
 	renderBitmap(_background_first.first_frame, position[0], position[1]);
 
 	// render the header of this gauge
-	renderString(position[0] + _header_offsets[0], position[1] + _header_offsets[1], EG_WEAPON_TITLE, XSTR( "Primary Weapons", 328));
+	renderString(position[0] + _header_offsets[0], position[1] + _header_offsets[1], EG_WEAPON_TITLE, header_text);
 
 	char ammo_str[32];
 	int i, w, h;
@@ -7153,6 +7231,31 @@ HudGaugeWeaponList(HUD_OBJECT_SECONDARY_WEAPONS)
 
 }
 
+void HudGaugeSecondaryWeapons::initSecondaryAmmoOffsetX(int x)
+{
+	_sammo_offset_x = x;
+}
+
+void HudGaugeSecondaryWeapons::initSecondaryNameOffsetX(int x)
+{
+	_sname_offset_x = x;
+}
+
+void HudGaugeSecondaryWeapons::initSecondaryReloadOffsetX(int x)
+{
+	_sreload_offset_x = x;
+}
+
+void HudGaugeSecondaryWeapons::initSecondaryLinkedOffsetX(int x)
+{
+	_slinked_offset_x = x;
+}
+
+void HudGaugeSecondaryWeapons::initSecondaryUnlinkedOffsetX(int x)
+{
+	_sunlinked_offset_x = x;
+}
+
 void HudGaugeSecondaryWeapons::render(float frametime)
 {
 	ship_weapon	*sw;
@@ -7175,7 +7278,7 @@ void HudGaugeSecondaryWeapons::render(float frametime)
 	renderBitmap(_background_first.first_frame, position[0], position[1]);
 
 	// render the header of this gauge
-	renderString(position[0] + _header_offsets[0], position[1] + _header_offsets[1], EG_WEAPON_TITLE, XSTR( "Secondary Weapons", 328));
+	renderString(position[0] + _header_offsets[0], position[1] + _header_offsets[1], EG_WEAPON_TITLE, header_text);
 
 	weapon_info	*wip;
 	char weapon_name[NAME_LENGTH + 10];

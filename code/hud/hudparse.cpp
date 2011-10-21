@@ -773,6 +773,12 @@ int parse_gauge_type()
 	if ( optional_string("+Hardpoints:") )
 		return HUD_OBJECT_HARDPOINTS;
 
+	if ( optional_string("+Primary Weapons:") )
+		return HUD_OBJECT_PRIMARY_WEAPONS;
+
+	if ( optional_string("+Secondary Weapons:") )
+		return HUD_OBJECT_SECONDARY_WEAPONS;
+
 	return -1;
 }
 
@@ -3805,6 +3811,8 @@ void load_gauge_auto_target(int base_w, int base_h, int font, int ship_index)
 	char fname[MAX_FILENAME_LEN] = "toggle1";
 	bool slew = false;
 	int font_num = FONT1;
+	int on_color[4] = {0, 0, 0, 255};
+	int off_color[4] = {-1, -1, -1, -1};
 
 	if(gr_screen.res == GR_640) {
 		base_res[0] = 640;
@@ -3852,6 +3860,14 @@ void load_gauge_auto_target(int base_w, int base_h, int font, int ship_index)
 		stuff_int_list(target_text_offset, 2);
 	}
 
+	if ( optional_string("On Text Color:") ) {
+		stuff_int_list(on_color, 4);
+	}
+
+	if ( optional_string("Off Text Color:") ) {
+		stuff_int_list(off_color, 4);
+	}
+
 	HudGaugeAutoTarget* hud_gauge = new HudGaugeAutoTarget();
 	hud_gauge->initAutoTextOffsets(auto_text_offset[0], auto_text_offset[1]);
 	hud_gauge->initBaseResolution(base_res[0], base_res[1]);
@@ -3860,6 +3876,8 @@ void load_gauge_auto_target(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initTargetTextOffsets(target_text_offset[0], target_text_offset[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->initOnColor(on_color[0], on_color[1], on_color[2], on_color[3]);
+	hud_gauge->initOffColor(off_color[0], off_color[1], off_color[2], off_color[3]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -3877,6 +3895,8 @@ void load_gauge_auto_speed(int base_w, int base_h, int font, int ship_index)
 	char fname[MAX_FILENAME_LEN] = "toggle1";
 	bool slew = false;
 	int font_num = FONT1;
+	int on_color[4] = {0, 0, 0, 255};
+	int off_color[4] = {-1, -1, -1, -1};
 
 	if(gr_screen.res == GR_640) {
 		base_res[0] = 640;
@@ -3924,6 +3944,14 @@ void load_gauge_auto_speed(int base_w, int base_h, int font, int ship_index)
 		stuff_int_list(speed_text_offset, 2);
 	}
 
+	if ( optional_string("On Text Color:") ) {
+		stuff_int_list(on_color, 4);
+	}
+
+	if ( optional_string("Off Text Color:") ) {
+		stuff_int_list(off_color, 4);
+	}
+
 	HudGaugeAutoSpeed* hud_gauge = new HudGaugeAutoSpeed();
 	hud_gauge->initAutoTextOffsets(auto_text_offset[0], auto_text_offset[1]);
 	hud_gauge->initBaseResolution(base_res[0], base_res[1]);
@@ -3932,6 +3960,8 @@ void load_gauge_auto_speed(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initSpeedTextOffsets(speed_text_offset[0], speed_text_offset[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->initOnColor(on_color[0], on_color[1], on_color[2], on_color[3]);
+	hud_gauge->initOffColor(off_color[0], off_color[1], off_color[2], off_color[3]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -5751,7 +5781,7 @@ void load_gauge_hardpoints(int base_w, int base_h, int font, int ship_index)
 {
 	int coords[2];
 	int base_res[2];
-	bool slew = true;
+	bool slew = false;
 	int font_num = FONT1;
 
 	int sizes[2] = {150, 150};
@@ -5828,13 +5858,14 @@ void load_gauge_primary_weapons(int base_w, int base_h, int font, int ship_index
 {
 	int coords[2];
 	int base_res[2];
-	bool slew = true;
+	bool slew = false;
 	int font_num = FONT1;
 
 	char fname_first[MAX_FILENAME_LEN] = "weapon_list1";
 	char fname_entry[MAX_FILENAME_LEN] = "weapon_list2";
 	char fname_last[MAX_FILENAME_LEN] = "weapon_list3";
 	int header_offsets[2] = {2, 2};
+	char header_text[NAME_LENGTH] = "Primary Weapons";
 	int first_bg_h = 12;
 	int first_bg_offset_x = 0;
 	int entry_bg_h = 12;
@@ -5871,6 +5902,10 @@ void load_gauge_primary_weapons(int base_w, int base_h, int font, int ship_index
 		stuff_int_list(header_offsets, 2);
 	}
 
+	if ( optional_string("Header Text:") ) {
+		stuff_string(header_text, F_NAME, NAME_LENGTH);
+	}
+
 	if ( optional_string("First Background Filename:") ) {
 		stuff_string(fname_first, F_NAME, MAX_FILENAME_LEN);
 	}
@@ -5884,11 +5919,23 @@ void load_gauge_primary_weapons(int base_w, int base_h, int font, int ship_index
 	}
 
 	if ( optional_string("Entry Background Filename:") ) {
+		stuff_string(fname_entry, F_NAME, MAX_FILENAME_LEN);
+	}
+
+	if ( optional_string("Entry Background Height:") ) {
 		stuff_int(&entry_bg_h);
 	}
 
 	if ( optional_string("Entry Background X-offset:") ) {
 		stuff_int(&entry_bg_offset_x);
+	}
+
+	if ( optional_string("Last Background Filename:") ) {
+		stuff_string(fname_last, F_NAME, MAX_FILENAME_LEN);
+	}
+
+	if ( optional_string("Last Background X-offset:") ) {
+		stuff_int(&last_bg_offset_x);
 	}
 
 	if ( optional_string("Entry Height:") ) {
@@ -5920,6 +5967,7 @@ void load_gauge_primary_weapons(int base_w, int base_h, int font, int ship_index
 	
 	hud_gauge->initBitmaps(fname_first, fname_entry, fname_last);
 	hud_gauge->initHeaderOffsets(header_offsets[0], header_offsets[1]);
+	hud_gauge->initHeaderText(header_text);
 	hud_gauge->initBgFirstHeight(first_bg_h);
 	hud_gauge->initBgFirstOffsetX(first_bg_offset_x);
 	hud_gauge->initBgEntryHeight(entry_bg_h);
@@ -5927,22 +5975,29 @@ void load_gauge_primary_weapons(int base_w, int base_h, int font, int ship_index
 	hud_gauge->initBgLastOffsetX(last_bg_offset_x);
 	hud_gauge->initEntryHeight(entry_h);
 	hud_gauge->initEntryStartY(entry_start_offset_y);
-	hud_gauge->initPrimaryAmmoOffsetX();
-	hud_gauge->initPrimaryLinkOffsetX();
-	hud_gauge->initPrimaryNameOffsetX();
+	hud_gauge->initPrimaryAmmoOffsetX(ammo_x);
+	hud_gauge->initPrimaryLinkOffsetX(link_x);
+	hud_gauge->initPrimaryNameOffsetX(name_x);
+
+	if(ship_index >= 0) {
+		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
+	} else {
+		default_hud_gauges.push_back(hud_gauge);
+	}
 }
 
 void load_gauge_secondary_weapons(int base_w, int base_h, int font, int ship_index)
 {
 	int coords[2];
 	int base_res[2];
-	bool slew = true;
+	bool slew = false;
 	int font_num = FONT1;
 
 	char fname_first[MAX_FILENAME_LEN] = "weapon_list1";
 	char fname_entry[MAX_FILENAME_LEN] = "weapon_list2";
 	char fname_last[MAX_FILENAME_LEN] = "weapon_list3";
 	int header_offsets[2] = {2, 2};
+	char header_text[NAME_LENGTH] = "Secondary Weapons";
 	int first_bg_h = 12;
 	int first_bg_offset_x = 0;
 	int entry_bg_h = 12;
@@ -5981,6 +6036,10 @@ void load_gauge_secondary_weapons(int base_w, int base_h, int font, int ship_ind
 		stuff_int_list(header_offsets, 2);
 	}
 
+	if ( optional_string("Header Text:") ) {
+		stuff_string(header_text, F_NAME, NAME_LENGTH);
+	}
+
 	if ( optional_string("First Background Filename:") ) {
 		stuff_string(fname_first, F_NAME, MAX_FILENAME_LEN);
 	}
@@ -5994,11 +6053,23 @@ void load_gauge_secondary_weapons(int base_w, int base_h, int font, int ship_ind
 	}
 
 	if ( optional_string("Entry Background Filename:") ) {
+		stuff_string(fname_entry, F_NAME, MAX_FILENAME_LEN);
+	}
+
+	if ( optional_string("Entry Background Height:") ) {
 		stuff_int(&entry_bg_h);
 	}
 
 	if ( optional_string("Entry Background X-offset:") ) {
 		stuff_int(&entry_bg_offset_x);
+	}
+
+	if ( optional_string("Last Background Filename:") ) {
+		stuff_string(fname_last, F_NAME, MAX_FILENAME_LEN);
+	}
+
+	if ( optional_string("Last Background X-offset:") ) {
+		stuff_int(&last_bg_offset_x);
 	}
 
 	if ( optional_string("Entry Height:") ) {
@@ -6038,6 +6109,7 @@ void load_gauge_secondary_weapons(int base_w, int base_h, int font, int ship_ind
 
 	hud_gauge->initBitmaps(fname_first, fname_entry, fname_last);
 	hud_gauge->initHeaderOffsets(header_offsets[0], header_offsets[1]);
+	hud_gauge->initHeaderText(header_text);
 	hud_gauge->initBgFirstHeight(first_bg_h);
 	hud_gauge->initBgFirstOffsetX(first_bg_offset_x);
 	hud_gauge->initBgEntryHeight(entry_bg_h);
@@ -6050,4 +6122,10 @@ void load_gauge_secondary_weapons(int base_w, int base_h, int font, int ship_ind
 	hud_gauge->initSecondaryNameOffsetX(name_x);
 	hud_gauge->initSecondaryReloadOffsetX(reload_x);
 	hud_gauge->initSecondaryUnlinkedOffsetX(unlink_x);
+
+	if(ship_index >= 0) {
+		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
+	} else {
+		default_hud_gauges.push_back(hud_gauge);
+	}
 }
