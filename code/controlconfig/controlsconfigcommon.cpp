@@ -449,21 +449,48 @@ int translate_key_to_index(char *key)
 // or there is no key current bound to the function, NULL is returned.
 char *translate_key(char *key)
 {
-	int index = -1, code = -1;
+	int index = -1, key_code = -1, joy_code = -1;
+	char *key_text = NULL;
+	char *joy_text = NULL;
+
+	static char text[40] = {"None"};
 
 	index = translate_key_to_index(key);
-	if (index < 0)
+	if (index < 0) {
 		return NULL;
-
-	code = Control_config[index].key_id;
-	Failed_key_index = index;
-	if (code < 0) {
-		code = Control_config[index].joy_id;
-		if (code >= 0)
-			return Joy_button_text[code];
 	}
 
-	return textify_scancode(code);
+	key_code = Control_config[index].key_id;
+	joy_code = Control_config[index].joy_id;
+
+	Failed_key_index = index;
+
+	if (key_code >= 0) {
+		key_text = textify_scancode(key_code);
+	}
+
+	if (joy_code >= 0) {
+		joy_text = Joy_button_text[joy_code];
+	}
+
+	// both key and joystick button are mapped to this control
+	if ((key_code >= 0 ) && (joy_code >= 0) ) {
+		strcpy_s(text, key_text);
+		strcat_s(text, " or ");
+		strcat_s(text, joy_text);
+	}
+	// if we only have one
+	else if (key_code >= 0 ) {
+		strcpy_s(text, key_text);
+	}
+	else if (joy_code >= 0) {
+		strcpy_s(text, joy_text);
+	}
+	else {
+		strcpy_s(text, "None");
+	}
+
+	return text;
 }
 
 char *textify_scancode(int code)
@@ -529,7 +556,7 @@ void control_config_common_init()
 
 #include <map>
 #include <string>
-std::map<std::string, int> mEnumNameToVal;
+SCP_map<SCP_string, int> mEnumNameToVal;
 
 void LoadEnumsIntoMap();
 void control_config_common_load_overrides()
@@ -555,8 +582,8 @@ void control_config_common_load_overrides()
         required_string("$Bind Name:");
         stuff_string(szTempBuffer, F_NAME, iBufferLength);
         
-        const int iCntrlAryLength = sizeof(Control_config) / sizeof(Control_config[0]);
-        for (int i = 0; i < iCntrlAryLength; ++i)
+        const size_t cCntrlAryLength = sizeof(Control_config) / sizeof(Control_config[0]);
+        for (size_t i = 0; i < cCntrlAryLength; ++i)
         {
             config_item& r_ccConfig = Control_config[i];
             
@@ -602,7 +629,7 @@ void control_config_common_load_overrides()
                 // Nerf the buffer now.
                 szTempBuffer[0] = '\0';
             }
-            else if ((i + 1) == iCntrlAryLength)
+            else if ((i + 1) == cCntrlAryLength)
             {
                 error_display(1, "Bind Name not found: %s\n", szTempBuffer);
 		        advance_to_eoln(NULL);

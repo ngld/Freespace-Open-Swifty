@@ -194,11 +194,6 @@ int gr_opengl_create_buffer()
 
 	opengl_vertex_buffer vbuffer;
 
-	// allocate additional blocks if we need them to prevent memory fragmentation, 15 at a time
-	if ( GL_vertex_buffers.size() >= GL_vertex_buffers.capacity() ) {
-		GL_vertex_buffers.reserve( GL_vertex_buffers.size() + 15 );
-	}
-
 	GL_vertex_buffers.push_back( vbuffer );
 	GL_vertex_buffers_in_use++;
 
@@ -331,8 +326,8 @@ bool gr_opengl_pack_buffer(const int buffer_id, vertex_buffer *vb)
 
 		// tex coords
 		if (vb->flags & VB_FLAG_UV1) {
-			array[arsize++] = vl->u;
-			array[arsize++] = vl->v;
+			array[arsize++] = vl->texture_position.u;
+			array[arsize++] = vl->texture_position.v;
 		}
 
 		// normals
@@ -353,9 +348,9 @@ bool gr_opengl_pack_buffer(const int buffer_id, vertex_buffer *vb)
 		}
 
 		// verts
-		array[arsize++] = vl->x;
-		array[arsize++] = vl->y;
-		array[arsize++] = vl->z;
+		array[arsize++] = vl->world.xyz.x;
+		array[arsize++] = vl->world.xyz.y;
+		array[arsize++] = vl->world.xyz.z;
 	}
 
 	// generate the index array
@@ -506,9 +501,7 @@ int GL_last_shader_index = -1;
 
 static void opengl_render_pipeline_fixed(int start, const vertex_buffer *bufferp, const buffer_data *datap, int flags);
 
-extern bool Post_in_frame;
-extern GLuint Post_screen_texture_id;
-extern GLuint Post_effect_texture_id;
+extern bool Scene_framebuffer_in_frame;
 extern GLuint Framebuffer_fallback_texture_id;
 static void opengl_render_pipeline_program(int start, const vertex_buffer *bufferp, const buffer_data *datap, int flags)
 {
@@ -691,8 +684,8 @@ static void opengl_render_pipeline_program(int start, const vertex_buffer *buffe
 	{
 		GL_state.Texture.SetActiveUnit(render_pass);
 		GL_state.Texture.SetTarget(GL_TEXTURE_2D);
-		if( Post_in_frame )
-			GL_state.Texture.Enable(Post_effect_texture_id);
+		if( Scene_framebuffer_in_frame )
+			GL_state.Texture.Enable(Scene_effect_texture);
 		else
 			GL_state.Texture.Enable(Framebuffer_fallback_texture_id);
 		vglUniform1iARB( opengl_shader_get_uniform("sFramebuffer"), render_pass );

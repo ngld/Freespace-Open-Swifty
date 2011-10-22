@@ -147,11 +147,7 @@ static int Ship_info_coords[GR_NUM_RESOLUTIONS][2] = {
 
 
 // NK: changed from 37 to 51 for new FS2 animations
-#ifdef FS2_DEMO
-#define SHIP_ANIM_LOOP_FRAME	0
-#else
 #define SHIP_ANIM_LOOP_FRAME	51
-#endif
 
 #define MAX_ICONS_ON_SCREEN	4
 
@@ -1252,7 +1248,7 @@ void ship_select_blit_ship_info()
 		}
 	}
 	
-	if(strlen(Ship_select_ship_info_text) > 0){
+	if(Ship_select_ship_info_text[0] != '\0'){
 		// split the string into multiple lines
 		n_lines = split_str(Ship_select_ship_info_text, gr_screen.res == GR_640 ? 128 : 350, n_chars, p_str, MAX_NUM_SHIP_DESC_LINES, 0);
 
@@ -2809,8 +2805,6 @@ void ss_load_icons(int ship_class)
 // load all the icons for ships in the pool
 void ss_load_all_icons()
 {
-	#ifndef DEMO // not for FS2_DEMO
-
 	int i, j;
 
 	Assert( (Ss_pool != NULL) && (Ss_icons != NULL) );
@@ -2827,8 +2821,6 @@ void ss_load_all_icons()
 			ss_load_icons(i);
 		}
 	}
-
-	#endif
 }
 
 // determine if the slot is disabled

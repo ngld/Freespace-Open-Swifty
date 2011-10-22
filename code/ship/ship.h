@@ -122,6 +122,7 @@ typedef struct ship_weapon {
 	int primary_bank_capacity[MAX_SHIP_PRIMARY_BANKS];		// Max number of projectiles in bank
 	int primary_next_slot[MAX_SHIP_PRIMARY_BANKS];			// Next slot to fire in the bank
 	int primary_bank_rearm_time[MAX_SHIP_PRIMARY_BANKS];	// timestamp which indicates when bank can get new projectile
+	// end ballistic primary support
 
 	int secondary_bank_ammo[MAX_SHIP_SECONDARY_BANKS];			// Number of missiles left in secondary bank
 	int secondary_bank_start_ammo[MAX_SHIP_SECONDARY_BANKS];	// Number of missiles starting in secondary bank
@@ -265,6 +266,7 @@ typedef struct cockpit_display_info {
 #define SSF_ROTATES				(1 << 10)
 #define SSF_DAMAGE_AS_HULL		(1 << 11)		// Applies armor damage instead of subsystem damge. - FUBAR
 #define SSF_NO_AGGREGATE		(1 << 12)		// exclude this subsystem from the aggregate subsystem-info tracking - Goober5000
+#define SSF_PLAY_SOUND_FOR_PLAYER	( 1 << 13)	// If this subsystem is a turret on a player ship, play firing sounds - The E 
 
 
 // Wanderer 
@@ -365,6 +367,10 @@ typedef	struct ship_subsys {
 	//scaler for setting adjusted turret rof
 	float	rof_scaler;
 	float	turn_rate;
+
+	//Per-turret ownage settings - SUSHI
+	int turret_max_bomb_ownage; 
+	int turret_max_target_ownage; 
 } ship_subsys;
 
 // structure for subsystems which tells us the total count of a particular type of subsystem (i.e.
@@ -533,12 +539,12 @@ typedef struct ship {
 	ship_spark	sparks[MAX_SHIP_HITS];
 	
 	bool use_special_explosion; 
-	float special_exp_damage;					// new special explosion/hitpoints system
-	float special_exp_blast;
-	float special_exp_inner;
-	float special_exp_outer;
+	int special_exp_damage;					// new special explosion/hitpoints system
+	int special_exp_blast;
+	int special_exp_inner;
+	int special_exp_outer;
 	bool use_shockwave;
-	float special_exp_shockwave_speed;
+	int special_exp_shockwave_speed;
 	int special_exp_deathroll_time;
 
 	int	special_hitpoints;
@@ -633,6 +639,7 @@ typedef struct ship {
 
 	int	thruster_secondary_glow_bitmap;		// Bobboau
 	int	thruster_tertiary_glow_bitmap;		// Bobboau
+	int	thruster_distortion_bitmap;			// Valathil
 
 	int	next_engine_stutter;				// timestamp to time the engine stuttering when a ship dies
 
@@ -876,8 +883,9 @@ extern int ship_find_exited_ship_by_signature( int signature);
 #define SIF2_NO_PAIN_FLASH					(1 << 11)	// The E - disable red pain flash
 #define SIF2_ALLOW_LANDINGS					(1 << 12)	// SUSHI: Automatically set if any subsystems allow landings (as a shortcut)
 #define SIF2_NO_ETS							(1 << 13)	// The E - No ETS on this ship class
+#define SIF2_NO_LIGHTING					(1 << 14)	// Valathil - No lighting for this ship
 // !!! IF YOU ADD A FLAG HERE BUMP MAX_SHIP_FLAGS !!!
-#define	MAX_SHIP_FLAGS	14		//	Number of distinct flags for flags field in ship_info struct
+#define	MAX_SHIP_FLAGS	15		//	Number of distinct flags for flags field in ship_info struct
 #define	SIF_DEFAULT_VALUE		0
 #define SIF2_DEFAULT_VALUE		0
 
@@ -989,8 +997,8 @@ typedef struct ship_type_info {
 	SCP_vector<SCP_string> ai_cripple_ignores_temp;
 
 	ship_type_info( )
-		: message_bools( 0 ), hud_bools( 0 ), ship_bools( 0 ), weapon_bools( 0 ),
-		  debris_max_speed( 0.f ), ff_multiplier( 0.f ), emp_multiplier( 0.f ),
+		: message_bools( 0 ), hud_bools( 0 ), ship_bools( 0 ), debris_max_speed( 0.f ),
+		  weapon_bools( 0 ), ff_multiplier( 0.f ), emp_multiplier( 0.f ),
 		  fog_start_dist( 0.f ), fog_complete_dist( 0.f ),
 		  ai_valid_goals( 0 ), ai_player_orders( 0 ), ai_bools( 0 ), ai_active_dock( 0 ), ai_passive_dock( 0 ),
 		  vaporize_chance( 0.f )
@@ -1153,6 +1161,7 @@ typedef struct ship_info {
 	int			warpin_snd_end;
 	float		warpin_speed;
 	int			warpin_time;	//in ms
+	float		warpin_decel_exp;
 	int			warpin_type;
 
 	char		warpout_anim[MAX_FILENAME_LEN];
@@ -1161,6 +1170,7 @@ typedef struct ship_info {
 	int			warpout_snd_end;
 	float		warpout_speed;
 	int			warpout_time;	//in ms
+	float		warpout_accel_exp;
 	int			warpout_type;
 
 	float		warpout_player_speed;
@@ -1252,6 +1262,15 @@ typedef struct ship_info {
 	int engine_snd;							// handle to engine sound for ship (-1 if no engine sound)
 	int glide_start_snd;					// handle to sound to play at the beginning of a glide maneuver (default is 0 for regular throttle down sound)
 	int glide_end_snd;						// handle to sound to play at the end of a glide maneuver (default is 0 for regular throttle up sound)
+	
+	int engine_snd_cockpit;					// handle to engine sound heard in cockpit
+	int full_throttle_snd;					// handle to sound played when throttle is set to full power
+	int zero_throttle_snd;					// handle to sound played when throttle is set to zero power
+	int throttle_up_snd;					// handle to sound played when throttle power is increaded by 1/3
+	int throttle_down_snd;					// handle to sound played when throttle power is decreased by 1/3
+	int afterburner_engage_snd;				// handle to sound played when afterburner is engaged
+	int afterburner_loop_snd;				// handle to sound played when afterburner is active
+	int afterburner_fail_snd;				// handle to sound player when afterburner activation failed
 
 	vec3d	closeup_pos;					// position for camera when using ship in closeup view (eg briefing and hud target monitor)
 	float		closeup_zoom;					// zoom when using ship in closeup view (eg briefing and hud target monitor)
@@ -1300,10 +1319,16 @@ typedef struct ship_info {
 	thrust_pair			thruster_glow_info;
 	thrust_pair_bitmap	thruster_secondary_glow_info;
 	thrust_pair_bitmap	thruster_tertiary_glow_info;
+	thrust_pair_bitmap	thruster_distortion_info;
+
 	float		thruster01_glow_rad_factor;
 	float		thruster02_glow_rad_factor;
 	float		thruster03_glow_rad_factor;
+	float		thruster_dist_rad_factor;
 	float		thruster02_glow_len_factor;
+	float		thruster_dist_len_factor;
+
+	bool		draw_distortion;
 
 	int splodeing_texture;
 	char splodeing_texture_name[MAX_FILENAME_LEN];

@@ -284,9 +284,6 @@ int sexp_tree::save_branch(int cur, int at_root)
 			} else {
 				node = alloc_sexp(tree_nodes[cur].text, SEXP_ATOM, SEXP_ATOM_STRING, -1, -1);
 			}
-		} else if (tree_nodes[cur].type & SEXPT_STRING) {
-			Assert( !(tree_nodes[cur].type & SEXPT_VARIABLE) );
-			Int3();
 		} else {
 			Assert(0); // unknown and/or invalid type
 		}
@@ -824,6 +821,10 @@ void sexp_tree::right_clicked(int mode)
 									// enable navsystem always
 									if (op_type == OPF_NAV_POINT)
 										flag &= ~MF_GRAYED;
+
+									if (!( (idx + 3) % 30)) {
+										flag |= MF_MENUBARBREAK;
+									}
 
 									char buf[128];
 									// append list of variable names and values
@@ -2749,9 +2750,7 @@ int sexp_tree::query_default_argument_available(int op, int i)
 
 		case OPF_POINT:
 		case OPF_WAYPOINT_PATH:
-			if (Num_waypoint_lists)
-				return 1;
-			return 0;
+			return Waypoint_lists.empty() ? 0 : 1;
 
 		case OPF_MISSION_NAME:
 			if (m_mode != MODE_CAMPAIGN) {
@@ -3264,7 +3263,6 @@ void sexp_tree::verify_and_fix_arguments(int node)
 		return;
 
 	tmp = item_index;
-	item_index = node;
 
 	arg_num = 0;
 	item_index = tree_nodes[node].child;
@@ -4270,7 +4268,7 @@ sexp_list_item *sexp_tree::get_listing_opf(int opf, int parent_node, int arg_ind
 			break;
 
 		case OPF_SHIP_WING_TEAM:
-			list = get_listing_opf_ship_wing_team(parent_node);
+			list = get_listing_opf_ship_wing_team();
 			break;
 
 		case OPF_SHIP_WING_POINT_OR_NONE:
@@ -4813,6 +4811,8 @@ sexp_list_item *sexp_tree::get_listing_opf_subsystem(int parent_node, int arg_in
 			// if this is arg index 3 (targeted ship)
 			if(arg_index == 3)
 			{
+				special_subsys = OPS_STRENGTH;
+
 				child = tree_nodes[child].next;
 				Assert(child >= 0);			
 				child = tree_nodes[child].next;			
@@ -4821,6 +4821,10 @@ sexp_list_item *sexp_tree::get_listing_opf_subsystem(int parent_node, int arg_in
 			{
 				Assert(arg_index == 1);
 			}
+			break;
+
+		case OP_BEAM_FIRE_COORDS:
+			special_subsys = OPS_BEAM_TURRET;
 			break;
 
 		// these sexps check the subsystem of the *second entry* on the list, not the first
@@ -4863,7 +4867,7 @@ sexp_list_item *sexp_tree::get_listing_opf_subsystem(int parent_node, int arg_in
 			Assert(child >= 0);
 			child = tree_nodes[child].next;
 			break;
-	}			
+	}
 
 	// now find the ship and add all relevant subsystems
 	Assert(child >= 0);
@@ -4973,14 +4977,18 @@ sexp_list_item *sexp_tree::get_listing_opf_subsystem_type(int parent_node)
 sexp_list_item *sexp_tree::get_listing_opf_point()
 {
 	char buf[NAME_LENGTH+8];
-	int i, j;
+	SCP_list<waypoint_list>::iterator ii;
+	int j;
 	sexp_list_item head;
 
-	for (i=0; i<Num_waypoint_lists; i++)
-		for (j=0; j<Waypoint_lists[i].count; j++) {
-			sprintf(buf, "%s:%d", Waypoint_lists[i].name, j + 1);
+	for (ii = Waypoint_lists.begin(); ii != Waypoint_lists.end(); ++ii)
+	{
+		for (j = 0; (uint) j < ii->get_waypoints().size(); ++j)
+		{
+			sprintf(buf, "%s:%d", ii->get_name(), j + 1);
 			head.add_data_dup(buf);
 		}
+	}
 
 	return head.next;
 }
@@ -5168,21 +5176,33 @@ sexp_list_item *sexp_tree::get_listing_opf_ai_goal(int parent_node)
 
 sexp_list_item *sexp_tree::get_listing_opf_docker_point(int parent_node)
 {
-	int i, z, sh;
+	int i, z;
 	sexp_list_item head;
+	int sh = -1;
 
 	Assert(parent_node >= 0);
-	Assert(!stricmp(tree_nodes[parent_node].text, "ai-dock"));
+	Assert(!stricmp(tree_nodes[parent_node].text, "ai-dock") || !stricmp(tree_nodes[parent_node].text, "set-docked"));
 
-	z = tree_nodes[parent_node].parent;
-	Assert(z >= 0);
-	Assert(!stricmp(tree_nodes[z].text, "add-ship-goal") || !stricmp(tree_nodes[z].text, "add-wing-goal") || !stricmp(tree_nodes[z].text, "add-goal"));
+	if (!stricmp(tree_nodes[parent_node].text, "ai-dock"))
+	{
+		z = tree_nodes[parent_node].parent;
+		Assert(z >= 0);
+		Assert(!stricmp(tree_nodes[z].text, "add-ship-goal") || !stricmp(tree_nodes[z].text, "add-wing-goal") || !stricmp(tree_nodes[z].text, "add-goal"));
 
-	z = tree_nodes[z].child;
-	Assert(z >= 0);
+		z = tree_nodes[z].child;
+		Assert(z >= 0);
 
-	sh = ship_name_lookup(tree_nodes[z].text, 1);
-	if (sh >= 0) {
+		sh = ship_name_lookup(tree_nodes[z].text, 1);
+	}
+	else if (!stricmp(tree_nodes[parent_node].text, "set-docked"))
+	{
+		//Docker ship should be the first child node
+		z = tree_nodes[parent_node].child;
+		sh = ship_name_lookup(tree_nodes[z].text, 1);
+	}
+
+	if (sh >= 0) 
+	{
 		z = get_docking_list(Ship_info[Ships[sh].ship_info_index].model_num);
 		for (i=0; i<z; i++)
 			head.add_data(Docking_bay_list[i]);
@@ -5193,17 +5213,32 @@ sexp_list_item *sexp_tree::get_listing_opf_docker_point(int parent_node)
 
 sexp_list_item *sexp_tree::get_listing_opf_dockee_point(int parent_node)
 {
-	int i, z, sh;
+	int i, z;
 	sexp_list_item head;
+	int sh = -1;
 
 	Assert(parent_node >= 0);
-	Assert(!stricmp(tree_nodes[parent_node].text, "ai-dock"));
+	Assert(!stricmp(tree_nodes[parent_node].text, "ai-dock") || !stricmp(tree_nodes[parent_node].text, "set-docked"));
 
-	z = tree_nodes[parent_node].child;
-	Assert(z >= 0);
+	if (!stricmp(tree_nodes[parent_node].text, "ai-dock"))
+	{
+		z = tree_nodes[parent_node].child;
+		Assert(z >= 0);
 
-	sh = ship_name_lookup(tree_nodes[z].text, 1);
-	if (sh >= 0) {
+		sh = ship_name_lookup(tree_nodes[z].text, 1);
+	}
+	else if (!stricmp(tree_nodes[parent_node].text, "set-docked"))
+	{
+		//Dockee ship should be the third child node
+		z = tree_nodes[parent_node].child;	// 1
+		z = tree_nodes[z].next;				// 2
+		z = tree_nodes[z].next;				// 3
+
+		sh = ship_name_lookup(tree_nodes[z].text, 1);
+	}
+
+	if (sh >= 0) 
+{
 		z = get_docking_list(Ship_info[Ships[sh].ship_info_index].model_num);
 		for (i=0; i<z; i++)
 			head.add_data(Docking_bay_list[i]);
@@ -5339,7 +5374,7 @@ sexp_list_item *sexp_tree::get_listing_ship_effects()
 {
 	sexp_list_item head;
 	
-	for (SCP_vector<ship_effect>::iterator sei = Ship_effects.begin(); sei != Ship_effects.end(); sei++) {
+	for (SCP_vector<ship_effect>::iterator sei = Ship_effects.begin(); sei != Ship_effects.end(); ++sei) {
 		head.add_data_dup(sei->name);
 	}
 
@@ -5358,11 +5393,11 @@ sexp_list_item *sexp_tree::get_listing_opf_explosion_option()
 
 sexp_list_item *sexp_tree::get_listing_opf_waypoint_path()
 {
-	int i;
+	SCP_list<waypoint_list>::iterator ii;
 	sexp_list_item head;
 
-	for (i=0; i<Num_waypoint_lists; i++)
-		head.add_data(Waypoint_lists[i].name);
+	for (ii = Waypoint_lists.begin(); ii != Waypoint_lists.end(); ++ii)
+		head.add_data(ii->get_name());
 
 	return head.next;
 }
@@ -5394,11 +5429,10 @@ sexp_list_item *sexp_tree::get_listing_opf_ship_wing_point()
 	return head.next;
 }
 
-sexp_list_item *sexp_tree::get_listing_opf_ship_wing_team(int parent_node)
+sexp_list_item *sexp_tree::get_listing_opf_ship_wing_team()
 {
 	int i;
 	sexp_list_item head;
-	int op = get_operator_const(tree_nodes[parent_node].text);
 
 	for (i=0; i<Num_iffs; i++) {
 		head.add_data(Iff_info[i].iff_name);
@@ -5406,10 +5440,6 @@ sexp_list_item *sexp_tree::get_listing_opf_ship_wing_team(int parent_node)
 	
 	head.add_list(get_listing_opf_ship());
 	head.add_list(get_listing_opf_wing());
-
-	//add <ship_wing_adv> to list for processing of arriving wings
-	if (op != OP_NUM_SHIPS_IN_BATTLE)
-		head.add_data(SEXP_SHIP_WING_ADV_STRING);
 
 	return head.next;
 }
@@ -5719,7 +5749,8 @@ sexp_list_item *sexp_tree::get_listing_opf_jump_nodes()
 {
 	sexp_list_item head;
 
-	for ( jump_node *jnp = (jump_node *)Jump_nodes.get_first(); !Jump_nodes.is_end(jnp); jnp = (jump_node *)jnp->get_next() ) {	
+	SCP_list<jump_node>::iterator jnp;
+	for (jnp = Jump_nodes.begin(); jnp != Jump_nodes.end(); ++jnp) {	
 		head.add_data( jnp->get_name_ptr());
 	}
 

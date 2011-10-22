@@ -52,7 +52,6 @@
 #include "jumpnode/jumpnode.h"
 #include "localization/localize.h"
 #include "nebula/neb.h"
-#include "demo/demo.h"
 #include "nebula/neblightning.h"
 #include "math/fvi.h"
 #include "weapon/weapon.h"
@@ -308,6 +307,7 @@ char *Parse_object_flags_2[MAX_PARSE_OBJECT_FLAGS_2] = {
 	"force-shields-on",
 	"immobile",
 	"no-ets",
+	"cloaked",
 };
 
 
@@ -471,6 +471,14 @@ void parse_mission_info(mission *pm, bool basic = false)
 		if (!basic)
 			nebl_set_storm(Mission_parse_storm_name);
 	}
+	Neb2_fog_near_mult = 1.0f;
+	Neb2_fog_far_mult = 1.0f;
+	if(optional_string("+Fog Near Mult:")){
+		stuff_float(&Neb2_fog_near_mult);
+	}
+	if(optional_string("+Fog Far Mult:")){
+		stuff_float(&Neb2_fog_far_mult);
+	}
 
 	// Goober5000 - ship contrail speed threshold
 	pm->contrail_threshold = CONTRAIL_THRESHOLD_DEFAULT;
@@ -632,7 +640,7 @@ void parse_mission_info(mission *pm, bool basic = false)
 	}
 	// reassign the player
 	else {		
-		if(!Fred_running && (Player != NULL) && (strlen(pm->squad_name) > 0) && (Game_mode & GM_CAMPAIGN_MODE)){
+		if(!Fred_running && (Player != NULL) && (pm->squad_name[0] != '\0') && (Game_mode & GM_CAMPAIGN_MODE)){
 			mprintf(("Reassigning player to squadron %s\n", pm->squad_name));
 			player_set_squad(Player, pm->squad_name);
 			player_set_squad_bitmap(Player, pm->squad_filename);
@@ -2233,8 +2241,9 @@ int parse_create_object_sub(p_object *p_objp)
 		}
 
 		// initial velocities now do not apply to ships which warp in after mission starts
-		//WMC - Make it apply for ships with IN_PLACE_ANIM type
-		if (!(Game_mode & GM_IN_MISSION) || sip->warpin_type == WT_IN_PLACE_ANIM)
+		// WMC - Make it apply for ships with IN_PLACE_ANIM type
+		// zookeeper - Also make it apply for hyperspace warps
+		if (!(Game_mode & GM_IN_MISSION) || (sip->warpin_type == WT_IN_PLACE_ANIM || sip->warpin_type == WT_HYPERSPACE))
 		{
 			Objects[objnum].phys_info.speed = (float) p_objp->initial_velocity * sip->max_speed / 100.0f;
 			Objects[objnum].phys_info.vel.xyz.z = Objects[objnum].phys_info.speed;
@@ -2315,10 +2324,6 @@ int parse_create_object_sub(p_object *p_objp)
 		if ((Game_mode & GM_IN_MISSION) && MULTIPLAYER_MASTER && (p_objp->wingnum == -1))
 			send_ship_create_packet(&Objects[objnum], (p_objp == Arriving_support_ship) ? 1 : 0);
 	}
-
-	// if recording a demo, post the event
-	if(Game_mode & GM_DEMO_RECORD)
-		demo_POST_obj_create(p_objp->name, Objects[objnum].signature);
 
 	return objnum;
 }
@@ -2456,6 +2461,9 @@ void resolve_parse_flags(object *objp, int parse_flags, int parse_flags2)
 
 	if (parse_flags2 & P2_SF2_NO_ETS)
 		shipp->flags2 |= SF2_NO_ETS;
+
+	if (parse_flags2 & P2_SF2_CLOAKED)
+		shipp->flags2 |= SF2_CLOAKED;
 }
 
 void fix_old_special_explosions(p_object *p_objp, int variable_index) 
@@ -2474,12 +2482,12 @@ void fix_old_special_explosions(p_object *p_objp, int variable_index)
 
 	p_objp->use_special_explosion = true;
 
-	p_objp->special_exp_damage = (float)atoi(Block_variables[variable_index+DAMAGE].text);
-	p_objp->special_exp_blast = (float)atoi(Block_variables[variable_index+BLAST].text);
-	p_objp->special_exp_inner = (float)atoi(Block_variables[variable_index+INNER_RAD].text);
-	p_objp->special_exp_outer = (float)atoi(Block_variables[variable_index+OUTER_RAD].text);
+	p_objp->special_exp_damage = atoi(Block_variables[variable_index+DAMAGE].text);
+	p_objp->special_exp_blast = atoi(Block_variables[variable_index+BLAST].text);
+	p_objp->special_exp_inner = atoi(Block_variables[variable_index+INNER_RAD].text);
+	p_objp->special_exp_outer = atoi(Block_variables[variable_index+OUTER_RAD].text);
 	p_objp->use_shockwave = (atoi(Block_variables[variable_index+PROPAGATE].text) ? 1:0);
-	p_objp->special_exp_shockwave_speed = (float)atoi(Block_variables[variable_index+SHOCK_SPEED].text);
+	p_objp->special_exp_shockwave_speed = atoi(Block_variables[variable_index+SHOCK_SPEED].text);
 	p_objp->special_exp_deathroll_time = 0;
 }
 
@@ -2858,24 +2866,49 @@ int parse_object(mission *pm, int flag, p_object *p_objp)
 		p_objp->use_special_explosion = true;
 
 		if (required_string("+Special Exp Damage:")) {
-			stuff_float(&p_objp->special_exp_damage);
+			stuff_int(&p_objp->special_exp_damage);
+
+			if (*Mp == '.') {
+				Warning(LOCATION, "Special explosion damage has been returned to integer format");
+				advance_to_eoln(NULL);
+			}
 		}
 
 		if (required_string("+Special Exp Blast:")) {
-			stuff_float(&p_objp->special_exp_blast);
+			stuff_int(&p_objp->special_exp_blast);
+
+			if (*Mp == '.') {
+				Warning(LOCATION, "Special explosion blast has been returned to integer format");
+				advance_to_eoln(NULL);
+			}
 		}
 
 		if (required_string("+Special Exp Inner Radius:")) {
-			stuff_float(&p_objp->special_exp_inner);
+			stuff_int(&p_objp->special_exp_inner);
+
+			if (*Mp == '.') {
+				Warning(LOCATION, "Special explosion inner radius has been returned to integer format");
+				advance_to_eoln(NULL);
+			}
 		}
 
 		if (required_string("+Special Exp Outer Radius:")) {
-			stuff_float(&p_objp->special_exp_outer);
+			stuff_int(&p_objp->special_exp_outer);
+
+			if (*Mp == '.') {
+				Warning(LOCATION, "Special explosion outer radius has been returned to integer format");
+				advance_to_eoln(NULL);
+			}
 		}
 
 		if (optional_string("+Special Exp Shockwave Speed:")) {
-			stuff_float(&p_objp->special_exp_shockwave_speed);
+			stuff_int(&p_objp->special_exp_shockwave_speed);
 			p_objp->use_shockwave = true;
+
+			if (*Mp == '.') {
+				Warning(LOCATION, "Special explosion shockwave speed has been returned to integer format");
+				advance_to_eoln(NULL);
+			}
 		}
 
 		if (optional_string("+Special Exp Death Roll Time:")) {
@@ -2930,7 +2963,7 @@ int parse_object(mission *pm, int flag, p_object *p_objp)
 		int damage;
 
 		stuff_int(&damage);
-		p_objp->kamikaze_damage = i2fl(damage);
+		p_objp->kamikaze_damage = damage;
 	}
 
 	p_objp->hotkey = -1;
@@ -3071,7 +3104,7 @@ int parse_object(mission *pm, int flag, p_object *p_objp)
 
 			if (p_objp->replacement_textures[p_objp->num_texture_replacements].new_texture_id < 0)
 			{
-				Warning(LOCATION, "Could not load replacement texture %s for ship %s\n", p_objp->replacement_textures[p_objp->num_texture_replacements].new_texture, p_objp->name);
+				mprintf(("Could not load replacement texture %s for ship %s\n", p_objp->replacement_textures[p_objp->num_texture_replacements].new_texture, p_objp->name));
 			}
 
 			// *** account for FRED
@@ -4663,20 +4696,17 @@ void parse_goals(mission *pm)
 
 void parse_waypoint_list(mission *pm)
 {
-	waypoint_list	*wpl;
-
-
-	Assert(Num_waypoint_lists < MAX_WAYPOINT_LISTS);
 	Assert(pm != NULL);
-	wpl = &Waypoint_lists[Num_waypoint_lists];
 
+	char name_buf[NAME_LENGTH];
 	required_string("$Name:");
-	stuff_string(wpl->name, F_NAME, NAME_LENGTH);
+	stuff_string(name_buf, F_NAME, NAME_LENGTH);
 
+	SCP_vector<vec3d> vec_list;
 	required_string("$List:");
-	wpl->count = stuff_vector_list(wpl->waypoints, MAX_WAYPOINTS_PER_LIST);
+	stuff_vector_list(vec_list);
 
-	Num_waypoint_lists++;
+	waypoint_add_list(name_buf, vec_list);
 }
 
 void parse_waypoints(mission *pm)
@@ -4716,6 +4746,8 @@ void parse_waypoints(mission *pm)
 			stuff_boolean(&hide);
 			jnp->show(!hide);
 		}
+
+		Jump_nodes.push_back(*jnp);
 	}
 
 	while (required_string_either("#Messages", "$Name:"))
@@ -5244,7 +5276,9 @@ int parse_mission(mission *pm, int flags)
 
 	int i;
 
-	Player_starts = Num_cargo = Num_waypoint_lists = Num_goals = Num_wings = 0;
+	waypoint_parse_init();
+
+	Player_starts = Num_cargo = Num_goals = Num_wings = 0;
 	Player_start_shipnum = -1;
 	*Player_start_shipname = 0;		// make the string 0 length for checking later
 	Player_start_pobject.Reset( );
@@ -5330,7 +5364,7 @@ int parse_mission(mission *pm, int flags)
 			if (Cmdline_mod == NULL || *Cmdline_mod == 0) {
 				strcat_s(text, "<retail default> ");
 			} else {
-				for (char *mod_token = Cmdline_mod; strlen(mod_token) != 0; mod_token += strlen(mod_token) + 1) {
+				for (char *mod_token = Cmdline_mod; *mod_token != '\0'; mod_token += strlen(mod_token) + 1) {
 					strcat_s(text, mod_token);
 					strcat_s(text, " ");
 				}
@@ -5424,7 +5458,7 @@ void post_process_mission()
 
 	init_ai_system();
 
-	create_waypoints();
+	waypoint_create_game_objects();
 
 	// Goober5000 - this needs to be called only once after parsing of objects and wings is complete
 	// (for individual invalidation, see mission_parse_mark_non_arrival)
@@ -5477,9 +5511,9 @@ void post_process_mission()
 			// entering this if statement will result in program termination!!!!!
 			// print out an error based on the return value from check_sexp_syntax()
 			if ( result ) {
-				char sexp_str[4096], text[4500];
+				char sexp_str[MAX_EVENT_SIZE], text[4500];
 
-				convert_sexp_to_string( i, sexp_str, SEXP_ERROR_CHECK_MODE, 4096);
+				convert_sexp_to_string( i, sexp_str, SEXP_ERROR_CHECK_MODE, MAX_EVENT_SIZE);
 				sprintf(text, "%s.\n\nIn sexpression: %s\n(Error appears to be: %s)",
 					sexp_error_message(result), sexp_str, Sexp_nodes[bad_node].text);
 
@@ -5664,7 +5698,7 @@ void parse_init(bool basic)
 	for (int i = 0; i < MAX_CARGO; i++)
 		Cargo_names[i] = Cargo_names_buf[i]; // make a pointer array for compatibility
 
-	Total_goal_ship_names = 0;
+	Total_goal_target_names = 0;
 
 	// if we are just wanting basic info then we shouldn't need sexps
 	// (prevents memory fragmentation with the now dynamic Sexp_nodes[])

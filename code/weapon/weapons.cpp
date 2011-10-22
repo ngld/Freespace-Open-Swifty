@@ -48,6 +48,7 @@
 #include "network/multimsgs.h"
 #include "network/multiutil.h"
 #include "parse/scripting.h"
+#include "stats/scoring.h"
 
 
 #ifndef NDEBUG
@@ -475,6 +476,9 @@ int weapon_info_lookup(const char *name)
 //	Parse the weapon flags.
 void parse_wi_flags(weapon_info *weaponp, int wi_flags, int wi_flags2)
 {
+	const char *spawn_str = NOX("Spawn");
+	const size_t spawn_str_len = strlen(spawn_str);
+
 	//Make sure we HAVE flags :p
 	if(!optional_string("$Flags:"))
 		return;
@@ -494,7 +498,7 @@ void parse_wi_flags(weapon_info *weaponp, int wi_flags, int wi_flags2)
 	bool set_nopierce = false;
 	
 	for (int i=0; i<num_strings; i++) {
-		if (!strnicmp(NOX("Spawn"), weapon_strings[i], 5))
+		if (!strnicmp(spawn_str, weapon_strings[i], 5))
 		{
             if (weaponp->num_spawn_weapons_defined < MAX_SPAWN_TYPES_PER_WEAPON)
 			{
@@ -511,7 +515,7 @@ void parse_wi_flags(weapon_info *weaponp, int wi_flags, int wi_flags2)
 
 				weaponp->wi_flags |= WIF_SPAWN;
 				weaponp->spawn_info[weaponp->num_spawn_weapons_defined].spawn_type = (short)Num_spawn_types;
-				skip_length = strlen(NOX("Spawn")) + strspn(&temp_string[strlen(NOX("Spawn"))], NOX(" \t"));
+				skip_length = spawn_str_len + strspn(&temp_string[spawn_str_len], NOX(" \t"));
 				char *num_start = strchr(&temp_string[skip_length], ',');
 				if (num_start == NULL) {
 					weaponp->spawn_info[weaponp->num_spawn_weapons_defined].spawn_count = DEFAULT_WEAPON_SPAWN_COUNT;
@@ -695,6 +699,11 @@ void parse_wi_flags(weapon_info *weaponp, int wi_flags, int wi_flags2)
 	if ((weaponp->wi_flags2 & WIF2_INHERIT_PARENT_TARGET) && (!(weaponp->wi_flags & WIF_CHILD)))
 	{
 		Warning(LOCATION,"Weapon %s has the \"inherit parent target\" flag, but not the \"child\" flag.  No changes in behavior will occur.", weaponp->name);
+	}
+
+	if (!(weaponp->wi_flags & WIF_HOMING_HEAT) && (weaponp->wi_flags2 & WIF2_UNTARGETED_HEAT_SEEKER))
+	{
+		Warning(LOCATION,"Weapon '%s' has the \"untargeted heat seeker\" flag, but Homing Type is not set to \"HEAT\".", weaponp->name);
 	}
 }
 
@@ -1378,7 +1387,7 @@ int parse_weapon(int subtype, bool replace)
 
 		if(wip->life_min < 0.0f) {
 			wip->life_min = 0.0f;
-			Warning(LOCATION, "Lifetime min for weapon '%s' cannot be less than 0. Setting to 0.", wip->name);
+			Warning(LOCATION, "Lifetime min for weapon '%s' cannot be less than 0. Setting to 0.\n", wip->name);
 		}
 	}
 
@@ -1387,14 +1396,19 @@ int parse_weapon(int subtype, bool replace)
 
 		if(wip->life_max < 0.0f) {
 			wip->life_max = 0.0f;
-			Warning(LOCATION, "Lifetime max for weapon '%s' cannot be less than 0. Setting to 0.", wip->name);
+			Warning(LOCATION, "Lifetime max for weapon '%s' cannot be less than 0. Setting to 0.\n", wip->name);
+		} else if (wip->life_max < wip->life_min) {
+			wip->life_max = wip->life_min + 0.1f;
+			Warning(LOCATION, "Lifetime max for weapon '%s' cannot be less than its Lifetime Min (%d) value. Setting to %d.\n", wip->name, wip->life_min, wip->life_max);
+		} else {
+			wip->lifetime = (wip->life_min+wip->life_max)*0.5f;
 		}
 	}
 
 	if(wip->life_min >= 0.0f && wip->life_max < 0.0f) {
 		wip->lifetime = wip->life_min;
 		wip->life_min = -1.0f;
-		Warning(LOCATION, "Lifetime min, but not lifetime max, specified for weapon %s. Assuming static lifetime of %.2f seconds.", wip->lifetime);
+		Warning(LOCATION, "Lifetime min, but not lifetime max, specified for weapon %s. Assuming static lifetime of %.2f seconds.\n", wip->lifetime);
 	}
 
 	if(optional_string("$Lifetime:")) {
@@ -2445,10 +2459,10 @@ int parse_weapon(int subtype, bool replace)
 		}
 
 		float bogus;
-		
+
 		required_string("+radius:");
 		stuff_float(&bogus);
-		
+
 		if ( optional_string("+burn time:") ) {
 			stuff_float(&bogus);
 		}
@@ -2543,24 +2557,24 @@ int parse_weapon(int subtype, bool replace)
 
 	/* Generate a substitution pattern for this weapon.
 	This pattern is very naive such that is calculates the lowest common demoniator as being all of
-	the freqencies multiplied together.
+	the periods multiplied together.
 	*/
 	while ( optional_string("$substitute:") ) {
 		char subname[NAME_LENGTH];
-		int frequency = 0;
+		int period = 0;
 		int index = 0;
 		int offset = 0;
 		stuff_string(subname, F_NAME, NAME_LENGTH);
-		if ( optional_string("+frequency:") ) {
-			stuff_int(&frequency);
-			if ( frequency <= 0 ) {
-				Warning(LOCATION, "Substitution '%s' for weapon '%s' requires a frequency greater than 0. Setting frequency to 1.", subname, wip->name);
-				frequency = 1;
+		if ( optional_string("+period:") ) {
+			stuff_int(&period);
+			if ( period <= 0 ) {
+				Warning(LOCATION, "Substitution '%s' for weapon '%s' requires a period greater than 0. Setting period to 1.", subname, wip->name);
+				period = 1;
 			}
 			if ( optional_string("+offset:") ) {
 				stuff_int(&offset);
 				if ( offset <= 0 ) {
-					Warning(LOCATION, "Frequency offset for substitution '%s' of weapon '%s' has to be greater than 0. Setting offset to 1.", subname, wip->name);
+					Warning(LOCATION, "Period offset for substitution '%s' of weapon '%s' has to be greater than 0. Setting offset to 1.", subname, wip->name);
 					offset = 1;
 				}
 			}
@@ -2570,24 +2584,21 @@ int parse_weapon(int subtype, bool replace)
 				Warning(LOCATION, "Substitution '%s' for weapon '%s' requires an index greater than 0. Setting index to 0.", subname, wip->name);
 				index = 0;
 			}
-		} else {
-			Warning(LOCATION, "Substitution '%s' for weapon '%s' requires either '+index:' or '+frequency:' to follow. Skipping substitution.", subname, wip->name);
-			continue;
 		}
 
-		// we are going to use weapon subistution so, make sure that the pattern array has at least one element
+		// we are going to use weapon substition so, make sure that the pattern array has at least one element
 		if ( wip->weapon_substitution_pattern_names.empty() ) {
 			// pattern is empty, initialize pattern with the weapon being currently parsed.
 			wip->weapon_substitution_pattern_names.push_back(wip->name);
 		}
 
-		// if tbler specifies a frequency then determine if we can fit the resulting pattern
+		// if tbler specifies a period then determine if we can fit the resulting pattern
 		// neatly into the pattern array.
-		if ( frequency > 0 ) {
-			if ( (wip->weapon_substitution_pattern_names.size() % frequency) > 0 ) {
+		if ( period > 0 ) {
+			if ( (wip->weapon_substitution_pattern_names.size() % period) > 0 ) {
 				// not neat, need to expand the pattern so that our freqency pattern fits completly.
 				size_t current_size = wip->weapon_substitution_pattern_names.size();
-				wip->weapon_substitution_pattern_names.resize(current_size*frequency);
+				wip->weapon_substitution_pattern_names.resize(current_size*period);
 
 				// now duplicate the current pattern into the new area so the current pattern holds
 				for ( size_t i = current_size; i < wip->weapon_substitution_pattern_names.size(); i++) {
@@ -2595,14 +2606,12 @@ int parse_weapon(int subtype, bool replace)
 				}
 			}
 
-			/* Apply the substituted weapon as the requested freqency, barrel
+			/* Apply the substituted weapon at the requested period, barrel
 			shifted by offset if needed.*/
-			for ( size_t pos = (frequency + offset - 1) % frequency;
-				pos < wip->weapon_substitution_pattern_names.size(); pos += frequency )
+			for ( size_t pos = (period + offset - 1) % period;
+				pos < wip->weapon_substitution_pattern_names.size(); pos += period )
 			{
-				if ( pos > 0 ) {
-					wip->weapon_substitution_pattern_names[pos] = subname;
-				}
+				wip->weapon_substitution_pattern_names[pos] = subname;
 			}
 		} else {
 			// assume that tbler wanted to specify a index for the new weapon.
@@ -2616,6 +2625,11 @@ int parse_weapon(int subtype, bool replace)
 
 			wip->weapon_substitution_pattern_names[index] = subname;
 		}
+	}
+
+	//Optional score for destroying this weapon.
+	if (optional_string("$Score:")) {
+		stuff_int(&wip->score);
 	}
 
 	return WEAPON_INFO_INDEX(wip);
@@ -3252,7 +3266,7 @@ void weapon_load_bitmaps(int weapon_index)
 			if (wip->particle_spewers[s].particle_spew_type != PSPEW_NONE){
 
 				if ((wip->particle_spewers[s].particle_spew_anim.first_frame < 0) 
-					&& (strlen(wip->particle_spewers[s].particle_spew_anim.filename) > 0) ) {
+					&& (wip->particle_spewers[s].particle_spew_anim.filename[0] != '\0') ) {
 
 					wip->particle_spewers[s].particle_spew_anim.first_frame = bm_load(wip->particle_spewers[s].particle_spew_anim.filename);
 
@@ -3291,9 +3305,10 @@ void weapon_load_bitmaps(int weapon_index)
 		used_weapons[weapon_index]++;
 }
 
-/* checks all of the weapon infos for subsitution patterns 
-and caches the weapon_index of any that it finds. */
-void weapon_generate_indexes_for_subsitution() {
+/**
+ * Checks all of the weapon infos for substitution patterns and caches the weapon_index of any that it finds. 
+ */
+void weapon_generate_indexes_for_substitution() {
 	for (int i = 0; i < MAX_WEAPON_TYPES; i++) {
 		weapon_info *wip = &(Weapon_info[i]);
 
@@ -3314,7 +3329,7 @@ void weapon_generate_indexes_for_subsitution() {
 				wip->weapon_substitution_pattern[j] = weapon_index;
 			}
 
-			wip->weapon_substitution_pattern_names.empty();
+			wip->weapon_substitution_pattern_names.clear();
 		}
 	}
 }
@@ -3329,7 +3344,7 @@ void weapon_do_post_parse()
 	weapon_sort_by_type();	// NOTE: This has to be first thing!
 	weapon_create_names();
 	weapon_clean_entries();
-	weapon_generate_indexes_for_subsitution();
+	weapon_generate_indexes_for_substitution();
 
 	Default_cmeasure_index = -1;
 
@@ -3864,7 +3879,9 @@ void find_homing_object(object *weapon_objp, int num)
 			}*/
 
 			//WMC - Spawn weapons shouldn't go for protected ships
-			if((objp->flags & OF_PROTECTED) && (wp->weapon_flags & WF_SPAWNED))
+			// ditto for untargeted heat seekers - niffiwan
+			if ( (objp->flags & OF_PROTECTED) &&
+				((wp->weapon_flags & WF_SPAWNED) || (wip->wi_flags2 & WIF2_UNTARGETED_HEAT_SEEKER)) )
 				continue;
 
 			// Spawned weapons should never home in on their parent - even in multiplayer dogfights where they would pass the iff test below
@@ -5349,6 +5366,15 @@ int weapon_create( vec3d * pos, matrix * porient, int weapon_type, int parent_ob
 	wp->collisionOccured = false;
 
 	Num_weapons++;
+
+	// reset the damage record fields (for scoring purposes)
+	wp->total_damage_received = 0.0f;
+	for(int i=0;i<MAX_WEP_DAMAGE_SLOTS;i++)
+	{
+		wp->damage_ship[i] = 0.0f;
+		wp->damage_ship_id[i] = -1;
+	}
+
 	return objnum;
 }
 //	Spawn child weapons from object *objp.
@@ -6019,6 +6045,14 @@ void weapon_hit( object * weapon_obj, object * other_obj, vec3d * hitpos, int qu
 					particle_emit(&pe, PARTICLE_BITMAP, expl_ani_handle, 10.0f);
 				}
 			}
+		}
+	}
+
+	// single player and multiplayer masters evaluate the scoring and kill stuff
+	if (!MULTIPLAYER_CLIENT) {
+		//If this is a bomb, set it up for scoring. -Halleck
+		if (wip->wi_flags & WIF_BOMB) {
+			scoring_eval_kill_on_weapon(weapon_obj, other_obj);
 		}
 	}
 

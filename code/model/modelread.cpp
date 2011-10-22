@@ -359,9 +359,6 @@ void model_init()
 		Polygon_models[i] = NULL;
 	}
 
-	// Init the model caching system
-//	model_cache_init();
-
 	atexit( model_free_all );
 	model_initted = 1;
 }
@@ -562,17 +559,7 @@ static void set_subsystem_info( model_subsystem *subsystemp, char *props, char *
 
 		// CASE OF NORMAL CONTINUOUS ROTATION
 		else {
-			// commented by Goober5000 to allow faster than 1sec rotation
-/*			if ( fabs(turn_time) < 1 )
-			{
-				// Warning(LOCATION, "%s has subsystem %s with rotation time less than 1 sec", dname, Global_filename );
-				subsystemp->flags &= ~MSS_FLAG_ROTATES;
-				subsystemp->turn_rate = 0.0f;
-			}
-			else */
-			{
-				subsystemp->turn_rate = PI2 / turn_time;
-			}
+			subsystemp->turn_rate = PI2 / turn_time;
 		}
 	}
 }
@@ -673,7 +660,7 @@ void print_family_tree( polymodel *obj, int modelnum, char * ident, int islast )
 	if ( modelnum < 0 ) return;
 	if (obj==NULL) return;
 
-	if (strlen(ident)==0 )	{
+	if (ident[0] == '\0')	{
 		mprintf(( " %s", obj->submodel[modelnum].name ));
 		sprintf( temp, " " );
 	} else if ( islast ) 	{
@@ -1749,13 +1736,20 @@ int read_model_file(polymodel * pm, char *filename, int n_subsystems, model_subs
 						if (bank->glow_neb_bitmap < 0)
 						{
 							bank->glow_neb_bitmap = bank->glow_bitmap;
-							nprintf(( "Model", "Glow point bank texture not found for '%s', setting as the normal one num\n", pm->filename));
+							nprintf(( "Model", "Glow point bank nebula texture not found for '%s', using normal glowpoint texture instead\n", pm->filename));
 						//	Error( LOCATION, "Couldn't open texture '%s'\nreferenced by model '%s'\n", glow_texture_name, pm->filename );
 						}
 						else
 						{
 							nprintf(( "Model", "Glow point bank %i nebula texture num is %d for '%s'\n", gpb, bank->glow_neb_bitmap, pm->filename));
 						}
+					} 
+					else 
+					{
+						// niffiwan: no "props" string found - ensure we don't have a random texture assigned!
+						bank->glow_bitmap = -1;
+						bank->glow_neb_bitmap = -1;
+						Warning( LOCATION, "No Glow point texture for bank '%d' referenced by model '%s'\n", gpb, pm->filename);
 					}
 
 					for (j = 0; j < bank->num_points; j++)
@@ -2426,16 +2420,6 @@ int model_load(char *filename, int n_subsystems, model_subsystem *subsystems, in
 			}
 		}
 
-		char collision_name[128];
-		strcpy_s( collision_name, pm->submodel[i].name );
-		strcat_s( collision_name, "-collision" );
-		for ( j = 0; j < pm->n_models; j++ ) {
-			if ( !stricmp(pm->submodel[j].name, collision_name) ) {
-				// mprintf("Found collision model for '%s'\n", pm->submodel[i].name);
-				pm->submodel[i].collision_model = j;
-			}
-		}
-
 		// Search for models with live debris
 		// This debris comes from a destroyed subsystem when ship is still alive
 		char live_debris_name[128];
@@ -2476,7 +2460,7 @@ int model_load(char *filename, int n_subsystems, model_subsystem *subsystems, in
 
 		sm1->num_details = 0;
 		// If a backward compatibility LOD name is declared use it
-		if (strlen(sm1->lod_name) != 0) {
+		if (sm1->lod_name[0] != '\0') {
 			l1=strlen(sm1->lod_name);
 		}
 		// otherwise use the name for LOD comparision
@@ -2513,7 +2497,7 @@ int model_load(char *filename, int n_subsystems, model_subsystem *subsystems, in
 			int first_diff = 0;
 			for ( k=0; k<l1; k++)	{
 				// If a backward compatibility LOD name is declared use it
-				if (strlen(sm1->lod_name) != 0) {
+				if (sm1->lod_name[0] != '\0') {
 					if (sm1->lod_name[k] != sm2->name[k] )	{
 						if (ndiff==0) first_diff = k;
 						ndiff++;
@@ -2530,7 +2514,7 @@ int model_load(char *filename, int n_subsystems, model_subsystem *subsystems, in
 			if (ndiff==1)	{		// They only differ by one character!
 				int dl1, dl2;
 				// If a backward compatibility LOD name is declared use it
-				if (strlen(sm1->lod_name) != 0) {
+				if (sm1->lod_name[0] != '\0') {
 					dl1 = tolower(sm1->lod_name[first_diff]) - 'a';
 				}
 				// otherwise do the standard LOD comparision
@@ -2954,8 +2938,8 @@ int model_find_2d_bound_min(int model_num,matrix *orient, vec3d * pos,int *x1, i
 			g3_project_vertex(&pt);
 
 			if (!(pt.flags & PF_OVERFLOW)) {
-				x = fl2i(pt.sx);
-				y = fl2i(pt.sy);
+				x = fl2i(pt.screen.xyw.x);
+				y = fl2i(pt.screen.xyw.y);
 				if ( n_valid_pts == 0 )	{
 					min_x = x;
 					min_y = y;
@@ -3018,8 +3002,8 @@ int submodel_find_2d_bound_min(int model_num,int submodel, matrix *orient, vec3d
 			g3_project_vertex(&pt);
 
 			if (!(pt.flags & PF_OVERFLOW)) {
-				x = fl2i(pt.sx);
-				y = fl2i(pt.sy);
+				x = fl2i(pt.screen.xyw.x);
+				y = fl2i(pt.screen.xyw.y);
 				if ( n_valid_pts == 0 )	{
 					min_x = x;
 					min_y = y;
@@ -3078,17 +3062,17 @@ int model_find_2d_bound(int model_num,matrix *orient, vec3d * pos,int *x1, int *
 	if (pnt.flags & PF_OVERFLOW)
 		return 2;
 
-	t = (width * Canv_w2)/pnt.z;
+	t = (width * Canv_w2)/pnt.world.xyz.z;
 	w = t*Matrix_scale.xyz.x;
 
-	t = (height*Canv_h2)/pnt.z;
+	t = (height*Canv_h2)/pnt.world.xyz.z;
 	h = t*Matrix_scale.xyz.y;
 
-	if (x1) *x1 = fl2i(pnt.sx - w);
-	if (y1) *y1 = fl2i(pnt.sy - h);
+	if (x1) *x1 = fl2i(pnt.screen.xyw.x - w);
+	if (y1) *y1 = fl2i(pnt.screen.xyw.y - h);
 
-	if (x2) *x2 = fl2i(pnt.sx + w);
-	if (y2) *y2 = fl2i(pnt.sy + h);
+	if (x2) *x2 = fl2i(pnt.screen.xyw.x + w);
+	if (y2) *y2 = fl2i(pnt.screen.xyw.y + h);
 
 	return 0;
 }
@@ -3116,17 +3100,17 @@ int subobj_find_2d_bound(float radius ,matrix *orient, vec3d * pos,int *x1, int 
 	if (pnt.flags & PF_OVERFLOW)
 		return 2;
 
-	t = (width * Canv_w2)/pnt.z;
+	t = (width * Canv_w2)/pnt.world.xyz.z;
 	w = t*Matrix_scale.xyz.x;
 
-	t = (height*Canv_h2)/pnt.z;
+	t = (height*Canv_h2)/pnt.world.xyz.z;
 	h = t*Matrix_scale.xyz.y;
 
-	if (x1) *x1 = fl2i(pnt.sx - w);
-	if (y1) *y1 = fl2i(pnt.sy - h);
+	if (x1) *x1 = fl2i(pnt.screen.xyw.x - w);
+	if (y1) *y1 = fl2i(pnt.screen.xyw.y - h);
 
-	if (x2) *x2 = fl2i(pnt.sx + w);
-	if (y2) *y2 = fl2i(pnt.sy + h);
+	if (x2) *x2 = fl2i(pnt.screen.xyw.x + w);
+	if (y2) *y2 = fl2i(pnt.screen.xyw.y + h);
 
 	return 0;
 }
@@ -3406,30 +3390,37 @@ void submodel_rotate(model_subsystem *psub, submodel_instance_info *sii)
 	float delta = (sii->cur_turn_rate + final_turn_rate) * 0.5f * flFrametime;
 	sii->cur_turn_rate = final_turn_rate;
 
-
-	//float delta = psub->turn_rate * flFrametime;
-
+	// Apply rotation in the axis of movement
+	// then normalize the angle angle so that we are within a valid range:
+	//  greater than or equal to 0
+	//  less than PI2
 	switch( sm->movement_axis )	{
-	case MOVEMENT_AXIS_X:	
+	case MOVEMENT_AXIS_X:
 		sii->angs.p += delta;
-		if (sii->angs.p > PI2 )
+
+		while (sii->angs.p > PI2)
 			sii->angs.p -= PI2;
-		else if (sii->angs.p < 0.0f )
+		while (sii->angs.p < 0.0f)
 			sii->angs.p += PI2;
+
 		break;
-	case MOVEMENT_AXIS_Y:	
+	case MOVEMENT_AXIS_Y:
 		sii->angs.h += delta;
-		if (sii->angs.h > PI2 )
+
+		while (sii->angs.h > PI2)
 			sii->angs.h -= PI2;
-		else if (sii->angs.h < 0.0f )
+		while (sii->angs.h < 0.0f)
 			sii->angs.h += PI2;
+
 		break;
-	case MOVEMENT_AXIS_Z:	
+	case MOVEMENT_AXIS_Z:
 		sii->angs.b += delta;
-		if (sii->angs.b > PI2 )
+
+		while (sii->angs.b > PI2)
 			sii->angs.b -= PI2;
-		else if (sii->angs.b < 0.0f )
+		while (sii->angs.b < 0.0f)
 			sii->angs.b += PI2;
+
 		break;
 	}
 }

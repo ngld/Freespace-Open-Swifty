@@ -82,15 +82,12 @@ typedef struct submodel_instance_info {
 } submodel_instance_info;
 
 typedef struct submodel_instance {
-	bool blown_off;
 	angles angs;
 	angles prev_angs;
-	//int num_arcs;
-	bool collision_checked;
-	//submodel_instance_info *sii;
-
 	vec3d mc_base;
 	matrix mc_orient;
+	bool collision_checked;
+	bool blown_off;
 } submodel_instance;
 
 typedef struct polymodel_instance {
@@ -136,6 +133,10 @@ typedef struct polymodel_instance {
 #define MSS_FLAG_NO_AGGREGATE		(1 << 30)		// Don't include with aggregate subsystem types - Goober5000
 #define MSS_FLAG_TURRET_ANIM_WAIT   (1 << 31)		// Turret won't fire until animation is complete - Sushi
 
+#define MSS_FLAG2_PLAYER_TURRET_SOUND (1 << 0)
+
+#define NUM_SUBSYSTEM_FLAGS			33
+
 // definition of stepped rotation struct
 typedef struct stepped_rotation {
 	int num_steps;				// number of steps in complete revolution
@@ -160,6 +161,7 @@ struct queued_animation;
 typedef struct model_subsystem {					/* contains rotation rate info */
 
 	uint		flags;									// See MSS_FLAG_* defines above
+	uint		flags2;
 	char		name[MAX_NAME_LEN];					// name of the subsystem.  Probably displayed on HUD
 	char		subobj_name[MAX_NAME_LEN];			// Temporary (hopefully) parameter used to match stuff in ships.tbl
 	char		alt_sub_name[NAME_LENGTH];					//Karajorma - Name that overrides name of original
@@ -227,6 +229,10 @@ typedef struct model_subsystem {					/* contains rotation rate info */
 	float	favor_current_facing;
 
 	float	turret_rof_scaler;
+
+	//Per-turret ownage settings - SUSHI
+	int turret_max_bomb_ownage; 
+	int turret_max_target_ownage; 
 } model_subsystem;
 
 typedef struct model_special {
@@ -318,7 +324,6 @@ typedef struct bsp_info {
 	bool	collide_invisible; //SUSHI: If set, this submodel should allow collisions for invisible textures. For the "replacement" collision model scheme.
 	bool	force_turret_normal; //Wanderer: Sets the turret uvec to override any input of for turret normal.
 	char	lod_name[MAX_NAME_LEN];	//FUBAR:  Name to be used for LOD naming comparison to preserve compatibility with older tables.  Only used on LOD0 
-	int		collision_model;		// Swifty: Alternate model used for collision detection
 
 	float		dumb_turn_rate;
 
@@ -354,7 +359,6 @@ typedef struct bsp_info {
 		bsp_data = NULL;
 		rad = 0.f;
 		lod_name[ 0 ] = '\0';  
-		collision_model = -1;
 
 		/* Compound types */
 		memset( live_debris, 0, sizeof( live_debris ) );
@@ -708,9 +712,6 @@ typedef struct polymodel {
 // Call once to initialize the model system
 void model_init();
 
-// call at the beginning of a level. after the level has been loaded
-void model_level_post_init();
-
 // call to unload a model (works like bm_unload()), "force" SHOULD NEVER BE SET outside of modelread.cpp!!!!
 void model_unload(int modelnum, int force = 0);
 
@@ -726,9 +727,6 @@ void model_delete_instance(int model_instance_num);
 
 // Goober5000
 void model_load_texture(polymodel *pm, int i, char *file);
-
-// notify the model system that a ship has died
-void model_notify_dead_ship(int objnum);
 
 // Returns a pointer to the polymodel structure for model 'n'
 polymodel *model_get(int model_num);
@@ -1132,6 +1130,7 @@ typedef struct mst_info {
 	int primary_glow_bitmap;
 	int secondary_glow_bitmap;
 	int tertiary_glow_bitmap;
+	int distortion_bitmap;
 
 	bool use_ab;
 	float glow_noise;
@@ -1142,28 +1141,41 @@ typedef struct mst_info {
 	float secondary_glow_rad_factor;
 	float tertiary_glow_rad_factor;
 	float glow_length_factor;
+	float distortion_rad_factor;
+	float distortion_length_factor;
+	bool draw_distortion;
 
 	mst_info() : primary_bitmap(-1), primary_glow_bitmap(-1), secondary_glow_bitmap(-1), tertiary_glow_bitmap(-1),
 					use_ab(false), glow_noise(1.0f), rotvel(NULL), length(vmd_zero_vector), glow_rad_factor(1.0f),
-					secondary_glow_rad_factor(1.0f), tertiary_glow_rad_factor(1.0f), glow_length_factor(1.0f)
+					secondary_glow_rad_factor(1.0f), tertiary_glow_rad_factor(1.0f), glow_length_factor(1.0f), distortion_rad_factor(1.0f), distortion_length_factor(1.0f)
 				{}
 } mst_info;
 
+
+//Valathil - Buffer struct for transparent object sorting
+typedef struct transparent_object {
+	int blend_filter;
+	float alpha;
+	int texture;
+	int glow_map;
+	int spec_map;
+	int norm_map;
+	int height_map;
+	vertex_buffer *buffer;
+	unsigned int tmap_flags;
+	int i;
+	vec3d scale;
+} transparent_object;
+
+typedef struct transparent_submodel {
+	bsp_info *model;
+	matrix orient;
+	bool is_submodel;
+	SCP_vector<transparent_object> transparent_objects;
+} transparent_submodel;
 // scale the engines thrusters by this much
 // Only enabled if MR_SHOW_THRUSTERS is on
 void model_set_thrust(int model_num = -1, mst_info *mst = NULL);
-
-//=========================================================
-// model caching
-
-// Call once to init the model caching stuff
-//void model_cache_init();
-
-// Call before every level to clean up the model caching stuff
-//void model_cache_reset();
-
-// If TRUE, then model caching is enabled
-//extern int Model_caching;
 
 
 //=======================================================================================

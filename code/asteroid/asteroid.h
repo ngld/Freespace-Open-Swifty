@@ -29,11 +29,6 @@ struct collision_info_struct;
 #define	ASTEROID_TYPE_MEDIUM	1
 #define	ASTEROID_TYPE_LARGE		2
 
-// This is for the asteroid types plus DEBRIS_X_Y
-// (X is each species and Y is SMALL, MEDIUM, and LARGE)
-// 20060826 - made dynamic -- taylor
-//#define	MAX_DEBRIS_TYPES	((MAX_SPECIES + 1) * NUM_DEBRIS_SIZES)
-
 // these should always be equal for the benefit of generic asteroids (c.f. asteroid_page_in)
 #define	MAX_ACTIVE_DEBRIS_TYPES		NUM_DEBRIS_SIZES
 
@@ -65,10 +60,10 @@ typedef struct asteroid_info {
 	polymodel	*modelp[NUM_DEBRIS_POFS];
 	int			model_num[NUM_DEBRIS_POFS];
 
-	asteroid_info( ) 
-		: num_detail_levels( 0 ), max_speed( 0 ), damage_type_idx_sav( -1 ),
-		  inner_rad( 0 ), outer_rad( 0 ), damage( 0 ), blast( 0 ),
-		  initial_asteroid_strength( 0 ), damage_type_idx( -1 )
+	asteroid_info( )
+		: num_detail_levels( 0 ), max_speed( 0 ), damage_type_idx( 0 ),
+		  damage_type_idx_sav( -1 ), inner_rad( 0 ), outer_rad( 0 ),
+		  damage( 0 ), blast( 0 ), initial_asteroid_strength( 0 )
 	{ 
 		name[ 0 ] = NULL;
 		memset( pof_files, 0, sizeof( pof_files ) );

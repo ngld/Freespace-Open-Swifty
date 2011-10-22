@@ -413,31 +413,11 @@ SOURCE=..\..\code\DebugConsole\Console.cpp
 # End Source File
 # Begin Source File
 
-SOURCE=..\..\code\debugconsole\dbugfile.cpp
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\code\debugconsole\dbugfile.h
-# End Source File
-# Begin Source File
-
 SOURCE=..\..\code\debugconsole\timerbar.cpp
 # End Source File
 # Begin Source File
 
 SOURCE=..\..\code\debugconsole\timerbar.h
-# End Source File
-# End Group
-# Begin Group "Demo"
-
-# PROP Default_Filter ""
-# Begin Source File
-
-SOURCE=..\..\code\Demo\Demo.cpp
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\code\Demo\Demo.h
 # End Source File
 # End Group
 # Begin Group "DirectX"
@@ -618,14 +598,6 @@ SOURCE=..\..\code\GlobalIncs\AlphaColors.cpp
 # Begin Source File
 
 SOURCE=..\..\code\GlobalIncs\AlphaColors.h
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\code\GlobalIncs\crypt.cpp
-# End Source File
-# Begin Source File
-
-SOURCE=..\..\code\GlobalIncs\crypt.h
 # End Source File
 # Begin Source File
 

@@ -14,29 +14,11 @@
 
 struct ship_subsys;
 struct ship;
+class waypoint_list;
 
 // bumped to 30 by Goober5000
 #define	OPERATOR_LENGTH	30  // if this ever exceeds TOKEN_LENGTH, let JasonH know!
 #define	TOKEN_LENGTH		32
-
-/*
-#ifdef FS2_DEMO
-	#define	MAX_SEXP_NODES	1600
-#else
-	#define	MAX_SEXP_NODES	4000			// Reduced from 2000 to 1200 by MK on 4/1/98.
-											// Most used nodes is 698 in sm1-10a.  Sandeep thinks that's the most complex mission.
-											// AL 2-4-98: upped to 1600, btm03 ran out of sexps, since campaign took a bunch
-											// DA 12/15 bumped up to 2000 - Dan ran out
-											// DaveB 9/02/99 bumped to 2200
-											// Goober5000 01/20/2004 bumped to 3000
-											// WMCoolmon 06/15/2004 bumped to 3500
-											// Goober5000 04/14/2005 bumped to 4000 for WCS
-											// Goober5000 04/17/2005 reduced to 3000, now that we solved the root problem
-											// taylor 03/11/2006 bumped to 4000, it's going dynamic soon so it should be ok to leave it this high
-											//                                   until then.
-											// Goober5000 10/8/2006 made dynamic :)
-#endif
-*/
 
 #define MAX_SEXP_VARIABLES 250
 
@@ -268,6 +250,8 @@ struct ship;
 #define	OP_PREVIOUS_EVENT_FALSE				(0x0007 | OP_CATEGORY_GOAL_EVENT)
 #define	OP_PREVIOUS_GOAL_TRUE				(0x0009 | OP_CATEGORY_GOAL_EVENT)
 #define	OP_PREVIOUS_GOAL_FALSE				(0x000a | OP_CATEGORY_GOAL_EVENT)
+#define	OP_EVENT_TRUE_MSECS_DELAY			(0x000b | OP_CATEGORY_GOAL_EVENT | OP_NONCAMPAIGN_FLAG)
+#define	OP_EVENT_FALSE_MSECS_DELAY			(0x000c | OP_CATEGORY_GOAL_EVENT | OP_NONCAMPAIGN_FLAG)
 
 #define	OP_IS_DESTROYED_DELAY				(0x0000 | OP_CATEGORY_OBJECTIVE | OP_NONCAMPAIGN_FLAG)
 #define	OP_IS_SUBSYSTEM_DESTROYED_DELAY		(0x0001 | OP_CATEGORY_OBJECTIVE | OP_NONCAMPAIGN_FLAG)
@@ -678,21 +662,18 @@ struct ship;
 #define OP_NAV_USEAP						(0x00ff | OP_CATEGORY_CHANGE | OP_NONCAMPAIGN_FLAG)	// Kazan
 
 // 0x00ff is the last remaining sexp in the CHANGE category!  Future change sexps should go under CHANGE2
+
 #define OP_STRING_GET_SUBSTRING				(0x0000 | OP_CATEGORY_CHANGE2 | OP_NONCAMPAIGN_FLAG)	// Goober5000
 #define OP_STRING_SET_SUBSTRING				(0x0001 | OP_CATEGORY_CHANGE2 | OP_NONCAMPAIGN_FLAG)	// Goober5000
-
 #define OP_SET_NUM_COUNTERMEASURES			(0x0002 | OP_CATEGORY_CHANGE2 | OP_NONCAMPAIGN_FLAG) // Karajorma
 #define OP_ADD_TO_COLGROUP					(0x0003 | OP_CATEGORY_CHANGE2 | OP_NONCAMPAIGN_FLAG) // The E
 #define OP_REMOVE_FROM_COLGROUP				(0x0004 | OP_CATEGORY_CHANGE2 | OP_NONCAMPAIGN_FLAG) // The E
 #define OP_GET_COLGROUP_ID					(0x0005 | OP_CATEGORY_CHANGE2 | OP_NONCAMPAIGN_FLAG) // The E
-#define OP_IGNORE_KEY						(0x0006 | OP_CATEGORY_CHANGE2 | OP_NONCAMPAIGN_FLAG) // Karajorma
-#define OP_SHIP_EFFECT						(0x0007 | OP_CATEGORY_CHANGE2 | OP_NONCAMPAIGN_FLAG) // Valathil
-#define OP_CLEAR_SUBTITLES					(0x0008 | OP_CATEGORY_CHANGE2 | OP_NONCAMPAIGN_FLAG) // The E
+#define OP_SHIP_EFFECT						(0x0006 | OP_CATEGORY_CHANGE2 | OP_NONCAMPAIGN_FLAG) // Valathil
+#define OP_CLEAR_SUBTITLES					(0x0007 | OP_CATEGORY_CHANGE2 | OP_NONCAMPAIGN_FLAG) // The E
+#define OP_BEAM_FIRE_COORDS					(0x0008 | OP_CATEGORY_CHANGE2 | OP_NONCAMPAIGN_FLAG)	// Goober5000
+#define OP_SET_DOCKED						(0x0009 | OP_CATEGORY_CHANGE2 | OP_NONCAMPAIGN_FLAG) // Sushi
 
-/* made obsolete by Goober5000
-// debugging sexpressions
-#define	OP_INT3									(0x0000 | OP_CATEGORY_DEBUG)
-*/
 
 // defined for AI goals
 #define OP_AI_CHASE							(0x0000 | OP_CATEGORY_AI | OP_NONCAMPAIGN_FLAG)
@@ -764,6 +745,7 @@ struct ship;
 #define OP_RESET_ORDERS						(0x0013 | OP_CATEGORY_TRAINING) // Karajorma
 #define OP_QUERY_ORDERS						(0x0014 | OP_CATEGORY_TRAINING) // Karajorma
 #define OP_NODE_TARGETED					(0x0015 | OP_CATEGORY_TRAINING) // FUBAR
+#define OP_IGNORE_KEY						(0x0016 | OP_CATEGORY_TRAINING) // Karajorma
 
 // defines for string constants
 #define SEXP_HULL_STRING			"Hull"
@@ -775,7 +757,6 @@ struct ship;
 #define SEXP_NONE_STRING			"<none>"
 #define SEXP_ANY_STRING				"<any string>"
 #define SEXP_ALL_BANKS_STRING		"<all weapon banks>"
-#define SEXP_SHIP_WING_ADV_STRING	"<ship wave carry>"
 
 // macros for accessing sexpression atoms
 #define CAR(n)		((n < 0) ? -1 : Sexp_nodes[n].first)
@@ -994,7 +975,7 @@ class arg_item
 		int flags;
 		int nesting_level;
 
-		arg_item() : flags(0), nesting_level(0), text(NULL), next(NULL) {}
+		arg_item() : text(NULL), next(NULL), flags(0), nesting_level(0) {}
 		void add_data(char *str);
 		void add_data_dup(char *str);
 		void add_data_set_dup(char *str);
@@ -1029,7 +1010,7 @@ extern int Training_context_speed_min;
 extern int Training_context_speed_max;
 extern int Training_context_speed_set;
 extern int Training_context_speed_timestamp;
-extern int Training_context_path;
+extern waypoint_list *Training_context_path;
 extern int Training_context_goal_waypoint;
 extern int Training_context_at_waypoint;
 extern float Training_context_distance;
@@ -1085,7 +1066,6 @@ int special_argument_appears_in_sexp_list(int node);
 // functions to change the attributes of an sexpression tree to persistent or not persistent
 extern void sexp_unmark_persistent( int n );
 extern void sexp_mark_persistent( int n );
-extern int waypoint_lookup(char *name);
 extern int verify_sexp_tree(int node);
 extern int query_sexp_ai_goal_valid(int sexp_ai_goal, int ship);
 int query_node_in_sexp(int node, int sexp);

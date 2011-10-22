@@ -290,8 +290,9 @@ static int Damage_flash_bright;
 static int Damage_flash_timer;
 
 HudGauge::HudGauge():
-base_w(0), base_h(0), gauge_config(-1), config_override(true), reticle_follow(false), active(false), pop_up(false), disabled_views(0), texture_target(-1), 
-target_w(-1), target_h(-1), canvas_w(-1), canvas_h(-1), custom_gauge(false), font_num(FONT1), off_by_default(false), sexp_override(false)
+base_w(0), base_h(0), gauge_config(-1), font_num(FONT1), config_override(true), reticle_follow(false),
+active(false), off_by_default(false), sexp_override(false), pop_up(false), disabled_views(0), custom_gauge(false),
+texture_target(-1), canvas_w(-1), canvas_h(-1), target_w(-1), target_h(-1)
 {
 	position[0] = 0;
 	position[1] = 0;
@@ -313,9 +314,10 @@ target_w(-1), target_h(-1), canvas_w(-1), canvas_h(-1), custom_gauge(false), fon
 }
 
 HudGauge::HudGauge(int _gauge_object, int _gauge_config, bool _allow_override, bool _slew, bool _message, int _disabled_views, int r, int g, int b):
-base_w(0), base_h(0), gauge_object(_gauge_object), gauge_config(_gauge_config), config_override(_allow_override), reticle_follow(_slew), 
-message_gauge(_message), active(false), pop_up(false), disabled_views(_disabled_views), texture_target(-1), target_w(-1), target_h(-1), 
-textoffset_x(0), textoffset_y(0), canvas_w(-1), canvas_h(-1), custom_gauge(false), font_num(FONT1), off_by_default(false), sexp_override(false)
+base_w(0), base_h(0), gauge_config(_gauge_config), gauge_object(_gauge_object), font_num(FONT1), config_override(_allow_override),
+reticle_follow(_slew), active(false), off_by_default(false), sexp_override(false), pop_up(false), message_gauge(_message),
+disabled_views(_disabled_views), custom_gauge(false), textoffset_x(0), textoffset_y(0), texture_target(-1),
+canvas_w(-1), canvas_h(-1), target_w(-1), target_h(-1)
 {
 	Assert(gauge_config <= NUM_HUD_GAUGES && gauge_config >= 0);
 
@@ -348,9 +350,10 @@ textoffset_x(0), textoffset_y(0), canvas_w(-1), canvas_h(-1), custom_gauge(false
 
 // constructor for custom gauges
 HudGauge::HudGauge(int _gauge_config, bool _slew, int r, int g, int b, char* _custom_name, char* _custom_text, char* frame_fname, int txtoffset_x, int txtoffset_y):
-gauge_object(HUD_OBJECT_CUSTOM), base_w(0), base_h(0), gauge_config(_gauge_config), config_override(true), reticle_follow(_slew), message_gauge(false), 
-active(false), pop_up(false), disabled_views(VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY), texture_target(-1), target_w(-1), target_h(-1), 
-textoffset_x(txtoffset_x), textoffset_y(txtoffset_y), canvas_w(-1), canvas_h(-1), custom_gauge(true), font_num(FONT1), off_by_default(false), sexp_override(false)
+base_w(0), base_h(0), gauge_config(_gauge_config), gauge_object(HUD_OBJECT_CUSTOM), font_num(FONT1), config_override(true),
+reticle_follow(_slew), active(false), off_by_default(false), sexp_override(false), pop_up(false), message_gauge(false),
+disabled_views(VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY), custom_gauge(true), textoffset_x(txtoffset_x),
+ textoffset_y(txtoffset_y), texture_target(-1), canvas_w(-1), canvas_h(-1), target_w(-1), target_h(-1)
 {
 	position[0] = 0;
 	position[1] = 0;
@@ -659,7 +662,7 @@ void HudGauge::render(float frametime)
 	setGaugeColor();
 
 	if(custom_text) {
-		if(strlen(custom_text) > 0) {
+		if(custom_text[0] != '\0') {
 			hud_num_make_mono(custom_text);
 			renderString(position[0] + textoffset_x, position[1] + textoffset_y, custom_text);
 		}
@@ -1077,7 +1080,7 @@ void HudGauge::initCockpitTarget(char* display_name, int _target_x, int _target_
 
 bool HudGauge::setupRenderCanvas(int render_target)
 {
-	if ( strlen(texture_target_fname) > 0 ) {
+	if (texture_target_fname[0] != '\0') {
 		if ( render_target >= 0 && render_target == texture_target ) {
 			return true;
 		}
@@ -1213,7 +1216,7 @@ void hud_close()
 		num_gauges = Ship_info[i].hud_gauges.size();
 
 		for(j = 0; j < num_gauges; j++) {
-			delete Ship_info[i].hud_gauges[j];
+			vm_free(Ship_info[i].hud_gauges[j]);
 			Ship_info[i].hud_gauges[j] = NULL;
 		}
 		Ship_info[i].hud_gauges.clear();
@@ -1222,7 +1225,7 @@ void hud_close()
 	num_gauges = default_hud_gauges.size();
 
 	for(j = 0; j < num_gauges; j++) {
-		delete default_hud_gauges[j];
+		vm_free(default_hud_gauges[j]);
 		default_hud_gauges[j] = NULL;
 	}
 	default_hud_gauges.clear();
@@ -1716,7 +1719,10 @@ void hud_render_gauges(int cockpit_display_num)
 		num_gauges = sip->hud_gauges.size();
 
 		for(j = 0; j < num_gauges; j++) {
-			sip->hud_gauges[j]->preprocess();
+			// only preprocess gauges if we're not rendering to cockpit
+			if ( cockpit_display_num < 0 ) {
+				sip->hud_gauges[j]->preprocess();
+			}
 
 			if ( !sip->hud_gauges[j]->setupRenderCanvas(render_target) ) {
 				continue;
@@ -1808,14 +1814,13 @@ void update_throttle_sound()
 
 			if ( percent_throttle < ZERO_PERCENT ) {
 				if ( Player_engine_snd_loop > -1 )	{
-					snd_chg_loop_status(Player_engine_snd_loop, 0);
 					snd_stop(Player_engine_snd_loop); // Backslash - otherwise, long engine loops keep playing
 					Player_engine_snd_loop = -1;
 				}
 			}
 			else {
 				if ( Player_engine_snd_loop == -1 ){
-					Player_engine_snd_loop = snd_play_looping( &Snds[SND_ENGINE], 0.0f , -1, -1, percent_throttle * ENGINE_MAX_VOL );
+					Player_engine_snd_loop = snd_play_looping( &Snds[Ship_info[Ships[Player_obj->instance].ship_info_index].engine_snd_cockpit], 0.0f , -1, -1, percent_throttle * ENGINE_MAX_VOL, FALSE);
 				} else {
 					// The sound may have been trashed at the low-level if sound channel overflow.
 					// TODO: implement system where certain sounds cannot be interrupted (priority?)
@@ -2633,8 +2638,8 @@ int hud_support_find_closest( int objnum )
 					// we can use == in the next statement (and should) since a ship will only ever be
 					// following one order at a time.
 					if ( aip->goals[i].ai_mode == AI_GOAL_REARM_REPAIR ) {
-						Assert( aip->goals[i].ship_name );
-						sindex = ship_name_lookup( aip->goals[i].ship_name );
+						Assert( aip->goals[i].target_name );
+						sindex = ship_name_lookup( aip->goals[i].target_name );
 						if ( sindex == pship_index )
 							return sop->objnum;
 					}
@@ -2835,11 +2840,7 @@ void HudGaugeSupport::render(float frametime)
 				show_time = 1;
 			}		
 
-			if (!show_time) {
-				renderString(position[0] + text_dock_offset_x, position[1] + text_val_offset_y, outstr);
-			} else {			
-				renderString(position[0] + text_dock_offset_x, position[1] + text_val_offset_y, outstr);
-			}
+			renderString(position[0] + text_dock_offset_x, position[1] + text_val_offset_y, outstr);
 		}
 	}
 
@@ -3505,9 +3506,9 @@ void HUD_set_offsets(object *viewer_obj, int wiggedy_wack, matrix *eye_orient)
 
 		g3_project_vertex(&pt);
 
-		gr_unsize_screen_posf( &pt.sx, &pt.sy );
-		HUD_offset_x -= 0.45f * (i2fl(gr_screen.clip_width_unscaled)*0.5f - pt.sx);
-		HUD_offset_y -= 0.45f * (i2fl(gr_screen.clip_height_unscaled)*0.5f - pt.sy);
+		gr_unsize_screen_posf( &pt.screen.xyw.x, &pt.screen.xyw.y );
+		HUD_offset_x -= 0.45f * (i2fl(gr_screen.clip_width_unscaled)*0.5f - pt.screen.xyw.x);
+		HUD_offset_y -= 0.45f * (i2fl(gr_screen.clip_height_unscaled)*0.5f - pt.screen.xyw.y);
 
 		if ( HUD_offset_x > 100.0f )	{
 			HUD_offset_x = 100.0f;
@@ -3557,8 +3558,8 @@ void HUD_get_nose_coordinates(int *x, int *y)
 		g3_project_vertex(&v0);
 
 		if ( !(v0.codes & PF_OVERFLOW) ) {
-			x_nose = v0.sx;
-			y_nose = v0.sy;
+			x_nose = v0.screen.xyw.x;
+			y_nose = v0.screen.xyw.y;
 		} else {
 			// Means that the ship forward vector is not going through the frame buffer.
 			// We're assigning a high negative value so that the the bitmaps will be drawn offscreen so that
@@ -3726,7 +3727,7 @@ void HudGaugeMultiMsg::render(float frametime)
 	char txt[MULTI_MSG_MAX_TEXT_LEN+20];
 
 	// clear the text
-	memset(txt,0,MULTI_MSG_MAX_TEXT_LEN+1);
+	memset(txt,0,MULTI_MSG_MAX_TEXT_LEN+20);
 
 	// if there is valid multiplayer message text to be displayed
 	if(multi_msg_message_text(txt)){

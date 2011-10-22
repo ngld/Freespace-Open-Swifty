@@ -28,6 +28,7 @@
 #include "object/objectsnd.h"
 #include "globalincs/pstypes.h"
 #include "graphics/gropenglshader.h"
+#include "graphics/gropengldraw.h"
 
 // flags
 #define LAB_FLAG_NORMAL				(0)		// default
@@ -462,6 +463,7 @@ void labviewer_add_model_thrusters(ship_info *sip)
 	int framenum;
 	int secondary_glow_bitmap = -1;
 	int tertiary_glow_bitmap = -1;
+	static int thruster_distortion_bitmap = -1;
 	generic_anim *flame_anim = NULL, *glow_anim = NULL;
 	species_info *species = &Species_info[0];
 	weapon_info *wip = NULL;
@@ -486,6 +488,7 @@ void labviewer_add_model_thrusters(ship_info *sip)
 		glow_anim = &sip->thruster_glow_info.afterburn;			// select afterburner glow
 		secondary_glow_bitmap = sip->thruster_secondary_glow_info.afterburn.bitmap_id;
 		tertiary_glow_bitmap = sip->thruster_tertiary_glow_info.afterburn.bitmap_id;
+		thruster_distortion_bitmap = sip->thruster_distortion_info.afterburn.bitmap_id;
 
 		rate = 1.5f;		// go at 1.5x faster when afterburners on
 	} else {
@@ -505,6 +508,7 @@ void labviewer_add_model_thrusters(ship_info *sip)
 			glow_anim = &sip->thruster_glow_info.normal;				// select normal glow
 			secondary_glow_bitmap = sip->thruster_secondary_glow_info.normal.bitmap_id;
 			tertiary_glow_bitmap = sip->thruster_tertiary_glow_info.normal.bitmap_id;
+			thruster_distortion_bitmap = sip->thruster_distortion_info.normal.bitmap_id;
 		}
 
 		// If thrust at 0, go at half as fast, full thrust; full framerate
@@ -596,6 +600,7 @@ void labviewer_add_model_thrusters(ship_info *sip)
 	mst.primary_glow_bitmap =thruster_glow_bitmap;
 	mst.secondary_glow_bitmap = secondary_glow_bitmap;
 	mst.tertiary_glow_bitmap = tertiary_glow_bitmap;
+	mst.distortion_bitmap = thruster_distortion_bitmap;
 
 	mst.use_ab = Lab_thrust_afterburn;
 	mst.glow_noise = thruster_glow_noise;
@@ -606,6 +611,9 @@ void labviewer_add_model_thrusters(ship_info *sip)
 		mst.secondary_glow_rad_factor = sip->thruster02_glow_rad_factor;
 		mst.tertiary_glow_rad_factor = sip->thruster03_glow_rad_factor;
 		mst.glow_length_factor = sip->thruster02_glow_len_factor;
+		mst.distortion_length_factor = sip->thruster_dist_len_factor;
+		mst.distortion_rad_factor = sip->thruster_dist_rad_factor;
+		mst.draw_distortion = sip->draw_distortion;
 	}
 
 	if (Lab_mode == LAB_MODE_WEAPON) {
@@ -816,6 +824,8 @@ void labviewer_render_model(float frametime)
 		model_render(Lab_model_num, &Lab_viewer_orient, &vmd_zero_vector, /*Lab_model_flags*/flagggs, -1, -1);
 	}
 
+	batch_render_all();
+	
 	if ( !Cmdline_nohtl ) {
 		gr_end_view_matrix();
 		gr_end_proj_matrix();
@@ -1013,11 +1023,12 @@ void labviewer_do_render(float frametime)
 
 	// render our particular thing
 	if (Lab_model_num >= 0) {
-		gr_post_process_begin();
+		
+		gr_scene_texture_begin();
 
 		labviewer_render_model(frametime);
 
-		gr_post_process_end();
+		gr_scene_texture_end();
 
 		// print out the current pof filename, to help with... something
 		if ( strlen(Lab_model_filename) ) {
@@ -1026,11 +1037,11 @@ void labviewer_do_render(float frametime)
 			gr_string(gr_screen.clip_right - w, gr_screen.clip_bottom - h, Lab_model_filename, false);
 		}
 	} else if (Lab_bitmap_id >= 0) {
-		gr_post_process_begin();
+		gr_scene_texture_begin();
 
 		labviewer_render_bitmap(frametime);
 
-		gr_post_process_end();
+		gr_scene_texture_end();
 
 		// print out the current bitmap filename, to help with... something
 		if ( strlen(Lab_bitmap_filename) ) {
@@ -1348,7 +1359,7 @@ void labviewer_variables_add(int *Y, char *var_name)
 	// variable
 	Lab_variables_window->AddChild(new Text((var_name), (var_name), 0, y, VAR_POS_LEFTWIDTH));
 	// edit box
-	new_text = (Text*)Lab_variables_window->AddChild(new Text(std::string((var_name)) + std::string("Editbox"), "", VAR_POS_RIGHTX, y, VAR_POS_RIGHTWIDTH, 12, T_EDITTABLE));
+	new_text = (Text*)Lab_variables_window->AddChild(new Text(SCP_string((var_name)) + SCP_string("Editbox"), "", VAR_POS_RIGHTX, y, VAR_POS_RIGHTWIDTH, 12, T_EDITTABLE));
 
 	if (Y) {
 		*Y += new_text->GetHeight() + 2;
@@ -1824,7 +1835,7 @@ void labviewer_make_ship_window(Button *caller)
 	Lab_species_nodes[Species_info.size()] = cmp->AddItem(NULL, "Other", 0, false);
 
 	// Now add the ships
-	std::string lod_name;
+	SCP_string lod_name;
 	char buf[33];
 
 	for (idx = 0; idx < Num_ship_classes; idx++) {
@@ -2034,7 +2045,7 @@ void labviewer_make_weap_window(Button* caller)
 
 		cwip = cmp->AddItem(stip, Weapon_info[i].name, i, false, labviewer_change_weapon);
 
-		if ( strlen(Weapon_info[i].tech_model) > 0 ) {
+		if (Weapon_info[i].tech_model[0] != '\0') {
 			cmp->AddItem(cwip, "Tech Model", 0, false, labviewer_show_tech_model);
 		}
 	}

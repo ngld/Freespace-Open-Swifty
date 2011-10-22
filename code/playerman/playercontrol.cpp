@@ -60,6 +60,9 @@ physics_info Descent_physics;			// used when we want to control the player like 
 angles chase_slew_angles;
 int view_centering = 0;
 
+int toggle_glide = 0;
+int press_glide = 0;
+
 ////////////////////////////////////////////////////////////
 // Module data
 ////////////////////////////////////////////////////////////
@@ -507,10 +510,10 @@ void read_keyboard_controls( control_info * ci, float frame_time, physics_info *
 			control_used(ONE_THIRD_THROTTLE);
 			player_clear_speed_matching();
 			if ( Player->ci.forward_cruise_percent < 33.3f ) {
-				snd_play( &Snds[SND_THROTTLE_UP], 0.0f );
+				snd_play( &Snds[Ship_info[Ships[Player_obj->instance].ship_info_index].throttle_up_snd], 0.0f );
 
 			} else if ( Player->ci.forward_cruise_percent > 33.3f ) {
-				snd_play( &Snds[SND_THROTTLE_DOWN], 0.0f );
+				snd_play( &Snds[Ship_info[Ships[Player_obj->instance].ship_info_index].throttle_down_snd], 0.0f );
 			}
 
 			Player->ci.forward_cruise_percent = 33.3f;
@@ -521,10 +524,10 @@ void read_keyboard_controls( control_info * ci, float frame_time, physics_info *
 			control_used(TWO_THIRDS_THROTTLE);
 			player_clear_speed_matching();
 			if ( Player->ci.forward_cruise_percent < 66.6f ) {
-				snd_play( &Snds[SND_THROTTLE_UP], 0.0f );
+				snd_play( &Snds[Ship_info[Ships[Player_obj->instance].ship_info_index].throttle_up_snd], 0.0f );
 
 			} else if (Player->ci.forward_cruise_percent > 66.6f) {
-				snd_play( &Snds[SND_THROTTLE_DOWN], 0.0f );
+				snd_play( &Snds[Ship_info[Ships[Player_obj->instance].ship_info_index].throttle_down_snd], 0.0f );
 			}
 
 			Player->ci.forward_cruise_percent = 66.6f;
@@ -549,7 +552,7 @@ void read_keyboard_controls( control_info * ci, float frame_time, physics_info *
 			control_used(ZERO_THROTTLE);
 			player_clear_speed_matching();
 			if ( ci->forward_cruise_percent > 0.0f && Player_obj->phys_info.fspeed > 0.5) {
-				snd_play( &Snds[SND_ZERO_THROTTLE], 0.0f );
+				snd_play( &Snds[Ship_info[Ships[Player_obj->instance].ship_info_index].zero_throttle_snd], 0.0f );
 			}
 
 			ci->forward_cruise_percent = 0.0f;
@@ -560,7 +563,7 @@ void read_keyboard_controls( control_info * ci, float frame_time, physics_info *
 			control_used(MAX_THROTTLE);
 			player_clear_speed_matching();
 			if ( ci->forward_cruise_percent < 100.0f ) {
-				snd_play( &Snds[SND_FULL_THROTTLE], 0.0f );
+				snd_play( &Snds[Ship_info[Ships[Player_obj->instance].ship_info_index].full_throttle_snd], 0.0f );
 			}
 
 			ci->forward_cruise_percent = 100.0f;
@@ -726,9 +729,6 @@ void read_keyboard_controls( control_info * ci, float frame_time, physics_info *
 
 		// new gliding systems combining code by Backslash, Turey, Kazan, and WMCoolmon
 
-		// Make these static so that we keep them from frame to frame.
-		static int toggle_glide = 0;
-		static int press_glide = 0;
 		// Check for toggle button pressed.
 		if ( button_info_query(&Player->bi, TOGGLE_GLIDING) ) {
 			control_used(TOGGLE_GLIDING);
@@ -764,7 +764,7 @@ void read_keyboard_controls( control_info * ci, float frame_time, physics_info *
 						object_set_gliding(Player_obj, false);
 						ci->forward_cruise_percent = savedspeed;
 						press_glide = !press_glide;
-						snd_play( &Snds[SND_THROTTLE_UP], 0.0f );
+						snd_play( &Snds[Ship_info[Ships[Player_obj->instance].ship_info_index].throttle_up_snd], 0.0f );
 					}
 				} else if ( !object_get_gliding(Player_obj) ) {
 					object_set_gliding(Player_obj, true);
@@ -776,7 +776,7 @@ void read_keyboard_controls( control_info * ci, float frame_time, physics_info *
 						snd_play( &Snds[Ship_info[Player_ship->ship_info_index].glide_start_snd], 0.0f );
 					} else {
 						//If glide_start_snd wasn't set (probably == 0), use the default throttle down sound
-						snd_play( &Snds[SND_THROTTLE_DOWN], 0.0f );
+						snd_play( &Snds[Ship_info[Ships[Player_obj->instance].ship_info_index].throttle_down_snd], 0.0f );
 					}
 				}
 			}
@@ -792,7 +792,7 @@ void read_keyboard_controls( control_info * ci, float frame_time, physics_info *
 						snd_play( &Snds[Ship_info[Player_ship->ship_info_index].glide_end_snd], 0.0f );
 					} else {
 						//If glide_end_snd wasn't set (probably == 0), use the default throttle up sound
-						snd_play( &Snds[SND_THROTTLE_UP], 0.0f );
+						snd_play( &Snds[Ship_info[Ships[Player_obj->instance].ship_info_index].throttle_up_snd], 0.0f );
 					}
 				}
 			}
@@ -1182,6 +1182,8 @@ void player_restore_target_and_weapon_link_prefs()
  */
 void player_level_init()
 {
+	toggle_glide = 0;
+	press_glide = 0;
 	memset(&(Player->ci), 0, sizeof(control_info) );		// set the controls to 0
 
 	Viewer_slew_angles.p = 0.0f;	Viewer_slew_angles.b = 0.0f;	Viewer_slew_angles.h = 0.0f;
@@ -1851,27 +1853,27 @@ void player_maybe_play_all_alone_msg()
 
 void player_set_padlock_state()
 {
-	if ( check_control_timef(PADLOCK_UP) ) {
+	if ( check_control(PADLOCK_UP) ) {
 		chase_slew_angles.h = 0.0f;
 		chase_slew_angles.p = -PI_2;
 		Viewer_mode |= VM_PADLOCK_UP;
 		return;
 	}
-	if ( check_control_timef(PADLOCK_DOWN) ) {
+	if ( check_control(PADLOCK_DOWN) ) {
 		chase_slew_angles.h = -PI;
 		chase_slew_angles.p = 0.0f;
 		Viewer_mode |= VM_PADLOCK_REAR;
 		return;
 	}
 
-	if ( check_control_timef(PADLOCK_RIGHT) ) {
+	if ( check_control(PADLOCK_RIGHT) ) {
 		chase_slew_angles.h = PI_2;
 		chase_slew_angles.p = 0.0f;
 		Viewer_mode |= VM_PADLOCK_RIGHT;
 		return;
 	}
 
-	if ( check_control_timef(PADLOCK_LEFT) ) {
+	if ( check_control(PADLOCK_LEFT) ) {
 		chase_slew_angles.h = -PI_2;
 		chase_slew_angles.p = 0.0f;
 		Viewer_mode |= VM_PADLOCK_LEFT;
