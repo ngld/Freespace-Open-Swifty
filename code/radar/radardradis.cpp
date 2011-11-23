@@ -141,7 +141,7 @@ void HudGaugeRadarDradis::plotBlip(blip* b, vec3d *pos, float *alpha)
 	}
 }
 
-void HudGaugeRadarDradis::drawContact(vec3d *pnt, int idx, float dist, float alpha)
+void HudGaugeRadarDradis::drawContact(vec3d *pnt, int idx, int clr_idx, float dist, float alpha)
 {
 	vec3d  p;
 	int h, w;
@@ -173,8 +173,15 @@ void HudGaugeRadarDradis::drawContact(vec3d *pnt, int idx, float dist, float alp
 	matrix flip = vmd_identity_matrix;
 	flip.vec.uvec.xyz.y = -1.0;
 
-	gr_set_bitmap(idx, GR_ALPHABLEND_FILTER, GR_BITBLT_MODE_NORMAL, alpha);
-	g3_draw_polygon(&p, &vmd_identity_matrix, sizef/35.0f, aspect_mp*sizef/35.0f, TMAP_FLAG_TEXTURED | TMAP_HTL_3D_UNLIT);
+	if ( idx >= 0 ) {
+		gr_set_bitmap(idx, GR_ALPHABLEND_FILTER, GR_BITBLT_MODE_NORMAL, alpha);
+		g3_draw_polygon(&p, &vmd_identity_matrix, sizef/35.0f, aspect_mp*sizef/35.0f, TMAP_FLAG_TEXTURED | TMAP_HTL_3D_UNLIT);
+	}
+
+	if ( clr_idx >= 0 ) {
+		gr_set_bitmap(clr_idx, GR_ALPHABLEND_FILTER, GR_BITBLT_MODE_NORMAL, alpha);
+		g3_draw_polygon(&p, &vmd_identity_matrix, sizef/35.0f, aspect_mp*sizef/35.0f, TMAP_FLAG_TEXTURED | TMAP_FLAG_BW_TEXTURE | TMAP_HTL_3D_UNLIT);
+	}
 }
 
 // radar is damaged, so make blips dance around
@@ -199,7 +206,7 @@ void HudGaugeRadarDradis::blipDrawDistorted(blip *b, vec3d *pos, float alpha)
 	vm_vec_random_cone(&out, pos, distortion_angle);
 	vm_vec_scale(&out, dist);
 
-	drawContact(&out, unknown_contact_icon, b->dist, alpha);
+	drawContact(&out, -1, unknown_contact_icon, b->dist, alpha);
 }
 
 // blip is for a target immune to sensors, so cause to flicker in/out with mild distortion
@@ -237,7 +244,7 @@ void HudGaugeRadarDradis::blipDrawFlicker(blip *b, vec3d *pos, float alpha)
 	vm_vec_random_cone(&out,pos,distortion_angle);
 	vm_vec_scale(&out,dist);
 
-	drawContact(&out, unknown_contact_icon, b->dist, alpha);
+	drawContact(&out, -1, unknown_contact_icon, b->dist, alpha);
 }
 
 // Draw all the active radar blips
@@ -272,7 +279,7 @@ void HudGaugeRadarDradis::drawBlips(int blip_type, int bright, int distort)
 		{
 			alpha = 1.0;
 			b->rad = Radar_blip_radius_target;
-			drawContact(&pos, target_brackets, b->dist, alpha);
+			drawContact(&pos, -1, target_brackets, b->dist, alpha);
 		}
 		else {
 			b->rad = Radar_blip_radius_normal;
@@ -284,10 +291,10 @@ void HudGaugeRadarDradis::drawBlips(int blip_type, int bright, int distort)
 		} else {
 			if (b->flags & BLIP_DRAW_DISTORTED) {
 				blipDrawFlicker(b, &pos, alpha);
-			} else if (b->radar_image_2d >= 0) {
-				drawContact(&pos, b->radar_image_2d, b->dist, alpha);
+			} else if (b->radar_image_2d >= 0 || b->radar_color_image_2d >= 0) {
+				drawContact(&pos, b->radar_image_2d, b->radar_color_image_2d, b->dist, alpha);
 			} else {
-				drawContact(&pos, unknown_contact_icon, b->dist, alpha);
+				drawContact(&pos, -1, unknown_contact_icon, b->dist, alpha);
 			}
 		}
 	}
