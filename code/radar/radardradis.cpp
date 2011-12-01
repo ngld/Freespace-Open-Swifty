@@ -160,7 +160,7 @@ void HudGaugeRadarDradis::drawContact(vec3d *pnt, int idx, int clr_idx, float di
 		scale = 0.6f + (range-dist)/range;
 	}
 	
-	float sizef = fl_sqrt(vm_vec_dist(&Orb_eye_position, pnt) * 8.0f) * scale;
+	float sizef = fl_sqrt(vm_vec_dist(&Orb_eye_position, pnt) * 8.0f);
 
 	matrix flip = vmd_identity_matrix;
 	flip.vec.uvec.xyz.y = -1.0;
