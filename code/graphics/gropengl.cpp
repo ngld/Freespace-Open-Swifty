@@ -1586,7 +1586,7 @@ int opengl_init_display_device()
 	GL_pfd.cBlueBits = (ubyte)Gr_blue.bits;
 	GL_pfd.cAlphaBits = (bpp == 32) ? (ubyte)Gr_alpha.bits : 0;
 	GL_pfd.cDepthBits = (bpp == 32) ? 24 : 16;
-
+	GL_pfd.cStencilBits = (bpp == 32) ? 24 : 16;
 
 	wnd = (HWND)os_get_window();
 
@@ -1615,6 +1615,7 @@ int opengl_init_display_device()
 			// if we failed at 32-bit then we are probably a 16-bit desktop, so try and init a 16-bit visual instead
 			GL_pfd.cAlphaBits = 0;
 			GL_pfd.cDepthBits = 16;
+			GL_pfd.cStencilBits = 16;
 			// NOTE: the bit values for colors should get updated automatically by ChoosePixelFormat()
 
 			PixelFormat = ChoosePixelFormat(GL_device_context, &GL_pfd);
@@ -1690,6 +1691,7 @@ int opengl_init_display_device()
 	SDL_GL_SetAttribute(SDL_GL_GREEN_SIZE, Gr_green.bits);
 	SDL_GL_SetAttribute(SDL_GL_BLUE_SIZE, Gr_blue.bits);
 	SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, (bpp == 32) ? 24 : 16);
+	SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, (bpp == 32) ? 24 : 16);
 	SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, db);
 	
 	int fsaa_samples = os_config_read_uint(NULL, "OGL_AntiAliasSamples", 0);
