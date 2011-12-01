@@ -160,26 +160,34 @@ void HudGaugeRadarDradis::drawContact(vec3d *pnt, int idx, int clr_idx, float di
 		scale = 0.6f + (range-dist)/range;
 	}
 	
-	bm_get_info(idx, &w, &h);
-
-	if (h == w) {
-        aspect_mp = 1.0f;
-    } else {
-        aspect_mp = (((float) h) / ((float) w));
-    }
-
 	float sizef = fl_sqrt(vm_vec_dist(&Orb_eye_position, pnt) * 8.0f) * scale;
 
 	matrix flip = vmd_identity_matrix;
 	flip.vec.uvec.xyz.y = -1.0;
 
-	if ( idx >= 0 ) {
-		gr_set_bitmap(idx, GR_ALPHABLEND_FILTER, GR_BITBLT_MODE_NORMAL, alpha);
+	if ( clr_idx >= 0 ) {
+		bm_get_info(clr_idx, &w, &h);
+
+		if (h == w) {
+			aspect_mp = 1.0f;
+		} else {
+			aspect_mp = (((float) h) / ((float) w));
+		}
+
+		gr_set_bitmap(clr_idx, GR_ALPHABLEND_FILTER, GR_BITBLT_MODE_NORMAL, alpha);
 		g3_draw_polygon(&p, &vmd_identity_matrix, sizef/35.0f, aspect_mp*sizef/35.0f, TMAP_FLAG_TEXTURED | TMAP_HTL_3D_UNLIT);
 	}
 
-	if ( clr_idx >= 0 ) {
-		gr_set_bitmap(clr_idx, GR_ALPHABLEND_FILTER, GR_BITBLT_MODE_NORMAL, alpha);
+	if ( idx >= 0 ) {
+		bm_get_info(idx, &w, &h);
+
+		if (h == w) {
+			aspect_mp = 1.0f;
+		} else {
+			aspect_mp = (((float) h) / ((float) w));
+		}
+
+		gr_set_bitmap(idx, GR_ALPHABLEND_FILTER, GR_BITBLT_MODE_NORMAL, alpha);
 		g3_draw_polygon(&p, &vmd_identity_matrix, sizef/35.0f, aspect_mp*sizef/35.0f, TMAP_FLAG_TEXTURED | TMAP_FLAG_BW_TEXTURE | TMAP_HTL_3D_UNLIT);
 	}
 }
