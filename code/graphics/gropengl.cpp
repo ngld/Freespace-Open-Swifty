@@ -785,7 +785,7 @@ int gr_opengl_stencil_set(int mode)
 	if ( mode == GR_STENCIL_READ ) {
 		GL_state.StencilTest(1);
 		GL_state.SetStencilType(STENCIL_TYPE_READ);
-	} else if ( mode = GR_STENCIL_WRITE ) {
+	} else if ( mode == GR_STENCIL_WRITE ) {
 		GL_state.StencilTest(1);
 		GL_state.SetStencilType(STENCIL_TYPE_WRITE);
 	} else {

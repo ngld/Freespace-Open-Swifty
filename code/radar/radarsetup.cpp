@@ -295,6 +295,7 @@ void radar_plot_object( object *objp )
 	b->dist = dist;
 	b->objp = objp;
 	b->radar_image_2d = -1;
+	b->radar_color_image_2d = -1;
 	b->radar_image_size = -1;
 	b->radar_projection_size = 1.0f;
 
