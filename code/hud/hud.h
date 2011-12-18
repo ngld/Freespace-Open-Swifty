@@ -426,6 +426,7 @@ protected:
 	int middle_frame_start_offset_y;
 	int subsys_integ_start_offsets[2];
 	int subsys_integ_val_offset_x;
+	int bottom_bg_offset;
 	int line_h;
 
 	int Damage_flash_timer;
@@ -442,6 +443,7 @@ public:
 	void initMiddleFrameStartOffsetY(int y);
 	void initSubsysIntegStartOffsets(int x, int y);
 	void initSubsysIntegValueOffsetX(int x);
+	void initBottomBgOffset(int offset);
 	void initLineHeight(int h);
 	void render(float frametime);
 	void pageIn();

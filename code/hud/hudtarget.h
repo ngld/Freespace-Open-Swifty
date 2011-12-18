@@ -346,6 +346,7 @@ protected:
 	int _bg_first_offset_x;
 	int _bg_entry_offset_x;
 	int _bg_last_offset_x;
+	int _bg_last_offset_y;
 
 	int _background_first_h;
 	int _background_entry_h;
@@ -361,6 +362,7 @@ public:
 	void initBgFirstOffsetX(int x);
 	void initBgEntryOffsetX(int x);
 	void initBgLastOffsetX(int x);
+	void initBgLastOffsetY(int x);
 	void initBgFirstHeight(int h);
 	void initBgEntryHeight(int h);
 	void initHeaderText(char *text);

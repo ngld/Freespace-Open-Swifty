@@ -241,6 +241,11 @@ void HudGaugeWingmanStatus::initWingWidth(int w)
 	wing_width = w;
 }
 
+void HudGaugeWingmanStatus::initRightBgOffset(int offset)
+{
+	right_frame_start_offset = offset;
+}
+
 void HudGaugeWingmanStatus::initWingNameOffsets(int x, int y)
 {
 	wing_name_offsets[0] = x;
@@ -354,6 +359,8 @@ void HudGaugeWingmanStatus::renderBackground(int num_wings_to_draw)
 			renderBitmap(bitmap, sx, sy);
 			sy += wing_width;
 		}
+
+		sy += right_frame_start_offset;
 	} else {
 		if(num_wings_to_draw > 2 && bitmap > 0) {
 			for(int i = 0; i < num_wings_to_draw - 2; i++){
@@ -361,6 +368,8 @@ void HudGaugeWingmanStatus::renderBackground(int num_wings_to_draw)
 				sx += wing_width;
 			}
 		}
+
+		sx += right_frame_start_offset;
 	}
 
 	bitmap = Wingman_status_right.first_frame;

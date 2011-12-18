@@ -1447,6 +1447,7 @@ void load_gauge_escort_view(int base_w, int base_h, int font, int ship_index)
 	int list_start_offsets[2];
 	int entry_h;
 	int entry_stagger_w;
+	int bottom_bg_offset = 0;
 	int ship_name_offsets[2];
 	int ship_integrity_offsets[2];
 	int ship_status_offsets[2];
@@ -1531,6 +1532,9 @@ void load_gauge_escort_view(int base_w, int base_h, int font, int ship_index)
 	if(optional_string("Entry Stagger Width:")) {
 		stuff_int(&entry_stagger_w);
 	}
+	if(optional_string("Bottom Background Offset:")) {
+		stuff_int(&bottom_bg_offset);
+	}
 	if(optional_string("Header Text:")) {
 		stuff_string(header_text, F_NAME, MAX_FILENAME_LEN);
 	}
@@ -1556,6 +1560,7 @@ void load_gauge_escort_view(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initBitmaps(fname_top, fname_middle, fname_bottom);
 	hud_gauge->initEntryHeight(entry_h);
 	hud_gauge->initEntryStaggerWidth(entry_stagger_w);
+	hud_gauge->initBottomBgOffset(bottom_bg_offset);
 	hud_gauge->initHeaderText(header_text);
 	hud_gauge->initHeaderTextOffsets(header_text_offsets[0], header_text_offsets[1]);
 	hud_gauge->initListStartOffsets(list_start_offsets[0], list_start_offsets[1]);
@@ -3126,6 +3131,7 @@ void load_gauge_squad_message(int base_w, int base_h, int font, int ship_index)
 	int Header_offsets[2];
 	int Item_start_offsets[2];
 	int Middle_frame_start_offset_y;
+	int bottom_bg_offset = 0;
 	int Item_h;
 	int Item_offset_x;
 	char fname_top[MAX_FILENAME_LEN] = "message1";
@@ -3206,6 +3212,9 @@ void load_gauge_squad_message(int base_w, int base_h, int font, int ship_index)
 	if(optional_string("Entry Height:")) {
 		stuff_int(&Item_h);
 	}
+	if(optional_string("Bottom Background Offset:")) {
+		stuff_int(&bottom_bg_offset);
+	}
 	if(optional_string("Command X-offset:")) {
 		stuff_int(&Item_offset_x);
 	}
@@ -3223,6 +3232,7 @@ void load_gauge_squad_message(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initHeaderOffsets(Header_offsets[0], Header_offsets[1]);
 	hud_gauge->initItemStartOffsets(Item_start_offsets[0], Item_start_offsets[1]);
 	hud_gauge->initMiddleFrameStartOffsetY(Middle_frame_start_offset_y);
+	hud_gauge->initBottomBgOffset(bottom_bg_offset);
 	hud_gauge->initItemHeight(Item_h);
 	hud_gauge->initItemOffsetX(Item_offset_x);
 	hud_gauge->initPgUpOffsets(Pgup_offsets[0], Pgup_offsets[1]);
@@ -3576,6 +3586,7 @@ void load_gauge_directives(int base_w, int base_h, int font, int ship_index)
 	char fname_top[MAX_FILENAME_LEN] = "directives1";
 	char fname_middle[MAX_FILENAME_LEN] = "directives2";
 	char fname_bottom[MAX_FILENAME_LEN] = "directives3";
+	int bottom_bg_offset = 0;
 	bool slew = false;
 	int font_num = FONT1;
 
@@ -3638,6 +3649,9 @@ void load_gauge_directives(int base_w, int base_h, int font, int ship_index)
 	if(optional_string("Entry Height:")) {
 		stuff_int(&text_h);
 	}
+	if(optional_string("Bottom Background Offset:")) {
+		stuff_int(&bottom_bg_offset);
+	}
 
 	HudGaugeDirectives* hud_gauge = new HudGaugeDirectives();
 	hud_gauge->initBaseResolution(base_res[0], base_res[1]);
@@ -3645,6 +3659,7 @@ void load_gauge_directives(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initMiddleFrameOffsetY(middle_frame_offset_y);
 	hud_gauge->initPosition(coords[0], coords[1]);
 	hud_gauge->initTextHeight(text_h);
+	hud_gauge->initBottomBgOffset(bottom_bg_offset);
 	hud_gauge->initTextStartOffsets(text_start_offsets[0], text_start_offsets[1]);
 	hud_gauge->initHeaderOffsets(header_offsets[0], header_offsets[1]);
 	hud_gauge->initSlew(slew);
@@ -3980,6 +3995,7 @@ void load_gauge_wingman_status(int base_w, int base_h, int font, int ship_index)
 	int single_wing_offsets[2];
 	int multiple_wing_offsets[2];
 	int wing_width;
+	int right_bg_offset = 0;
 	int wing_name_offsets[2];
 	bool slew = false;
 	int font_num = FONT1;
@@ -4058,10 +4074,7 @@ void load_gauge_wingman_status(int base_w, int base_h, int font, int ship_index)
 	if(optional_string("Entry Background Filename:")) {
 		stuff_string(fname_middle, F_NAME, MAX_FILENAME_LEN);
 	}
-	if(optional_string("Right Background Filename:")) {
-		stuff_string(fname_right, F_NAME, MAX_FILENAME_LEN);
-	}
-	if(optional_string("Last Background Filename:")) {
+	if(optional_string("Right Background Filename:") || optional_string("Last Background Filename:")) {
 		stuff_string(fname_right, F_NAME, MAX_FILENAME_LEN);
 	}
 	if(optional_string("Dot Filename:")) {
@@ -4081,6 +4094,9 @@ void load_gauge_wingman_status(int base_w, int base_h, int font, int ship_index)
 	}
 	if(optional_string("Entry Size:")) {
 		stuff_int(&wing_width);
+	}
+	if(optional_string("Right Background Offset:") || optional_string("Last Background Offset:")) {
+		stuff_int(&right_bg_offset);
 	}
 	if(optional_string("Single Wing Offsets:")) {
 		stuff_int_list(single_wing_offsets, 2);
@@ -4125,6 +4141,7 @@ void load_gauge_wingman_status(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initWingmate6Offsets(wingmate_offsets[5][0], wingmate_offsets[5][1]);
 	hud_gauge->initWingNameOffsets(wing_name_offsets[0], wing_name_offsets[1]);
 	hud_gauge->initWingWidth(wing_width);
+	hud_gauge->initRightBgOffset(right_bg_offset);
 	hud_gauge->initGrowMode(grow_mode);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
@@ -4146,6 +4163,7 @@ void load_gauge_damage(int base_w, int base_h, int font, int ship_index)
 	int middle_frame_start_offset_y;
 	int subsys_integ_start_offsets[2];
 	int subsys_integ_val_offset_x;
+	int bottom_bg_offset = 0;
 	int line_h;
 	char fname_top[MAX_FILENAME_LEN] = "damage1";
 	char fname_middle[MAX_FILENAME_LEN] = "damage2";
@@ -4224,6 +4242,9 @@ void load_gauge_damage(int base_w, int base_h, int font, int ship_index)
 	if(optional_string("Subsystem Entry Value X-offset:")) {
 		stuff_int(&subsys_integ_val_offset_x);
 	}
+	if(optional_string("Bottom Background Offset:")) {
+		stuff_int(&bottom_bg_offset);
+	}
 
 	HudGaugeDamage* hud_gauge = new HudGaugeDamage();
 	hud_gauge->initBaseResolution(base_res[0], base_res[1]);
@@ -4235,6 +4256,7 @@ void load_gauge_damage(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initPosition(coords[0], coords[1]);
 	hud_gauge->initSubsysIntegStartOffsets(subsys_integ_start_offsets[0], subsys_integ_start_offsets[1]);
 	hud_gauge->initSubsysIntegValueOffsetX(subsys_integ_val_offset_x);
+	hud_gauge->initBottomBgOffset(bottom_bg_offset);
 	hud_gauge->initHeaderOffsets(header_offsets[0], header_offsets[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
@@ -5882,6 +5904,7 @@ void load_gauge_primary_weapons(int base_w, int base_h, int font, int ship_index
 	int entry_bg_h = 12;
 	int entry_bg_offset_x = 0;
 	int last_bg_offset_x = 0;
+	int last_bg_offset_y = 0;
 	int entry_h = 10;
 	int entry_start_offset_y = 12;
 	int ammo_x = 28;
@@ -5949,6 +5972,10 @@ void load_gauge_primary_weapons(int base_w, int base_h, int font, int ship_index
 		stuff_int(&last_bg_offset_x);
 	}
 
+	if ( optional_string("Last Background Y-offset:") ) {
+		stuff_int(&last_bg_offset_y);
+	}
+
 	if ( optional_string("Entry Height:") ) {
 		stuff_int(&entry_h);
 	}
@@ -5984,6 +6011,7 @@ void load_gauge_primary_weapons(int base_w, int base_h, int font, int ship_index
 	hud_gauge->initBgEntryHeight(entry_bg_h);
 	hud_gauge->initBgEntryOffsetX(entry_bg_offset_x);
 	hud_gauge->initBgLastOffsetX(last_bg_offset_x);
+	hud_gauge->initBgLastOffsetY(last_bg_offset_y);
 	hud_gauge->initEntryHeight(entry_h);
 	hud_gauge->initEntryStartY(entry_start_offset_y);
 	hud_gauge->initPrimaryAmmoOffsetX(ammo_x);
@@ -6014,6 +6042,7 @@ void load_gauge_secondary_weapons(int base_w, int base_h, int font, int ship_ind
 	int entry_bg_h = 12;
 	int entry_bg_offset_x = 0;
 	int last_bg_offset_x = 0;
+	int last_bg_offset_y = 0;
 	int entry_h = 10;
 	int entry_start_offset_y = 12;
 	int ammo_x = 28;
@@ -6083,6 +6112,10 @@ void load_gauge_secondary_weapons(int base_w, int base_h, int font, int ship_ind
 		stuff_int(&last_bg_offset_x);
 	}
 
+	if ( optional_string("Last Background Y-offset:") ) {
+		stuff_int(&last_bg_offset_y);
+	}
+
 	if ( optional_string("Entry Height:") ) {
 		stuff_int(&entry_h);
 	}
@@ -6126,6 +6159,7 @@ void load_gauge_secondary_weapons(int base_w, int base_h, int font, int ship_ind
 	hud_gauge->initBgEntryHeight(entry_bg_h);
 	hud_gauge->initBgEntryOffsetX(entry_bg_offset_x);
 	hud_gauge->initBgLastOffsetX(last_bg_offset_x);
+	hud_gauge->initBgLastOffsetY(last_bg_offset_y);
 	hud_gauge->initEntryHeight(entry_h);
 	hud_gauge->initEntryStartY(entry_start_offset_y);
 	hud_gauge->initSecondaryAmmoOffsetX(ammo_x);

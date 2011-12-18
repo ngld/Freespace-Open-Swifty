@@ -171,6 +171,11 @@ void HudGaugeEscort::initEntryStaggerWidth(int w)
 	entry_stagger_w = w;
 }
 
+void HudGaugeEscort::initBottomBgOffset(int offset)
+{
+	bottom_bg_offset = offset;
+}
+
 void HudGaugeEscort::initShipNameOffsets(int x, int y)
 {
 	ship_name_offsets[0] = x;
@@ -320,7 +325,7 @@ void HudGaugeEscort::render(float frametime)
 	Num_escort_ships++;
 
 	//Show the last escort entry
-	renderBitmap(Escort_gauges[2].first_frame, x, y);
+	renderBitmap(Escort_gauges[2].first_frame, x, y + bottom_bg_offset);
 	renderIcon(x, y, i);
 }
 

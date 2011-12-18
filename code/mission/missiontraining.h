@@ -36,6 +36,7 @@ protected:
 
 	int header_offsets[2];
 	int middle_frame_offset_y;
+	int bottom_bg_offset;
 	int text_start_offsets[2];
 	int text_h;
 public:
@@ -43,6 +44,7 @@ public:
 	void initBitmaps(char *fname_top, char *fname_middle, char *fname_bottom);
 	void initHeaderOffsets(int x, int y);
 	void initMiddleFrameOffsetY(int y);
+	void initBottomBgOffset(int offset);
 	void initTextStartOffsets(int x, int y);
 	void initTextHeight(int h);
 	void render(float frametime);

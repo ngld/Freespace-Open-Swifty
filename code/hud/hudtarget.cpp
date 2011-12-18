@@ -7012,6 +7012,11 @@ void HudGaugeWeaponList::initBgLastOffsetX(int x)
 	_bg_last_offset_x = x;
 }
 
+void HudGaugeWeaponList::initBgLastOffsetY(int y)
+{
+	_bg_last_offset_y = y;
+}
+
 void HudGaugeWeaponList::initBgFirstHeight(int h)
 {
 	_background_first_h = h;
@@ -7182,7 +7187,7 @@ void HudGaugePrimaryWeapons::render(float frametime)
 		bg_y_offset += _background_entry_h;
 	}
 
-	renderBitmap(_background_last.first_frame, position[0], position[1] + bg_y_offset);
+	renderBitmap(_background_last.first_frame, position[0], position[1] + bg_y_offset + _bg_last_offset_y);
 }
 
 HudGaugeSecondaryWeapons::HudGaugeSecondaryWeapons():
@@ -7306,7 +7311,7 @@ void HudGaugeSecondaryWeapons::render(float frametime)
 	}
 
 	// finish drawing the background
-	renderBitmap(_background_last.first_frame, position[0], position[1] + bg_y_offset);
+	renderBitmap(_background_last.first_frame, position[0], position[1] + bg_y_offset + _bg_last_offset_y);
 }
 
 HudGaugeHardpoints::HudGaugeHardpoints():

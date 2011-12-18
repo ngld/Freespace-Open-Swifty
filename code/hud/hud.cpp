@@ -1896,6 +1896,11 @@ void HudGaugeDamage::initSubsysIntegValueOffsetX(int x)
 	subsys_integ_val_offset_x = x;
 }
 
+void HudGaugeDamage::initBottomBgOffset(int offset)
+{
+	bottom_bg_offset = offset;
+}
+
 void HudGaugeDamage::initLineHeight(int h)
 {
 	line_h = h;
@@ -2109,7 +2114,7 @@ void HudGaugeDamage::render(float frametime)
 	}
 
 	setGaugeColor();
-	renderBitmap(damage_bottom.first_frame, bx, by);		
+	renderBitmap(damage_bottom.first_frame, bx, by + bottom_bg_offset);		
 }
 
 /** 
