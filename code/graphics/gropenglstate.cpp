@@ -744,23 +744,23 @@ void opengl_state::SetStencilType(gr_stencil_type st)
 	}
 
 	switch (st) {
-	case STENCIL_TYPE_NONE:
-		glStencilFunc( GL_NEVER, 1, 0xFFFF );
-		glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
-		break;
+		case STENCIL_TYPE_NONE:
+			glStencilFunc( GL_NEVER, 1, 0xFFFF );
+			glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
+			break;
 
-	case STENCIL_TYPE_READ:
-		glStencilFunc( GL_NOTEQUAL, 1, 0XFFFF );
-		glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
-		break;
+		case STENCIL_TYPE_READ:
+			glStencilFunc( GL_NOTEQUAL, 1, 0XFFFF );
+			glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
+			break;
+			
+		case STENCIL_TYPE_WRITE:
+			glStencilFunc( GL_ALWAYS, 1, 0xFFFF );
+			glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
+			break;
 
-	case STENCIL_TYPE_WRITE:
-		glStencilFunc( GL_ALWAYS, 1, 0xFFFF );
-		glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
-		break;
-
-	default:
-		break;
+		default:
+			break;
 	}
 
 	GL_state.StencilTest( (st == STENCIL_TYPE_NONE) ? GL_FALSE : GL_TRUE );
