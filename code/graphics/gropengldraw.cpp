@@ -479,8 +479,8 @@ void gr_opengl_string(int sx, int sy, char *s, bool resize)
 		u0 = u_scale * (i2fl(u+xd) / bw);
 		v0 = v_scale * (i2fl(v+yd) / bh);
 
-		u1 = u_scale * (i2fl((u+xd)+wc) / bw)*(do_resize?0.99f:1.0f);
-		v1 = v_scale * (i2fl((v+yd)+hc) / bh)*(do_resize?0.99f:1.0f);
+		u1 = u_scale * (i2fl((u+xd)+wc) / bw);
+		v1 = v_scale * (i2fl((v+yd)+hc) / bh);
 
 		glTexCoord2f(u0, v1);
 		glVertex2i(x1, y2);
@@ -1335,6 +1335,13 @@ void gr_opengl_render_effect(int nverts, vertex *verts, float *radius_list, uint
 
 				vglEnableVertexAttribArrayARB(attrib_index);
 
+			}
+			if(flags & TMAP_FLAG_DISTORTION_THRUSTER)
+			{
+				attrib_index = opengl_shader_get_attribute("offset_in");
+				vglVertexAttribPointerARB(attrib_index, 1, GL_FLOAT, GL_FALSE, 0, radius_list);
+
+				vglEnableVertexAttribArrayARB(attrib_index);
 			}
 			GL_state.Texture.SetActiveUnit(1);
 			GL_state.Texture.SetTarget(GL_TEXTURE_2D);
