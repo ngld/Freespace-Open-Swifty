@@ -235,9 +235,9 @@ protected:
 	int custom_frame_offset;
 	int textoffset_x, textoffset_y;
 	char custom_name[NAME_LENGTH];
-	SCP_string custom_text_;
+	SCP_string custom_text;
 	
-	SCP_string default_text_;
+	SCP_string default_text;
 
 	// Render to texture stuff
 	char texture_target_fname[MAX_FILENAME_LEN];

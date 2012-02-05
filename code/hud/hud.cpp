@@ -307,7 +307,7 @@ texture_target(-1), canvas_w(-1), canvas_h(-1), target_w(-1), target_h(-1)
 	texture_target_fname[0] = '\0';
 
 	custom_name[0] = '\0';
-	custom_text_.clear();
+	custom_text.clear();
 	custom_frame.first_frame = -1;
 	custom_frame.num_frames = 0;
 	custom_frame_offset = 0;
@@ -341,8 +341,8 @@ canvas_w(-1), canvas_h(-1), target_w(-1), target_h(-1)
 	texture_target_fname[0] = '\0';
 
 	custom_name[0] = '\0';
-	custom_text_.clear();
-	default_text_.clear();
+	custom_text.clear();
+	default_text.clear();
 	custom_frame.first_frame = -1;
 	custom_frame.num_frames = 0;
 	custom_frame_offset = 0;
@@ -379,11 +379,11 @@ disabled_views(VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY), cus
 	}
 
 	if(_custom_text) {
-		custom_text_ = _custom_text;
-		default_text_ = _custom_text;
+		custom_text = _custom_text;
+		default_text = _custom_text;
 	} else {
-		custom_text_.clear();
-		default_text_.clear();
+		custom_text.clear();
+		default_text.clear();
 	}
 
 	custom_frame.first_frame = -1;
@@ -433,7 +433,7 @@ char* HudGauge::getCustomGaugeName()
 
 const char* HudGauge::getCustomGaugeText()
 {
-	return custom_text_.c_str();
+	return custom_text.c_str();
 }
 
 void HudGauge::updateCustomGaugeCoords(int _x, int _y)
@@ -461,7 +461,7 @@ void HudGauge::updateCustomGaugeText(char* txt)
 		return;
 	}
 
-	custom_text_ = txt;
+	custom_text = txt;
 }
 
 bool HudGauge::configOverride()
@@ -661,9 +661,9 @@ void HudGauge::render(float frametime)
 
 	setGaugeColor();
 
-	if( !custom_text_.empty() ) {
-		char *text = new char[custom_text_.size()+1];
-		strcpy(text, custom_text_.c_str());
+	if( !custom_text.empty() ) {
+		char *text = new char[custom_text.size()+1];
+		strcpy(text, custom_text.c_str());
 
 		hud_num_make_mono(text);
 		renderString(position[0] + textoffset_x, position[1] + textoffset_y, text);
@@ -1019,7 +1019,7 @@ void HudGauge::pageIn()
 void HudGauge::initialize()
 {
 	//Reset text to default
-	custom_text_ = default_text_;
+	custom_text = default_text;
 }
 
 bool HudGauge::canRender()
