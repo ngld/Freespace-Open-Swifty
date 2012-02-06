@@ -178,7 +178,7 @@ void hud_targetbox_truncate_subsys_name(char *outstr)
 }
 
 HudGaugeTargetBox::HudGaugeTargetBox():
-HudGauge(HUD_OBJECT_TARGET_MONITOR, HUD_TARGET_MONITOR, true, false, false, (VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY), 255, 255, 255)
+HudGauge(HUD_OBJECT_TARGET_MONITOR, HUD_TARGET_MONITOR, false, false, (VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY), 255, 255, 255)
 {
 }
 
@@ -1056,7 +1056,7 @@ void hud_get_target_strength(object *objp, float *shields, float *integrity)
 }
 
 HudGaugeExtraTargetData::HudGaugeExtraTargetData():
-HudGauge(HUD_OBJECT_EXTRA_TARGET_DATA, HUD_TARGET_MONITOR_EXTRA_DATA, true, false, false, (VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY), 255, 255, 255)
+HudGauge(HUD_OBJECT_EXTRA_TARGET_DATA, HUD_TARGET_MONITOR_EXTRA_DATA, false, false, (VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY), 255, 255, 255)
 {
 	initDockFlashTimer();
 }
@@ -1459,7 +1459,7 @@ int hud_targetbox_subsystem_in_view(object *target_objp, int *sx, int *sy)
 
 	subsys = Player_ai->targeted_subsys;
 	if (subsys != NULL ) {
-		vm_vec_unrotate(&subobj_pos, &subsys->system_info->pnt, &target_objp->orient);
+		find_submodel_instance_point(&subobj_pos, target_objp, subsys->system_info->subobj_num);
 		vm_vec_add2(&subobj_pos, &target_objp->pos);
 
 		// is it subsystem in view
