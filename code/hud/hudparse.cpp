@@ -930,6 +930,19 @@ inline bool check_base_res(int w, int h)
 	return (w >= 640) && (h >= 480);
 }
 
+void check_color(int *color)
+{
+	int i;
+
+	for ( i = 0; i < 3; ++i ) {
+		if ( color[i] > 255 ) {
+			color[i] = 255;
+		} else if ( color[i] < 0 ) {
+			color[i] = 0;
+		}
+	}
+}
+
 void load_gauge_custom(int base_w, int base_h, int font, int ship_index)
 {
 	int i;
@@ -945,6 +958,8 @@ void load_gauge_custom(int base_w, int base_h, int font, int ship_index)
 	int font_num = FONT1;
 	int txtoffset_x = 0, txtoffset_y = 0;
 	ubyte r = 255, g = 255, b = 255;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(check_base_res(base_w, base_h)) {
 		base_res[0] = base_w;
@@ -952,6 +967,14 @@ void load_gauge_custom(int base_w, int base_h, int font, int ship_index)
 		
 		if(optional_string("Position:")) {
 			stuff_int_list(coords, 2);
+		}
+
+		if ( optional_string("Color:") ) {
+			stuff_int_list(colors, 3);
+
+			check_color(colors);
+
+			lock_color = true;
 		}
 
 		if ( optional_string("Font:") ) {
@@ -1009,6 +1032,8 @@ void load_gauge_custom(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initPosition(coords[0], coords[1]);
 	hud_gauge->initFont(font_num);
 	hud_gauge->initRenderStatus(active_by_default);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -1024,6 +1049,8 @@ void load_gauge_lag(int base_w, int base_h, int font, int ship_index)
 	char fname[MAX_FILENAME_LEN] = "netlag1";
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 386;
@@ -1048,6 +1075,14 @@ void load_gauge_lag(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -1069,6 +1104,8 @@ void load_gauge_lag(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initBitmaps(fname);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -1087,6 +1124,8 @@ void load_gauge_mini_shields(int base_w, int base_h, int font, int ship_index)
 	char fname[MAX_FILENAME_LEN] = "targhit1";
 	bool slew = true;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 305;
@@ -1125,6 +1164,14 @@ void load_gauge_mini_shields(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -1157,6 +1204,8 @@ void load_gauge_mini_shields(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initPosition(coords[0], coords[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -1174,6 +1223,8 @@ void load_gauge_weapon_energy(int base_w, int base_h, int font, int ship_index)
 	char fname[MAX_FILENAME_LEN];
 	bool slew = true;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(Hud_reticle_style == HUD_RETICLE_STYLE_FS1) {
 		if(gr_screen.res == GR_640) {
@@ -1222,6 +1273,14 @@ void load_gauge_weapon_energy(int base_w, int base_h, int font, int ship_index)
 		}	
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -1250,6 +1309,8 @@ void load_gauge_weapon_energy(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initTextOffsets(Wenergy_text_offsets[0], Wenergy_text_offsets[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -1264,6 +1325,8 @@ void load_gauge_target_shields(int base_w, int base_h, int font, int ship_index)
 	int base_res[2];
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 142;
@@ -1288,6 +1351,14 @@ void load_gauge_target_shields(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -1304,6 +1375,8 @@ void load_gauge_target_shields(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initPosition(coords[0], coords[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -1318,6 +1391,8 @@ void load_gauge_player_shields(int base_w, int base_h, int font, int ship_index)
 	int base_res[2];
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 396;
@@ -1342,6 +1417,14 @@ void load_gauge_player_shields(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -1358,6 +1441,8 @@ void load_gauge_player_shields(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initPosition(coords[0], coords[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -1383,6 +1468,8 @@ void load_gauge_escort_view(int base_w, int base_h, int font, int ship_index)
 	char fname_bottom[MAX_FILENAME_LEN] = "escort3";
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 486;
@@ -1431,6 +1518,14 @@ void load_gauge_escort_view(int base_w, int base_h, int font, int ship_index)
 		if(optional_string("Position:")) {
 			stuff_int_list(coords, 2);
 		}
+	}
+
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
 	}
 
 	if ( optional_string("Font:") ) {
@@ -1491,6 +1586,8 @@ void load_gauge_escort_view(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initShipStatusOffsets(ship_status_offsets[0], ship_status_offsets[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -1507,6 +1604,8 @@ void load_gauge_afterburner(int base_w, int base_h, int font, int ship_index)
 	char fname[MAX_FILENAME_LEN];
 	bool slew = true;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(Hud_reticle_style == HUD_RETICLE_STYLE_FS1) {
 		if(gr_screen.res == GR_640) {
@@ -1549,6 +1648,14 @@ void load_gauge_afterburner(int base_w, int base_h, int font, int ship_index)
 		}	
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -1574,6 +1681,8 @@ void load_gauge_afterburner(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initBitmaps(fname);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -1592,6 +1701,8 @@ void load_gauge_mission_time(int base_w, int base_h, int font, int ship_index)
 	char fname[MAX_FILENAME_LEN] = "time1";
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 587;
@@ -1622,6 +1733,14 @@ void load_gauge_mission_time(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -1650,6 +1769,8 @@ void load_gauge_mission_time(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initBitmaps(fname);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -1669,6 +1790,8 @@ void load_gauge_threat_indicator(int base_w, int base_h, int font, int ship_inde
 	char fname_lock[MAX_FILENAME_LEN];
 	bool slew = true;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(Hud_reticle_style == HUD_RETICLE_STYLE_FS1) {
 		if(gr_screen.res == GR_640) {
@@ -1749,6 +1872,14 @@ void load_gauge_threat_indicator(int base_w, int base_h, int font, int ship_inde
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -1783,6 +1914,8 @@ void load_gauge_threat_indicator(int base_w, int base_h, int font, int ship_inde
 	hud_gauge->initLockWarnOffsets(Lock_warn_offsets[0], Lock_warn_offsets[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -1801,6 +1934,8 @@ void load_gauge_center_reticle(int base_w, int base_h, int font, int ship_index)
 	int scaleX = 15;
 	int scaleY = 10;
 	int size = 5;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(Hud_reticle_style == HUD_RETICLE_STYLE_FS1) {
 		if(gr_screen.res == GR_640) {
@@ -1849,6 +1984,14 @@ void load_gauge_center_reticle(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -1878,6 +2021,8 @@ void load_gauge_center_reticle(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initBitmaps(fname);
 	hud_gauge->initFont(font_num);
 	hud_gauge->initFirepointDisplay(firepoints, scaleX, scaleY, size);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -1901,6 +2046,8 @@ void load_gauge_throttle(int base_w, int base_h, int font, int ship_index)
 	bool show_background = false;
 	bool slew = true;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	// default values for the throttle
 	if(Hud_reticle_style == HUD_RETICLE_STYLE_FS1) {
@@ -1995,6 +2142,14 @@ void load_gauge_throttle(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -2051,6 +2206,8 @@ void load_gauge_throttle(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->showBackground(show_background);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -2071,6 +2228,8 @@ void load_gauge_ets_weapons(int base_w, int base_h, int font, int ship_index)
 	char fname[MAX_FILENAME_LEN] = "energy1";
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(Lcl_gr) {
 		// German
@@ -2113,6 +2272,14 @@ void load_gauge_ets_weapons(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -2150,6 +2317,8 @@ void load_gauge_ets_weapons(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initBitmaps(fname);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -2170,6 +2339,8 @@ void load_gauge_ets_shields(int base_w, int base_h, int font, int ship_index)
 	char fname[MAX_FILENAME_LEN] = "energy1";
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(Lcl_gr){
 		// German
@@ -2213,6 +2384,14 @@ void load_gauge_ets_shields(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -2251,6 +2430,8 @@ void load_gauge_ets_shields(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initTopOffsets(top_offsets[0], top_offsets[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -2271,6 +2452,8 @@ void load_gauge_ets_engines(int base_w, int base_h, int font, int ship_index)
 	char fname[MAX_FILENAME_LEN] = "energy1";
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(Lcl_gr){
 		// German
@@ -2315,6 +2498,14 @@ void load_gauge_ets_engines(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -2353,6 +2544,8 @@ void load_gauge_ets_engines(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initTopOffsets(top_offsets[0], top_offsets[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -2372,6 +2565,8 @@ void load_gauge_extra_target_data(int base_w, int base_h, int font, int ship_ind
 	char fname[MAX_FILENAME_LEN] = "targetview3";
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 5;
@@ -2414,6 +2609,14 @@ void load_gauge_extra_target_data(int base_w, int base_h, int font, int ship_ind
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -2451,6 +2654,8 @@ void load_gauge_extra_target_data(int base_w, int base_h, int font, int ship_ind
 	hud_gauge->initPosition(coords[0], coords[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -2470,6 +2675,8 @@ void load_gauge_radar_std(int base_w, int base_h, int font, int ship_index)
 	float Radar_center_offsets[2];
 	char fname[MAX_FILENAME_LEN];
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 257;
@@ -2534,6 +2741,14 @@ void load_gauge_radar_std(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -2567,6 +2782,8 @@ void load_gauge_radar_std(int base_w, int base_h, int font, int ship_index)
 		hud_gauge->initDistanceShortOffsets(Radar_dist_offsets[0][0], Radar_dist_offsets[0][1]);
 		hud_gauge->initRadius(Radar_radius[0], Radar_radius[1]);
 		hud_gauge->initFont(font_num);
+		hud_gauge->lockConfigColor(lock_color);
+		hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 		if(ship_index >= 0) {
 			Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -2587,6 +2804,8 @@ void load_gauge_radar_orb(int base_w, int base_h, int font, int ship_index)
 	float Radar_center_offsets[2];
 	char fname[MAX_FILENAME_LEN];
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 257;
@@ -2651,6 +2870,14 @@ void load_gauge_radar_orb(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -2684,6 +2911,8 @@ void load_gauge_radar_orb(int base_w, int base_h, int font, int ship_index)
 		hud_gauge->initDistanceShortOffsets(Radar_dist_offsets[0][0], Radar_dist_offsets[0][1]);
 		hud_gauge->initRadius(Radar_radius[0], Radar_radius[1]);
 		hud_gauge->initFont(font_num);
+		hud_gauge->lockConfigColor(lock_color);
+		hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 		if(ship_index >= 0) {
 			Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -2801,6 +3030,8 @@ void load_gauge_text_warnings(int base_w, int base_h, int font, int ship_index)
 	int base_res[2];
 	bool slew = true;
 	int font_num = FONT3;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 320;
@@ -2825,6 +3056,14 @@ void load_gauge_text_warnings(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -2841,6 +3080,8 @@ void load_gauge_text_warnings(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initPosition(coords[0], coords[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -2866,6 +3107,8 @@ void load_gauge_target_monitor(int base_w, int base_h, int font, int ship_index)
 	int Hull_offsets[2];
 	int Cargo_scan_start_offsets[2];
 	int Cargo_scan_size[2];
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	char fname_monitor[MAX_FILENAME_LEN] = "targetview1";
 	char fname_integrity[MAX_FILENAME_LEN] = "targetview2";
@@ -2925,6 +3168,14 @@ void load_gauge_target_monitor(int base_w, int base_h, int font, int ship_index)
 		if(optional_string("Position:")) {
 			stuff_int_list(coords, 2);
 		}
+	}
+
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
 	}
 
 	if ( optional_string("Font:") ) {
@@ -2998,6 +3249,8 @@ void load_gauge_target_monitor(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initCargoScanSize(Cargo_scan_size[0], Cargo_scan_size[1]);
 	hud_gauge->initBitmaps(fname_monitor, fname_integrity, fname_static);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -3022,6 +3275,8 @@ void load_gauge_squad_message(int base_w, int base_h, int font, int ship_index)
 	char fname_bottom[MAX_FILENAME_LEN] = "message3";
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 445;
@@ -3062,6 +3317,14 @@ void load_gauge_squad_message(int base_w, int base_h, int font, int ship_index)
 		if(optional_string("Position:")) {
 			stuff_int_list(coords, 2);
 		}
+	}
+
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
 	}
 
 	if ( optional_string("Font:") ) {
@@ -3118,6 +3381,8 @@ void load_gauge_squad_message(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initPgDnOffsets(Pgdn_offsets[0], Pgdn_offsets[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -3139,6 +3404,8 @@ void load_gauge_objective_notify(int base_w, int base_h, int font, int ship_inde
 	char fname[MAX_FILENAME_LEN] = "objective1";
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 245;
@@ -3175,6 +3442,14 @@ void load_gauge_objective_notify(int base_w, int base_h, int font, int ship_inde
 		if(optional_string("Position:")) {
 			stuff_int_list(coords, 2);
 		}
+	}
+
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
 	}
 
 	if ( optional_string("Font:") ) {
@@ -3221,6 +3496,8 @@ void load_gauge_objective_notify(int base_w, int base_h, int font, int ship_inde
 	hud_gauge->initRedAlertValueOffsetY(Red_text_val_offset_y);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -3252,6 +3529,8 @@ void load_gauge_weapons(int base_w, int base_h, int font, int ship_index)
 	int secondary_text_h;
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	// thank god both GR640 and GR1024 use the same weapons gauge bitmaps
 	char fname_p_top[MAX_FILENAME_LEN] = "weapons1";
@@ -3317,6 +3596,14 @@ void load_gauge_weapons(int base_w, int base_h, int font, int ship_index)
 		if(optional_string("Position:")) {
 			stuff_int_list(coords, 2);
 		}
+	}
+
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
 	}
 
 	if ( optional_string("Font:") ) {
@@ -3446,6 +3733,8 @@ void load_gauge_weapons(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initSecondaryHeights(top_secondary_h, secondary_text_h);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -3467,6 +3756,8 @@ void load_gauge_directives(int base_w, int base_h, int font, int ship_index)
 	char fname_bottom[MAX_FILENAME_LEN] = "directives3";
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 5;
@@ -3494,6 +3785,14 @@ void load_gauge_directives(int base_w, int base_h, int font, int ship_index)
 		if(optional_string("Position:")) {
 			stuff_int_list(coords, 2);
 		}
+	}
+
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
 	}
 
 	if ( optional_string("Font:") ) {
@@ -3538,6 +3837,8 @@ void load_gauge_directives(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initHeaderOffsets(header_offsets[0], header_offsets[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -3555,6 +3856,8 @@ void load_gauge_talking_head(int base_w, int base_h, int font, int ship_index)
 	int Anim_size[2];
 	char fname[MAX_FILENAME_LEN] = "head1";
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 5;
@@ -3582,6 +3885,14 @@ void load_gauge_talking_head(int base_w, int base_h, int font, int ship_index)
 		if(optional_string("Position:")) {
 			stuff_int_list(coords, 2);
 		}
+	}
+
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
 	}
 
 	if ( optional_string("Font:") ) {
@@ -3612,6 +3923,8 @@ void load_gauge_talking_head(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initBitmaps(fname);
 	hud_gauge->initHeaderOffsets(Header_offsets[0], Header_offsets[1]);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -3629,6 +3942,8 @@ void load_gauge_countermeasures(int base_w, int base_h, int font, int ship_index
 	char fname[MAX_FILENAME_LEN] = "countermeasure1";
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 497;
@@ -3653,6 +3968,14 @@ void load_gauge_countermeasures(int base_w, int base_h, int font, int ship_index
 		if(optional_string("Position:")) {
 			stuff_int_list(coords, 2);
 		}	
+	}
+
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
 	}
 
 	if ( optional_string("Font:") ) {
@@ -3683,6 +4006,8 @@ void load_gauge_countermeasures(int base_w, int base_h, int font, int ship_index
 	hud_gauge->initCountValueOffsets(cm_text_val_offset[0], cm_text_val_offset[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -3700,6 +4025,8 @@ void load_gauge_auto_target(int base_w, int base_h, int font, int ship_index)
 	char fname[MAX_FILENAME_LEN] = "toggle1";
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		base_res[0] = 640;
@@ -3725,6 +4052,14 @@ void load_gauge_auto_target(int base_w, int base_h, int font, int ship_index)
 		if(optional_string("Position:")) {
 			stuff_int_list(coords, 2);
 		}
+	}
+
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
 	}
 	
 	if ( optional_string("Font:") ) {
@@ -3755,6 +4090,8 @@ void load_gauge_auto_target(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initTargetTextOffsets(target_text_offset[0], target_text_offset[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -3772,6 +4109,8 @@ void load_gauge_auto_speed(int base_w, int base_h, int font, int ship_index)
 	char fname[MAX_FILENAME_LEN] = "toggle1";
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		base_res[0] = 640;
@@ -3797,6 +4136,14 @@ void load_gauge_auto_speed(int base_w, int base_h, int font, int ship_index)
 		if(optional_string("Position:")) {
 			stuff_int_list(coords, 2);
 		}
+	}
+
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
 	}
 	
 	if ( optional_string("Font:") ) {
@@ -3827,6 +4174,8 @@ void load_gauge_auto_speed(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initSpeedTextOffsets(speed_text_offset[0], speed_text_offset[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -3848,6 +4197,8 @@ void load_gauge_wingman_status(int base_w, int base_h, int font, int ship_index)
 	int wing_name_offsets[2];
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	int wingmate_offsets[MAX_SHIPS_PER_WING][2];
 	char fname_left[MAX_FILENAME_LEN] = "wingman1";
@@ -3902,6 +4253,14 @@ void load_gauge_wingman_status(int base_w, int base_h, int font, int ship_index)
 		if(optional_string("Position:")) {
 			stuff_int_list(coords, 2);
 		}
+	}
+
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
 	}
 
 	if ( optional_string("Font:") ) {
@@ -3979,6 +4338,8 @@ void load_gauge_wingman_status(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initGrowMode(grow_mode);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -4003,6 +4364,8 @@ void load_gauge_damage(int base_w, int base_h, int font, int ship_index)
 	char fname_bottom[MAX_FILENAME_LEN] = "damage3";
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 245;
@@ -4033,6 +4396,14 @@ void load_gauge_damage(int base_w, int base_h, int font, int ship_index)
 		if(optional_string("Position:")) {
 			stuff_int_list(coords, 2);
 		}
+	}
+
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
 	}
 
 	if ( optional_string("Font:") ) {
@@ -4089,6 +4460,8 @@ void load_gauge_damage(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initHeaderOffsets(header_offsets[0], header_offsets[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -4108,6 +4481,8 @@ void load_gauge_support(int base_w, int base_h, int font, int ship_index)
 	char fname[MAX_FILENAME_LEN] = "support1";
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 265;
@@ -4142,6 +4517,14 @@ void load_gauge_support(int base_w, int base_h, int font, int ship_index)
 		if(optional_string("Position:")) {
 			stuff_int_list(coords, 2);
 		}
+	}
+
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
 	}
 
 	if ( optional_string("Font:") ) {
@@ -4180,6 +4563,8 @@ void load_gauge_support(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initTextValueOffsetY(text_val_offset_y);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -4253,6 +4638,8 @@ void load_gauge_messages(int base_w, int base_h, int font, int ship_index)
 	coords[1] = 5;
 	int font_num = FONT1;
 	bool slew = false;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		base_res[0] = 640;
@@ -4273,6 +4660,14 @@ void load_gauge_messages(int base_w, int base_h, int font, int ship_index)
 		if(optional_string("Position:")) {
 			stuff_int_list(coords, 2);
 		}
+	}
+
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
 	}
 
 	if ( optional_string("Font:") ) {
@@ -4316,6 +4711,8 @@ void load_gauge_messages(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initStepSize(step_size);
 	hud_gauge->initTotalLife(total_life);
 	hud_gauge->initLineHeight(line_height);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -4386,6 +4783,8 @@ void load_gauge_weapon_linking(int base_w, int base_h, int font, int ship_index)
 	char fname_secondary_link_3[MAX_FILENAME_LEN];
 	bool slew = true;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 374;
@@ -4446,6 +4845,14 @@ void load_gauge_weapon_linking(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -4501,6 +4908,8 @@ void load_gauge_weapon_linking(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initBitmaps(fname_arc, fname_primary_link_1, fname_primary_link_2, fname_secondary_link_1, fname_secondary_link_2, fname_secondary_link_3);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -4564,6 +4973,8 @@ void load_gauge_voice_status(int base_w, int base_h, int font, int ship_index)
 	int base_res[2];
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 5;
@@ -4588,6 +4999,14 @@ void load_gauge_voice_status(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -4604,6 +5023,8 @@ void load_gauge_voice_status(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initPosition(coords[0], coords[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -4618,6 +5039,8 @@ void load_gauge_ping(int base_w, int base_h, int font, int ship_index)
 	int base_res[2];
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 560;
@@ -4642,6 +5065,14 @@ void load_gauge_ping(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -4658,6 +5089,8 @@ void load_gauge_ping(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initPosition(coords[0], coords[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -4672,6 +5105,8 @@ void load_gauge_supernova(int base_w, int base_h, int font, int ship_index)
 	int base_res[2];
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 100;
@@ -4696,6 +5131,14 @@ void load_gauge_supernova(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -4712,6 +5155,8 @@ void load_gauge_supernova(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initPosition(coords[0], coords[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -5350,6 +5795,8 @@ void load_gauge_lead_sight(int base_w, int base_h, int font, int ship_index)
 	int base_res[2];
 	char fname[MAX_FILENAME_LEN] = "leadsight";
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 320;
@@ -5374,6 +5821,14 @@ void load_gauge_lead_sight(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -5390,6 +5845,8 @@ void load_gauge_lead_sight(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initBaseResolution(base_res[0], base_res[1]);
 	hud_gauge->initBitmaps(fname);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
@@ -5407,6 +5864,8 @@ void load_gauge_kills(int base_w, int base_h, int font, int ship_index)
 	char fname[MAX_FILENAME_LEN] = "kills1";
 	bool slew = false;
 	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
 
 	if(gr_screen.res == GR_640) {
 		coords[0] = 497;
@@ -5439,6 +5898,14 @@ void load_gauge_kills(int base_w, int base_h, int font, int ship_index)
 		}
 	}
 
+	if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
@@ -5467,6 +5934,8 @@ void load_gauge_kills(int base_w, int base_h, int font, int ship_index)
 	hud_gauge->initTextValueOffsets(text_value_offsets[0], text_value_offsets[1]);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
