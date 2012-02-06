@@ -1013,12 +1013,6 @@ void load_gauge_custom(int base_w, int base_h, int font, int ship_index)
 			stuff_boolean(&slew);
 		}
 
-		if(optional_string("Color:")) {
-			stuff_ubyte(&r);
-			stuff_ubyte(&g);
-			stuff_ubyte(&b);
-		}
-
 		if(optional_string("Active by default:")) {
 			stuff_boolean(&active_by_default);
 		}
