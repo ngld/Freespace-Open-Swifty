@@ -1935,6 +1935,8 @@ void HudGaugeDamage::initialize()
 	Damage_flash_timer = timestamp(1);
 	next_flash = timestamp(1);
 	flash_status = false;
+
+	HudGauge::initialize();
 }
 
 void HudGaugeDamage::pageIn()
@@ -2283,6 +2285,8 @@ void HudGaugeTextWarnings::initialize()
 {
 	next_flash = timestamp(0);
 	flash_flags = false;
+
+	HudGauge::initialize();
 }
 
 int HudGaugeTextWarnings::maybeTextFlash()
@@ -3254,6 +3258,8 @@ void HudGaugeObjectiveNotify::initialize()
 	flash_timer[0] = timestamp(1);
 	flash_timer[1] = timestamp(1);
 	flash_flag = false;
+
+	HudGauge::initialize();
 }
 
 void HudGaugeObjectiveNotify::pageIn()
