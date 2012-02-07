@@ -184,18 +184,18 @@ void load_gauge_kills(int base_w, int base_h, int font, int ship_idx = -1, color
 void load_gauge_fixed_messages(int base_w, int base_h, int font, int ship_idx = -1, color *use_clr = NULL);
 
 #define HUD_OBJECT_FLIGHT_PATH			50
-void load_gauge_flight_path(int base_w, int base_h, int font, int ship_idx = -1);
+void load_gauge_flight_path(int base_w, int base_h, int font, int ship_idx = -1, color *use_clr = NULL);
 
 #define HUD_OBJECT_WARHEAD_COUNT		51
-void load_gauge_warhead_count(int base_w, int base_h, int font, int ship_idx = -1);
+void load_gauge_warhead_count(int base_w, int base_h, int font, int ship_idx = -1, color *use_clr = NULL);
 
 #define HUD_OBJECT_HARDPOINTS			52
-void load_gauge_hardpoints(int base_w, int base_h, int font, int ship_idx = -1);
+void load_gauge_hardpoints(int base_w, int base_h, int font, int ship_idx = -1, color *use_clr = NULL);
 
 #define HUD_OBJECT_PRIMARY_WEAPONS		53
-void load_gauge_primary_weapons(int base_w, int base_h, int font, int ship_idx = -1);
+void load_gauge_primary_weapons(int base_w, int base_h, int font, int ship_idx = -1, color *use_clr = NULL);
 
 #define HUD_OBJECT_SECONDARY_WEAPONS	54
-void load_gauge_secondary_weapons(int base_w, int base_h, int font, int ship_idx = -1);
+void load_gauge_secondary_weapons(int base_w, int base_h, int font, int ship_idx = -1, color *use_clr = NULL);
 
 #endif // _HUDPARSE_H

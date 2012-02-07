@@ -6449,7 +6449,7 @@ void HudGaugeOffscreen::renderOffscreenIndicator(vertex* target_point, vec3d *tp
 }
 
 HudGaugeWarheadCount::HudGaugeWarheadCount():
-HudGauge(HUD_OBJECT_WARHEAD_COUNT, HUD_WEAPONS_GAUGE, true, false, false, VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY, 255, 255, 255)
+HudGauge(HUD_OBJECT_WARHEAD_COUNT, HUD_WEAPONS_GAUGE, false, false, VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY, 255, 255, 255)
 {
 }
 
@@ -6583,7 +6583,7 @@ void HudGaugeWarheadCount::render(float frametime)
 }
 
 HudGaugeWeaponList::HudGaugeWeaponList(int gauge_object):
-HudGauge(gauge_object, HUD_WEAPONS_GAUGE, true, false, false, VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY, 255, 255, 255)
+HudGauge(gauge_object, HUD_WEAPONS_GAUGE, false, false, VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY, 255, 255, 255)
 {
 
 }
@@ -6924,7 +6924,7 @@ void HudGaugeSecondaryWeapons::render(float frametime)
 }
 
 HudGaugeHardpoints::HudGaugeHardpoints():
-HudGauge(HUD_OBJECT_HARDPOINTS, HUD_WEAPONS_GAUGE, true, false, false, VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY, 255, 255, 255)
+HudGauge(HUD_OBJECT_HARDPOINTS, HUD_WEAPONS_GAUGE, false, false, VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY, 255, 255, 255)
 {
 
 }
