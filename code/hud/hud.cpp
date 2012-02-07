@@ -3874,10 +3874,10 @@ void HudGaugeFlightPath::render(float frametime)
 
 	obj = Player_obj;
 
-	vm_vec_scale_add( &v, &obj->phys_info.vel, &obj->orient.vec.fvec, 3.0f );
+	vm_vec_scale_add( &v, &obj->phys_info.vel, &obj->orient.vec.fvec, 1.0f );
 	vm_vec_normalize( &v );
 			
-	vm_vec_scale_add( &p0, &obj->pos, &v, 20.0f);
+	vm_vec_scale_add( &p0, &obj->pos, &v, 1000000.0f );
 
 	g3_rotate_vertex( &v0, &p0 );
 

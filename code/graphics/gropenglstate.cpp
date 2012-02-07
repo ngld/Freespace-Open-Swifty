@@ -488,20 +488,20 @@ GLboolean opengl_state::ScissorTest(GLint state)
 
 GLboolean opengl_state::StencilTest(GLint state)
 {
-	GLboolean save_state = stenciltest_Status;
+    GLboolean save_state = stenciltest_Status;
 
-	if ( !((state == -1) || (state == stenciltest_Status)) ) {
-		if (state) {
-			Assert( state == GL_TRUE );
-			glEnable(GL_STENCIL_TEST);
-			stenciltest_Status = GL_TRUE;
-		} else {
-			glDisable(GL_STENCIL_TEST);
-			stenciltest_Status = GL_FALSE;
-		}
-	}
+    if ( !((state == -1) || (state == stenciltest_Status)) ) {
+        if (state) {
+            Assert( state == GL_TRUE );
+            glEnable(GL_STENCIL_TEST);
+            stenciltest_Status = GL_TRUE;
+        } else {
+            glDisable(GL_STENCIL_TEST);
+            stenciltest_Status = GL_FALSE;
+        }
+    }
 
-	return save_state;
+    return save_state;
 }
 
 GLboolean opengl_state::CullFace(GLint state)
@@ -620,20 +620,20 @@ GLboolean opengl_state::DepthMask(GLint state)
 
 GLboolean opengl_state::ColorMask(GLint state)
 {
-	GLboolean save_state = colormask_Status;
+    GLboolean save_state = colormask_Status;
 
-	if ( !((state == -1) || (state == colormask_Status)) ) {
-		if (state) {
-			Assert( state == GL_TRUE );
-			glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
-			colormask_Status = GL_TRUE;
-		} else {
-			glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
-			colormask_Status = GL_FALSE;
-		}
-	}
+    if ( !((state == -1) || (state == colormask_Status)) ) {
+        if (state) {
+            Assert( state == GL_TRUE );
+            glColorMask(GL_TRUE, GL_TRUE, GL_TRUE, GL_TRUE);
+            colormask_Status = GL_TRUE;
+        } else {
+            glColorMask(GL_FALSE, GL_FALSE, GL_FALSE, GL_FALSE);
+            colormask_Status = GL_FALSE;
+        }
+    }
 
-	return save_state;
+    return save_state;
 }
 
 void opengl_state::SetTextureSource(gr_texture_source ts)
@@ -739,33 +739,33 @@ void opengl_state::SetZbufferType(gr_zbuffer_type zt)
 
 void opengl_state::SetStencilType(gr_stencil_type st)
 {
-	if (st == Current_stencil_type) {
-		return;
-	}
+    if (st == Current_stencil_type) {
+        return;
+    }
 
-	switch (st) {
-		case STENCIL_TYPE_NONE:
-			glStencilFunc( GL_NEVER, 1, 0xFFFF );
-			glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
-			break;
-
-		case STENCIL_TYPE_READ:
-			glStencilFunc( GL_NOTEQUAL, 1, 0XFFFF );
-			glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
-			break;
-			
-		case STENCIL_TYPE_WRITE:
-			glStencilFunc( GL_ALWAYS, 1, 0xFFFF );
-			glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
-			break;
-
-		default:
-			break;
-	}
-
-	GL_state.StencilTest( (st == STENCIL_TYPE_NONE) ? GL_FALSE : GL_TRUE );
-
-	Current_stencil_type = st;
+    switch (st) {
+        case STENCIL_TYPE_NONE:
+            glStencilFunc( GL_NEVER, 1, 0xFFFF );
+            glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
+            break;
+            	
+        case STENCIL_TYPE_READ:
+            glStencilFunc( GL_NOTEQUAL, 1, 0XFFFF );
+            glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
+            break;
+            			
+        case STENCIL_TYPE_WRITE:
+            glStencilFunc( GL_ALWAYS, 1, 0xFFFF );
+            glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
+            break;
+            
+        default:
+            break;
+    }
+        
+    GL_state.StencilTest( (st == STENCIL_TYPE_NONE) ? GL_FALSE : GL_TRUE );
+        
+    Current_stencil_type = st;
 }
 
 void opengl_setup_render_states(int &r, int &g, int &b, int &alpha, int &tmap_type, int flags, int is_scaler)
