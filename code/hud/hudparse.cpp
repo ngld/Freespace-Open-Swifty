@@ -4337,9 +4337,6 @@ void load_gauge_auto_target(int base_w, int base_h, int font, int ship_index, co
 	int colors[3] = {255, 255, 255};
 	bool lock_color = false;
 
-	int colors[3] = {255, 255, 255};
-	bool lock_color = false;
-
 	if(gr_screen.res == GR_640) {
 		base_res[0] = 640;
 		base_res[1] = 480;
@@ -4439,9 +4436,6 @@ void load_gauge_auto_speed(int base_w, int base_h, int font, int ship_index, col
 	int font_num = FONT1;
 	int on_color[4] = {0, 0, 0, 255};
 	int off_color[4] = {-1, -1, -1, -1};
-	int colors[3] = {255, 255, 255};
-	bool lock_color = false;
-
 	int colors[3] = {255, 255, 255};
 	bool lock_color = false;
 
