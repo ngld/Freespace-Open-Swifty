@@ -30,8 +30,6 @@ class HudGaugeRadarDradis: public HudGaugeRadar
 	float sweep_duration; // in seconds
 	float sweep_percent;
 
-	color orb_color;
-
 	matrix view_perturb;
 	vec3d Orb_eye_position;
 

@@ -83,9 +83,6 @@ xy_plane(-1), xz_yz_plane(-1), sweep_plane(-1), target_brackets(-1), unknown_con
 	fx_guides2_1.a1d[0] = 0.0f;
 	fx_guides2_1.a1d[1] = 0.0f;
 	fx_guides2_1.a1d[2] = 1.0f;
-	
-	// give it some color
-	gr_init_alphacolor(&orb_color, 48, 96, 160, 1337);
 }
 
 void HudGaugeRadarDradis::initBitmaps(char* fname_xy, char* fname_xz_yz, char* fname_sweep, char* fname_target_brackets, char* fname_unknown)
@@ -336,14 +333,6 @@ void HudGaugeRadarDradis::drawOutlinesHtl()
 		return;
 	
 	g3_start_instance_matrix(&vmd_zero_vector, /*&Player_obj->orient*/&vmd_identity_matrix, true);
-		gr_init_alphacolor(&orb_color, 100, 150, 210, 255);
-		gr_set_color_fast(&orb_color);
-		
-		gr_set_line_width(1.5f);
-			g3_draw_htl_line(&fx_guides0_0, &fx_guides0_1);
-			g3_draw_htl_line(&fx_guides1_0, &fx_guides1_1);
-			g3_draw_htl_line(&fx_guides2_0, &fx_guides2_1);
-		gr_set_line_width(1.0f);
 		
 		// Tilt the base disc component of DRADIS-style radar 30 degrees down
 		vm_angle_2_matrix(&base_tilt, PI/6, 0);
