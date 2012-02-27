@@ -267,6 +267,7 @@ typedef struct cockpit_display_info {
 #define SSF_DAMAGE_AS_HULL		(1 << 11)		// Applies armor damage instead of subsystem damge. - FUBAR
 #define SSF_NO_AGGREGATE		(1 << 12)		// exclude this subsystem from the aggregate subsystem-info tracking - Goober5000
 #define SSF_PLAY_SOUND_FOR_PLAYER	( 1 << 13)	// If this subsystem is a turret on a player ship, play firing sounds - The E 
+#define SSF_NO_DISAPPEAR		( 1 << 14)		// prevents submodel from disappearing when subsys destroyed
 
 
 // Wanderer 
@@ -281,6 +282,8 @@ typedef struct cockpit_display_info {
 typedef	struct ship_subsys {
 	struct ship_subsys *next, *prev;				//	Index of next and previous objects in list.
 	model_subsystem *system_info;					// pointer to static data for this subsystem -- see model.h for definition
+
+	int			parent_objnum;						// objnum of the parent ship
 
 	char		sub_name[NAME_LENGTH];					//WMC - Name that overrides name of original
 	float		current_hits;							// current number of hits this subsystem has left.
