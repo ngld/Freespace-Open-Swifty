@@ -29,6 +29,7 @@
 #include "globalincs/pstypes.h"
 #include "graphics/gropenglshader.h"
 #include "graphics/gropengldraw.h"
+#include "hud/hudshield.h"
 
 // flags
 #define LAB_FLAG_NORMAL				(0)		// default
@@ -740,25 +741,7 @@ void labviewer_render_model(float frametime)
 	vec3d light_dir = vmd_zero_vector;
 	light_dir.xyz.y = 1.0f;
 	light_add_directional(&light_dir, 0.65f, 1.0f, 1.0f, 1.0f);
-/*
-	light_add_directional(&light_dir, 0.05f, 0.0f, 0.0f, 1.0f);
 
-	light_add_directional(&light_dir, 0.05f, 0.0f, 0.0f, 1.0f);
-	light_dir = vmd_zero_vector;
-	light_dir.xyz.y = -1.0f;
-	light_add_directional(&light_dir, 0.65f, 1.0f, 0.0f, 0.0f);
-
-	light_add_directional(&light_dir, 0.05f, 1.0f, 0.0f, 0.0f);
-
-	light_add_directional(&light_dir, 0.05f, 1.0f, 0.0f, 0.0f);
-	light_dir = vmd_zero_vector;
-	light_dir.xyz.x = -1.0f;
-	light_dir.xyz.y = 1.0f;
-	light_add_directional(&light_dir, 0.65f, 0.0f, 1.0f, 0.0f);
-
-	light_add_directional(&light_dir, 0.05f, 0.0f, 1.0f, 0.0f);
-*/
-	// light_filter_reset();
 	light_rotate_all();
 	// lighting for techroom
 
@@ -767,11 +750,6 @@ void labviewer_render_model(float frametime)
 	model_set_detail_level(Lab_model_LOD);
 
 	int flagggs = Lab_model_flags;
-
-//	if (sip && sip->flags2 & SIF2_TRANSPARENT) {
-//		flagggs |= MR_ALL_XPARENT;
-//		model_set_alpha(1.0f);
-//	}
 
 	// only render the insignia when the flag is set
 	if (Lab_viewer_flags & LAB_FLAG_SHOW_INSIGNIA) {
@@ -945,7 +923,8 @@ void labviewer_render_bitmap(float frametime)
 	vm_vec_scale_add(&headp, &vmd_zero_vector, &Lab_viewer_orient.vec.fvec, wip->laser_length);
 
 	gr_set_bitmap(wip->laser_bitmap.first_frame + framenum, GR_ALPHABLEND_FILTER, GR_BITBLT_MODE_NORMAL, 0.99999f);
-	g3_draw_laser(&headp, wip->laser_head_radius, &vmd_zero_vector, wip->laser_tail_radius, TMAP_FLAG_TEXTURED | TMAP_FLAG_XPARENT | TMAP_HTL_3D_UNLIT);
+	if(wip->laser_length > 0.0001f)
+		g3_draw_laser(&headp, wip->laser_head_radius, &vmd_zero_vector, wip->laser_tail_radius, TMAP_FLAG_TEXTURED | TMAP_FLAG_XPARENT | TMAP_HTL_3D_UNLIT);
 
 
 	// now draw the laser glow bitmap, if there is one, and if we are supposed to
@@ -996,7 +975,8 @@ void labviewer_render_bitmap(float frametime)
 		}
 
 		gr_set_bitmap(wip->laser_glow_bitmap.first_frame + framenum, GR_ALPHABLEND_FILTER, GR_BITBLT_MODE_NORMAL, weapon_glow_alpha);
-		g3_draw_laser_rgb(&headp2, wip->laser_head_radius * weapon_glow_scale_f, &tailp, wip->laser_tail_radius * weapon_glow_scale_r, c.red, c.green, c.blue,  TMAP_FLAG_TEXTURED | TMAP_FLAG_XPARENT  | TMAP_FLAG_RGB | TMAP_HTL_3D_UNLIT);
+		if(wip->laser_length > 0.0001f)
+			g3_draw_laser_rgb(&headp2, wip->laser_head_radius * weapon_glow_scale_f, &tailp, wip->laser_tail_radius * weapon_glow_scale_r, c.red, c.green, c.blue,  TMAP_FLAG_TEXTURED | TMAP_FLAG_XPARENT  | TMAP_FLAG_RGB | TMAP_HTL_3D_UNLIT);
 	}
 
 	// clean up and move on ...
@@ -1494,8 +1474,7 @@ void labviewer_populate_variables_window()
 	}	\
 	i++;	\
 }
-
-extern int Hud_shield_filename_count;
+extern SCP_vector<SCP_string> Hud_shield_filenames;
 
 void labviewer_update_variables_window()
 {
@@ -1537,7 +1516,7 @@ void labviewer_update_variables_window()
 		VAR_SET_VALUE_SAVE(sip->subsys_repair_rate, 0);
 		VAR_SET_VALUE_SAVE(sip->hull_repair_rate, 0);
 		VAR_SET_VALUE_SAVE(sip->cmeasure_max, 0);
-		VAR_SET_VALUE_SAVE(sip->shield_icon_index, Hud_shield_filename_count-1);
+		VAR_SET_VALUE_SAVE(sip->shield_icon_index, Hud_shield_filenames.size()-1);
 
 		VAR_SET_VALUE_SAVE(sip->power_output, 0);
 		VAR_SET_VALUE_SAVE(sip->max_overclocked_speed, 0);
