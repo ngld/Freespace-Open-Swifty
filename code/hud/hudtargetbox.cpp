@@ -450,6 +450,7 @@ void HudGaugeTargetBox::renderTargetSetup(vec3d *camera_eye, matrix *camera_orie
 
 }
 
+extern bool Interp_desaturate;
 void HudGaugeTargetBox::renderTargetShip(object *target_objp)
 {
 	vec3d		obj_pos = ZERO_VECTOR;
@@ -523,12 +524,14 @@ void HudGaugeTargetBox::renderTargetShip(object *target_objp)
 			opengl_shader_set_animated_effect(Targetbox_shader_effect);
 		}
 
+		Interp_desaturate = true;
 		// maybe render a special hud-target-only model
 		if(target_sip->model_num_hud >= 0){
 			model_render( target_sip->model_num_hud, &target_objp->orient, &obj_pos, flags | MR_LOCK_DETAIL | MR_AUTOCENTER | MR_NO_FOGGING);
 		} else {
 			model_render( target_sip->model_num, &target_objp->orient, &obj_pos, flags | MR_LOCK_DETAIL | MR_AUTOCENTER | MR_NO_FOGGING, -1, -1, target_shipp->ship_replacement_textures);
 		}
+		Interp_desaturate = false;
 		ship_model_stop( target_objp );
 
 		sx = 0;

@@ -229,6 +229,7 @@ class opengl_state
 		inline GLenum BlendFuncSource();
 		inline GLenum BlendFuncDest();
 		inline GLenum DepthFunc(GLenum new_val = GL_INVALID_ENUM);
+		//inline void AlphaFunc(GLenum f_val, GLenum r_val);
 };
 
 inline GLenum opengl_state::FrontFaceValue(GLenum new_val)
@@ -290,6 +291,11 @@ inline GLenum opengl_state::DepthFunc(GLenum new_val)
 	return depthfunc_Value;
 }
 
+/*inline void opengl_state::AlphaFunc(GLenum f_val, GLclampf r_val)
+{
+
+	glAlphaFunc(f_val, r_val);
+}*/
 
 extern opengl_state GL_state;
 

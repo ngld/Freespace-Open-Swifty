@@ -786,7 +786,7 @@ void opengl_setup_render_states(int &r, int &g, int &b, int &alpha, int &tmap_ty
 
 	tmap_type = TCACHE_TYPE_NORMAL;
 
-	if (flags & TMAP_FLAG_TEXTURED) {
+	if ( flags & TMAP_FLAG_TEXTURED && !(flags & TMAP_FLAG_DESATURATE) ) {
 		r = g = b = 255;
 	} else {
 		r = gr_screen.current_color.red;
