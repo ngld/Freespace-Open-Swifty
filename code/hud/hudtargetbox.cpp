@@ -259,7 +259,7 @@ void HudGaugeTargetBox::initCargoScanSize(int w, int h)
 	Cargo_scan_h = h;
 }
 
-void HudGaugeTargetBox::initBitmaps(char *fname_monitor, char *fname_integrity, char *fname_static)
+void HudGaugeTargetBox::initBitmaps(char *fname_monitor, char *fname_monitor_mask, char *fname_integrity, char *fname_static)
 {
 	Monitor_frame.first_frame = bm_load_animation(fname_monitor, &Monitor_frame.num_frames);
 	if ( Monitor_frame.first_frame < 0 ) {
@@ -269,6 +269,14 @@ void HudGaugeTargetBox::initBitmaps(char *fname_monitor, char *fname_integrity, 
 	Integrity_bar.first_frame = bm_load_animation(fname_integrity, &Integrity_bar.num_frames);
 	if ( Integrity_bar.first_frame < 0 ) {
 		Warning(LOCATION,"Cannot load hud ani: %s\n", fname_integrity);
+	}
+
+	if ( strlen(fname_monitor_mask) > 0 ) {
+		Monitor_mask = bm_load_animation(fname_monitor_mask);
+
+		if ( Monitor_mask < 0 ) {
+			Warning(LOCATION, "Cannot load bitmap hud mask: %s\n", fname_monitor_mask);
+		}
 	}
 
 	strcpy_s(static_fname, fname_static);
@@ -307,6 +315,20 @@ void HudGaugeTargetBox::render(float frametime)
 
 	// blit the background frame
 	renderBitmap(Monitor_frame.first_frame, position[0], position[1]);
+
+	if ( Monitor_mask >= 0 ) {
+		// render the alpha mask
+		gr_alpha_mask_set(1);
+		gr_stencil_clear();
+		gr_stencil_set(GR_STENCIL_WRITE);
+		gr_set_color_buffer(0);
+
+		renderBitmapColor(Monitor_mask, position[0], position[1]);
+
+		gr_set_color_buffer(1);
+		gr_stencil_set(GR_STENCIL_NONE);
+		gr_alpha_mask_set(0);
+	}
 
 	switch ( target_objp->type ) {
 		case OBJ_SHIP:
@@ -523,7 +545,7 @@ void HudGaugeTargetBox::renderTargetShip(object *target_objp)
 
 			opengl_shader_set_animated_effect(Targetbox_shader_effect);
 		}
-
+		gr_stencil_set(GR_STENCIL_READ);
 		Interp_desaturate = true;
 		// maybe render a special hud-target-only model
 		if(target_sip->model_num_hud >= 0){
@@ -533,6 +555,7 @@ void HudGaugeTargetBox::renderTargetShip(object *target_objp)
 		}
 		Interp_desaturate = false;
 		ship_model_stop( target_objp );
+		gr_stencil_set(GR_STENCIL_NONE);
 
 		sx = 0;
 		sy = 0;

@@ -3367,6 +3367,7 @@ void load_gauge_target_monitor(int base_w, int base_h, int font, int ship_index,
 	char fname_monitor[MAX_FILENAME_LEN] = "targetview1";
 	char fname_integrity[MAX_FILENAME_LEN] = "targetview2";
 	char fname_static[MAX_FILENAME_LEN] = "TargetStatic";
+	char fname_monitor_mask[MAX_FILENAME_LEN] = "";
 
 	int font_num = FONT1;
 
@@ -3448,6 +3449,9 @@ void load_gauge_target_monitor(int base_w, int base_h, int font, int ship_index,
 	if(optional_string("Monitor Filename:")) {
 		stuff_string(fname_monitor, F_NAME, MAX_FILENAME_LEN);
 	}
+	if(optional_string("Monitor Alpha Mask Filename:")) {
+		stuff_string(fname_monitor_mask, F_NAME, MAX_FILENAME_LEN);
+	}
 	if(optional_string("Integrity Bar Filename:")) {
 		stuff_string(fname_integrity, F_NAME, MAX_FILENAME_LEN);
 	}
@@ -3507,7 +3511,7 @@ void load_gauge_target_monitor(int base_w, int base_h, int font, int ship_index,
 	hud_gauge->initHullOffsets(Hull_offsets[0], Hull_offsets[1]);
 	hud_gauge->initCargoScanStartOffsets(Cargo_scan_start_offsets[0], Cargo_scan_start_offsets[1]);
 	hud_gauge->initCargoScanSize(Cargo_scan_size[0], Cargo_scan_size[1]);
-	hud_gauge->initBitmaps(fname_monitor, fname_integrity, fname_static);
+	hud_gauge->initBitmaps(fname_monitor, fname_monitor_mask, fname_integrity, fname_static);
 	hud_gauge->initFont(font_num);
 	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 	hud_gauge->lockConfigColor(lock_color);
