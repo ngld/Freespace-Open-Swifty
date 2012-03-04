@@ -27,12 +27,6 @@ class HudGaugeRadarDradis: public HudGaugeRadar
 	int target_brackets;
 	int unknown_contact_icon;
 
-	int background;
-	int background_w, background_h;
-
-	int foreground;
-	int foreground_w, foreground_h;
-
 	float sweep_duration; // in seconds
 	float sweep_percent;
 
@@ -57,11 +51,28 @@ class HudGaugeRadarDradis: public HudGaugeRadar
 	float scale;
 
 	bool sub_y_clip;
+
+	int loop_sound_handle;
+	int loop_snd;
+	float loop_sound_volume;
+
+	int arrival_beep_snd;
+	int departure_beep_snd;
+
+	int stealth_arrival_snd;
+	int stealth_departure_snd;
+
+	int arrival_beep_delay;
+	int departure_beep_delay;
+
+	int arrival_beep_next_check;
+	int departure_beep_next_check;
+protected:
+	bool shouldDoSounds();
 public:
 	HudGaugeRadarDradis();
 	void initBitmaps(char* fname_xy, char* fname_xz_yz, char* fname_sweep, char* fname_target_brackets, char* fname_unknown);
-	void initBackground(char* fname_background, int _background_w, int _background_h);
-	void initForeground(char* fname_foreground, int n_foreground_w, int n_foreground_h);
+	void initSound(int loop_snd, float loop_sound_volume,  int arrival_snd, int departue_snd, int stealth_arrival_snd, int stealth_departue_snd, float arrival_delay, float departure_delay);
 
 	void blipDrawDistorted(blip *b, vec3d *pos, float alpha);
 	void blipDrawFlicker(blip *b, vec3d *pos, float alpha);
@@ -80,6 +91,13 @@ public:
 	void render(float frametime);
 	void pageIn();
 	void plotBlip(blip* b, vec3d *pos, float *alpha);
+
+	virtual void onFrame(float frametime);
+	virtual void initialize();
+
+	// Sound specific functions
+	void doLoopSnd();
+	void doBeeps();
 };
 
 #endif

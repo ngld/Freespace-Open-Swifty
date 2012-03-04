@@ -20,6 +20,7 @@
 #include "graphics/gropengltexture.h"
 #include "cmdline/cmdline.h"
 #include "ddsutils/ddsutils.h"
+#include "popup/popup.h"
 
 #include "osapi/outwnd.h"
 
@@ -102,11 +103,11 @@ ogl_extension GL_Extensions[NUM_OGL_EXTENSIONS] =
 	{ false, false, 1, { "GL_SGIS_generate_mipmap" }, 0, { NULL } },
 
 	// framebuffer object gives us render-to-texture support, among other things
-	{ false, false, 1, { "GL_EXT_framebuffer_object" }, 15, { 
+	{ false, false, 1, { "GL_EXT_framebuffer_object" }, 16, { 
 		"glIsRenderbufferEXT", "glBindRenderbufferEXT", "glDeleteRenderbuffersEXT", "glGenRenderbuffersEXT",
 		"glRenderbufferStorageEXT", "glGetRenderbufferParameterivEXT", "glIsFramebufferEXT", "glBindFramebufferEXT",
 		"glDeleteFramebuffersEXT", "glGenFramebuffersEXT", "glCheckFramebufferStatusEXT", "glFramebufferTexture2DEXT",
-		"glFramebufferRenderbufferEXT", "glGetFramebufferAttachmentParameterivEXT", "glGenerateMipmapEXT" } },
+		"glFramebufferRenderbufferEXT", "glGetFramebufferAttachmentParameterivEXT", "glGenerateMipmapEXT", "glDrawBuffers" } },
 
 	// these next three are almost exactly the same, just different stages of naming.
 	// allows for non-power-of-textures, but at a cost of functionality
@@ -130,10 +131,10 @@ ogl_extension GL_Extensions[NUM_OGL_EXTENSIONS] =
 	{ false, false, 1, { "GL_ARB_shading_language_100" }, 0, { NULL } },
 
 	// shader objects and program object management
-	{ false, false, 1, { "GL_ARB_shader_objects" }, 17, { "glDeleteObjectARB", "glCreateShaderObjectARB", "glShaderSourceARB",
+	{ false, false, 1, { "GL_ARB_shader_objects" }, 18, { "glDeleteObjectARB", "glCreateShaderObjectARB", "glShaderSourceARB",
 		"glCompileShaderARB", "glGetObjectParameterivARB", "glGetInfoLogARB", "glCreateProgramObjectARB",
 		"glAttachObjectARB", "glLinkProgramARB", "glUseProgramObjectARB", "glValidateProgramARB", "glGetUniformLocationARB",
-		"glGetUniformivARB", "glUniform1fARB", "glUniform3fARB", "glUniform1iARB", "glUniformMatrix4fvARB" } },
+		"glGetUniformivARB", "glUniform1fARB", "glUniform2fARB", "glUniform3fARB", "glUniform1iARB", "glUniformMatrix4fvARB" } },
 
 	// programmable vertex level processing
 	// some of functions are provided by GL_ARB_vertex_program
@@ -209,11 +210,14 @@ ogl_function GL_Functions[NUM_OGL_FUNCTIONS] =
 	{ "glGetUniformLocationARB", 0 },
 	{ "glGetUniformivARB", 0 },
 	{ "glUniform1fARB", 0 },
+	{ "glUniform2fARB", 0 },
 	{ "glUniform3fARB", 0 },
+	{ "glUniform4fARB", 0 },
 	{ "glUniform3fvARB", 0 },
 	{ "glUniform4fvARB", 0 },
 	{ "glUniform1iARB", 0 },
-	{ "glUniformMatrix4fvARB", 0 }
+	{ "glUniformMatrix4fvARB", 0 },
+	{ "glDrawBuffers", 0 }
 };
 
 // special extensions (only special functions are supported at the moment)
@@ -366,9 +370,22 @@ void opengl_extensions_init()
 		Use_PBOs = 1;
 	}
 
+	// setup the best fog function found
+	if ( !Fred_running ) {
+		if ( Is_Extension_Enabled(OGL_EXT_FOG_COORD) ) {
+			OGL_fogmode = 2;
+		} else {
+			OGL_fogmode = 1;
+		}
+	}
+
+	// if we can't do cubemaps then turn off Cmdline_env
+	if ( !(Is_Extension_Enabled(OGL_ARB_TEXTURE_CUBE_MAP) && Is_Extension_Enabled(OGL_ARB_TEXTURE_ENV_COMBINE)) ) {
+		Cmdline_env = 0;
+	}
+
 	if ( !Cmdline_noglsl && Is_Extension_Enabled(OGL_ARB_SHADER_OBJECTS) && Is_Extension_Enabled(OGL_ARB_FRAGMENT_SHADER)
-			&& Is_Extension_Enabled(OGL_ARB_VERTEX_SHADER) )
-	{
+			&& Is_Extension_Enabled(OGL_ARB_VERTEX_SHADER) ) {
 		int ver = 0, major = 0, minor = 0;
 		const char *glsl_ver = (const char*)glGetString(GL_SHADING_LANGUAGE_VERSION_ARB);
 
@@ -384,27 +401,17 @@ void opengl_extensions_init()
 			Use_GLSL = 3;
 		}
 		// SM 2.0 compatible
-		else if (ver >= 110) {
+		else if (ver >= 120) {
 			Use_GLSL = 2;
 		}
-		// we require GLSL 1.10 or higher
+		// we require GLSL 1.20 or higher
 		else if (ver < 110) {
 			Use_GLSL = 0;
+			mprintf(("  OpenGL Shading Language version %s is not sufficient to use GLSL mode in FSO. Defaulting to fixed-function renderer.\n", glGetString(GL_SHADING_LANGUAGE_VERSION_ARB) ));
+#ifdef NDEBUG
+			popup(0, 1, POPUP_OK, "GLSL support not available on this GPU. Disabling shader support and defaulting to fixed-function rendering.\n");
+#endif
 		}
-	}
-
-	// setup the best fog function found
-	if ( !Fred_running ) {
-		if ( Is_Extension_Enabled(OGL_EXT_FOG_COORD) ) {
-			OGL_fogmode = 2;
-		} else {
-			OGL_fogmode = 1;
-		}
-	}
-
-	// if we can't do cubemaps then turn off Cmdline_env
-	if ( !(Is_Extension_Enabled(OGL_ARB_TEXTURE_CUBE_MAP) && Is_Extension_Enabled(OGL_ARB_TEXTURE_ENV_COMBINE)) ) {
-		Cmdline_env = 0;
 	}
 
 	// can't have this stuff without GLSL support

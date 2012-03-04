@@ -37,10 +37,8 @@
 #define RADIANS_PER_DEGREE (PI / 180.0f)
 
 HudGaugeRadarDradis::HudGaugeRadarDradis():
-HudGaugeRadar(HUD_OBJECT_RADAR_BSG, true, 255, 255, 255), 
-xy_plane(-1), xz_yz_plane(-1), sweep_plane(-1), target_brackets(-1), unknown_contact_icon(-1), background(-1), background_w(-1), background_h(-1), 
-foreground(-1), foreground_w(-1), foreground_h(-1), sweep_duration(6.0), sweep_percent(0.0), sub_y_clip(false),
-scale(1.20f)
+HudGaugeRadar(HUD_OBJECT_RADAR_BSG, 255, 255, 255), 
+xy_plane(-1), xz_yz_plane(-1), sweep_plane(-1), target_brackets(-1), unknown_contact_icon(-1), sweep_duration(6.0), sweep_percent(0.0), scale(1.20f), sub_y_clip(false)
 {
 	vm_vec_copy_scale(&sweep_normal_x, &vmd_zero_vector, 1.0f);
 	vm_vec_copy_scale(&sweep_normal_y, &vmd_zero_vector, 1.0f);
@@ -88,6 +86,8 @@ scale(1.20f)
 	
 	// give it some color
 	gr_init_alphacolor(&orb_color, 48, 96, 160, 1337);
+
+	this->loop_sound_handle = -1;
 }
 
 void HudGaugeRadarDradis::initBitmaps(char* fname_xy, char* fname_xz_yz, char* fname_sweep, char* fname_target_brackets, char* fname_unknown)
@@ -115,50 +115,6 @@ void HudGaugeRadarDradis::initBitmaps(char* fname_xy, char* fname_xz_yz, char* f
 	unknown_contact_icon = bm_load(fname_unknown);
 	if ( unknown_contact_icon < 0 ) {
 		Warning(LOCATION,"Cannot load hud bitmap: %s\n", fname_unknown);
-	}
-}
-
-void HudGaugeRadarDradis::initBackground(char* fname_background, int _background_w, int _background_h)
-{
-	if( !(strlen(fname_background) > 0) ) {
-		return;
-	}
-
-	background = bm_load(fname_background);
-	if(background < 0) {
-		Warning(LOCATION,"Cannot load hud bitmap: %s\n", fname_background);
-		return;
-	}
-
-	background_w = _background_w;
-	background_h = _background_h;
-	
-	if(background_w <= 0 || background_h <= 0) {
-
-		// no dimensions given for our background bitmap so let's figure it out.
-		bm_get_info(background, &background_w, &background_h);
-	}
-}
-
-void HudGaugeRadarDradis::initForeground(char* fname_foreground, int _foreground_w, int _foreground_h)
-{
-	if( !(strlen(fname_foreground) > 0) ) {
-		return;
-	}
-
-	foreground = bm_load(fname_foreground);
-	if(foreground < 0) {
-		Warning(LOCATION,"Cannot load hud bitmap: %s\n", fname_foreground);
-		return;
-	}
-
-	foreground_w = _foreground_w;
-	foreground_h = _foreground_h;
-	
-	if(foreground_w <= 0 || foreground_h <= 0) {
-
-		// no dimensions given for our foreground bitmap so let's figure it out.
-		bm_get_info(foreground, &foreground_w, &foreground_h);
 	}
 }
 
@@ -352,13 +308,6 @@ void HudGaugeRadarDradis::doneDrawingHtl()
 {
 	gr_end_view_matrix();
 	gr_end_proj_matrix();
-
-	if(foreground >= 0) {
-		int w, h;
-
-		bm_get_info(foreground, &w, &h);
-		renderBitmapUv(foreground, position[0], position[1], Radar_radius[0], Radar_radius[1], 0.0f, 0.0f, i2fl(foreground_w)/i2fl(w), i2fl(foreground_h)/i2fl(h));
-	}
 	
 	//hud_save_restore_camera_data(0);
 
@@ -422,8 +371,20 @@ void HudGaugeRadarDradis::drawSweeps()
 		g3_draw_polygon(&vmd_zero_vector, &sweep_a, scale, scale, TMAP_FLAG_TEXTURED | TMAP_HTL_3D_UNLIT);
 		g3_draw_polygon(&vmd_zero_vector, &sweep_b, scale, scale, TMAP_FLAG_TEXTURED | TMAP_HTL_3D_UNLIT);
 		g3_draw_polygon(&vmd_zero_vector, &sweep_c, scale, scale, TMAP_FLAG_TEXTURED | TMAP_HTL_3D_UNLIT);
+
+		float rotation = sweep_percent;
+
+		vm_rot_point_around_line(&sweep_a, &vmd_y_vector, rotation, &vmd_zero_vector, &vmd_z_vector); // Sweep line: XZ
+		vm_rot_point_around_line(&sweep_b, &vmd_y_vector, rotation, &vmd_zero_vector, &vmd_x_vector); // Sweep line: YZ
+		vm_rot_point_around_line(&sweep_c, &vmd_x_vector,sweep_perc_z, &vmd_zero_vector, &vmd_y_vector); // Sweep line: YZ
 		
-		int dist = 90;
+		gr_set_bitmap(sweep_plane, GR_ALPHABLEND_FILTER, GR_BITBLT_MODE_NORMAL);
+
+		g3_draw_polygon(&vmd_zero_vector, &sweep_a, scale, scale, TMAP_FLAG_TEXTURED | TMAP_HTL_3D_UNLIT); // Sweep line: XZ
+		g3_draw_polygon(&vmd_zero_vector, &sweep_b, scale, scale, TMAP_FLAG_TEXTURED | TMAP_HTL_3D_UNLIT); // Sweep line: YZ
+		g3_draw_polygon(&vmd_zero_vector, &sweep_c, scale, scale, TMAP_FLAG_TEXTURED | TMAP_HTL_3D_UNLIT);
+
+		/*int dist = 90;
 
 		for(int i = 1; i < dist; i++)
 		{
@@ -446,7 +407,7 @@ void HudGaugeRadarDradis::drawSweeps()
 				vm_rot_point_around_line(&sweep_c, &vmd_x_vector,sweep_perc_z + (i * RADIANS_PER_DEGREE), &vmd_zero_vector, &vmd_y_vector); // Sweep line: YZ
 				g3_draw_polygon(&vmd_zero_vector, &sweep_c, scale, scale, TMAP_FLAG_TEXTURED | TMAP_HTL_3D_UNLIT);
 			}
-		}
+		}*/
 		
 	g3_done_instance(true);
 }
@@ -527,13 +488,6 @@ void HudGaugeRadarDradis::render(float frametime)
 
 	setupViewHtl();
 
-	if(background >= 0) {
-		int w, h;
-
-		bm_get_info(background, &w, &h);
-		renderBitmapUv(background, position[0], position[1], Radar_radius[0], Radar_radius[1], 0.0f, 0.0f, i2fl(background_w)/i2fl(w), i2fl(background_h)/i2fl(h));
-	}
-
 	//WMC - This strikes me as a bit hackish
 	bool g3_yourself = !g3_in_frame();
 	if(g3_yourself)
@@ -593,4 +547,164 @@ void HudGaugeRadarDradis::pageIn()
 	bm_page_in_texture(sweep_plane);
 	bm_page_in_texture(target_brackets);
 	bm_page_in_texture(unknown_contact_icon);
+}
+
+void HudGaugeRadarDradis::doLoopSnd()
+{
+	if (this->loop_snd < 0)
+	{
+		return;
+	}
+
+	if (!this->shouldDoSounds())
+	{
+		if (loop_sound_handle >= 0 && snd_is_playing(loop_sound_handle))
+		{
+			snd_stop(loop_sound_handle);
+			loop_sound_handle = -1;
+		}
+	}
+	else if (this->loop_sound_handle < 0 || !snd_is_playing(this->loop_sound_handle))
+	{
+		loop_sound_handle = snd_play(&Snds[loop_snd], 0.0f, loop_sound_volume);
+	}
+}
+
+void HudGaugeRadarDradis::doBeeps()
+{
+	if (!this->shouldDoSounds())
+	{
+		return;
+	}
+
+	if (Missiontime == 0 || Missiontime == Frametime)
+	{
+		// don't play sounds in first frame
+		return;
+	}
+
+	if (arrival_beep_snd < 0 &&
+		departure_beep_snd < 0 &&
+		stealth_arrival_snd < 0 &&
+		stealth_departure_snd < 0)
+	{
+		return;
+	}
+
+	bool departure_happened = false;
+	bool stealth_departure_happened = false;
+
+	bool arrival_happened = false;
+	bool stealth_arrival_happened = false;
+	
+	for (int i = 0; i < MAX_SHIPS; i++)
+	{
+		ship * shipp = &Ships[i];
+
+		if (shipp->objnum >= 0)
+		{
+			if (shipp->radar_visible_since >= 0 || shipp->radar_last_contact >= 0)
+			{
+				if (shipp->radar_visible_since == Missiontime)
+				{
+					if (shipp->radar_current_status == DISTORTED)
+					{
+						stealth_arrival_happened = true;
+					}
+					else
+					{
+						arrival_happened = true;
+					}
+				}
+				else if (shipp->radar_visible_since < 0 && shipp->radar_last_contact == Missiontime)
+				{
+					if (shipp->radar_last_status == DISTORTED)
+					{
+						stealth_departure_happened = true;
+					}
+					else
+					{
+						departure_happened = true;
+					}
+				}
+			}
+		}
+	}
+	
+	if (timestamp_elapsed(arrival_beep_next_check))
+	{
+		if (arrival_beep_snd >= 0 && arrival_happened)
+		{
+			snd_play(&Snds[arrival_beep_snd]);
+
+			arrival_beep_next_check = timestamp(arrival_beep_delay);
+		}
+		else if (stealth_arrival_snd >= 0 && stealth_arrival_happened)
+		{
+			snd_play(&Snds[stealth_arrival_snd]);
+
+			arrival_beep_next_check = timestamp(arrival_beep_delay);
+		}
+
+	}
+
+	if (timestamp_elapsed(departure_beep_next_check))
+	{
+		if (departure_beep_snd >= 0 && departure_happened)
+		{
+			snd_play(&Snds[departure_beep_snd]);
+
+			departure_beep_next_check = timestamp(departure_beep_delay);
+		}
+		else if (stealth_departure_snd >= 0 && stealth_departure_happened)
+		{
+			snd_play(&Snds[stealth_departure_snd]);
+
+			departure_beep_next_check = timestamp(departure_beep_delay);
+		}
+	}
+}
+
+void HudGaugeRadarDradis::initSound(int loop_snd, float loop_snd_volume, int arrival_snd, int departure_snd, int stealth_arrival_snd, int stealth_departue_snd, float arrival_delay, float departure_delay)
+{
+	this->loop_snd = loop_snd;
+	this->loop_sound_handle = -1;
+	this->loop_sound_volume = loop_snd_volume;
+
+	this->arrival_beep_snd = arrival_snd;
+	this->departure_beep_snd = departure_snd;
+
+	this->stealth_arrival_snd = stealth_arrival_snd;
+	this->stealth_departure_snd = stealth_departue_snd;
+
+	this->arrival_beep_delay = fl2i(arrival_delay * 1000.0f);
+	this->departure_beep_delay = fl2i(departure_delay * 1000.0f);
+}
+
+void HudGaugeRadarDradis::onFrame(float frametime)
+{
+	// Play the specified radar sound
+	this->doLoopSnd();
+
+	// Play beeps for ship arrival and departure
+	this->doBeeps();
+}
+
+void HudGaugeRadarDradis::initialize()
+{
+	HudGaugeRadar::initialize();
+
+	this->arrival_beep_next_check = timestamp();
+	this->departure_beep_next_check = timestamp();
+}
+
+bool HudGaugeRadarDradis::shouldDoSounds()
+{
+	if (hud_disabled())
+		return false;
+
+	if (Viewer_mode & (VM_EXTERNAL | VM_CHASE | VM_DEAD_VIEW | VM_OTHER_SHIP))
+		return false;
+
+	return true;
 }
