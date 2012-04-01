@@ -2116,7 +2116,7 @@ void sexp_list_item::add_data(char *str, int t)
 // add a node to end of list, allocating memory for the text
 // Defaults: t = SEXPT_STRING
 //
-void sexp_list_item::add_data_dup(char *str, int t)
+void sexp_list_item::add_data_dup(const char *str, int t)
 {
 	sexp_list_item *item, *ptr;
 
@@ -5213,7 +5213,7 @@ sexp_list_item *sexp_tree::get_listing_opf_persona()
 
 	for (i = 0; i < Num_personas; i++) {
 		if (Personas[i].flags & PERSONA_FLAG_WINGMAN) {
-			head.add_data (Personas[i].name);
+			head.add_data(Personas[i].name);
 		}
 	}
 
@@ -5270,9 +5270,7 @@ sexp_list_item *sexp_tree::get_listing_opf_sound_environment()
 
 	head.add_data(SEXP_NONE_STRING);
 	for (int i = 0; i  < (int)EFX_presets.size(); i++) {
-		// ugh
-		char *text = const_cast<char*>(EFX_presets[i].name.c_str());
-		head.add_data_dup(text);
+		head.add_data_dup(EFX_presets[i].name.c_str());
 	}
 
 	return head.next;
@@ -5476,6 +5474,14 @@ sexp_list_item *sexp_tree::get_listing_opf_keypress()
 {
 	int i;
 	sexp_list_item head;
+
+	/*UGLY HACK!*/
+	static bool overrides_loaded = false;
+	if (!overrides_loaded) {
+		control_config_common_load_overrides();
+		overrides_loaded = true;
+	}
+	/*END OF UGLY HACK!*/
 
 	for (i=0; i<CCFG_MAX; i++) {
 		if (Control_config[i].key_default > 0) {
@@ -5791,7 +5797,7 @@ sexp_list_item *sexp_tree::get_listing_opf_post_effect()
 	SCP_vector<SCP_string> ppe_names;
 	get_post_process_effect_names(ppe_names);
 	for (i=0; i < ppe_names.size(); i++) {
-		head.add_data_dup(const_cast<char*>(ppe_names[i].c_str()));
+		head.add_data_dup(ppe_names[i].c_str());
 	}
 	head.add_data_dup("lightshafts");
 
