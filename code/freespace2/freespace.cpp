@@ -675,6 +675,8 @@ DCF(sn_glare, "")
 
 float Supernova_last_glare = 0.0f;
 bool stars_sun_has_glare(int index);
+extern bool ls_on;
+extern bool ls_force_off;
 void game_sunspot_process(float frametime)
 {
 	int n_lights, idx;
@@ -747,23 +749,21 @@ void game_sunspot_process(float frametime)
 			n_lights = light_get_global_count();
 
 			// check
-			for(idx=0; idx<n_lights; idx++){
-				if ( !shipfx_eye_in_shadow( &Eye_position, Viewer_obj, idx ) )	{
-
+			for(idx=0; idx<n_lights; idx++)	{
+				if ( (ls_on && !ls_force_off) || !shipfx_eye_in_shadow( &Eye_position, Viewer_obj, idx ) )	{
 					vec3d light_dir;				
 					light_get_global_dir(&light_dir, idx);
 
 					//only do sunglare stuff if this sun has one
-					if (stars_sun_has_glare(idx))
-					{
+					if (stars_sun_has_glare(idx))	{
 						float dot = vm_vec_dot( &light_dir, &Eye_matrix.vec.fvec )*0.5f+0.5f;
-
 						Sun_spot_goal += (float)pow(dot,85.0f);
 					}
-
-					// draw the glow for this sun
-					stars_draw_sun_glow(idx);				
 				}
+			if (!shipfx_eye_in_shadow( &Eye_position, Viewer_obj, idx ) )	{
+			// draw the glow for this sun
+			stars_draw_sun_glow(idx);				
+			}
 			}
 
 			Sun_drew = 0;
@@ -848,7 +848,7 @@ void game_flash_diminish(float frametime)
 		g = fl2i( Game_flash_green*128.0f );   
 		b = fl2i( Game_flash_blue*128.0f );  
 
-		if ( Sun_spot > 0.0f )	{
+		if ( Sun_spot > 0.0f && (!ls_on || ls_force_off))	{
 			r += fl2i(Sun_spot*128.0f);
 			g += fl2i(Sun_spot*128.0f);
 			b += fl2i(Sun_spot*128.0f);
@@ -1035,7 +1035,6 @@ void game_level_init(int seed)
 	Missiontime = 0;
 	Pre_player_entry = 1;			//	Means the player has not yet entered.
 	Entry_delay_time = 0;			//	Could get overwritten in mission read.
-	fireball_preload();				//	page in warphole bitmaps
 	observer_init();
 	flak_level_init();				// initialize flak - bitmaps, etc
 	ct_level_init();				// initialize ships contrails, etc
@@ -2026,6 +2025,11 @@ void game_init()
 		old_alpha_colors_init();
 	}
 
+	if(!Cmdline_reparse_mainhall)
+	{
+		main_hall_read_table();
+	}
+
 	if (Cmdline_env) {
 		ENVMAP = Default_env_map = bm_load("cubemap");
 	}
@@ -2387,7 +2391,7 @@ void game_show_standalone_framerate()
 /**
  * Show the time remaining in a mission.  Used only when the end-mission sexpression is used
  *
- * ::mission_end_time is a global from missionparse.cpp that contains the mission time at which the
+ * mission_end_time is a global from missionparse.cpp that contains the mission time at which the
  * mission should end (in fixed seconds).  There is code in missionparse.cpp which actually handles
  * checking how much time is left.
  */
@@ -2528,6 +2532,7 @@ void game_set_view_clip(float frametime)
 		if (g3_in_frame() == 0) {
 			// Ensure that the bars are black
 			gr_set_color(0,0,0);
+			gr_set_bitmap(0); // Valathil - Dont ask me why this has to be here but otherwise the black bars dont draw
 			gr_rect(0, 0, gr_screen.max_w, yborder, false);
 			gr_rect(0, gr_screen.max_h-yborder, gr_screen.max_w, yborder, false);
 		} else {
@@ -2942,16 +2947,19 @@ void say_view_target()
 
 			end_string_at_first_hash_symbol(view_target_name);
 			if ( strlen(view_target_name) ) {
-				HUD_fixed_printf(0.0f, XSTR( "Viewing %s%s\n", 185), (Viewer_mode & VM_OTHER_SHIP) ? XSTR( "from ", 186) : "", view_target_name);
+				hud_set_iff_color(&Objects[Player_ai->target_objnum], 1);
+				HUD_fixed_printf(0.0f, gr_screen.current_color, XSTR( "Viewing %s%s\n", 185), (Viewer_mode & VM_OTHER_SHIP) ? XSTR( "from ", 186) : "", view_target_name);
 				Show_viewing_from_self = 1;
 			}
 		} else {
+			color col;
+			gr_init_color(&col, 0, 255, 0);
 			if((Game_mode & GM_MULTIPLAYER) && (Net_player->flags & NETINFO_FLAG_OBSERVER) && (Player_obj->type == OBJ_OBSERVER)){
-				HUD_fixed_printf(2.0f,XSTR( "Viewing from observer\n", 187));
+				HUD_fixed_printf(2.0f, col, XSTR( "Viewing from observer\n", 187));
 				Show_viewing_from_self = 1;
 			} else {
 				if (Show_viewing_from_self)
-					HUD_fixed_printf(2.0f, XSTR( "Viewing from self\n", 188));
+					HUD_fixed_printf(2.0f, col, XSTR( "Viewing from self\n", 188));
 			}
 		}
 	}
@@ -3330,7 +3338,7 @@ camid game_render_frame_setup()
 	say_view_target();
 
 	if ( Viewer_mode & VM_PADLOCK_ANY ) {
-		player_display_packlock_view();
+		player_display_padlock_view();
 	}
 
 	if (Game_mode & GM_DEAD) {
@@ -3684,7 +3692,6 @@ void game_render_frame( camid cid )
 	if(draw_viewer_last && Viewer_obj)
 	{
 		gr_post_process_save_zbuffer();
-		gr_zbuffer_clear(TRUE);
 		ship_render(Viewer_obj);
 	}
 
@@ -3702,10 +3709,9 @@ void game_render_frame( camid cid )
 	}
 
 	//Draw viewer cockpit
-	if(Viewer_obj != NULL && Viewer_mode != VM_TOPDOWN)
+	if(Viewer_obj != NULL && Viewer_mode != VM_TOPDOWN && Ship_info[Ships[Viewer_obj->instance].ship_info_index].cockpit_model_num > 0)
 	{
 		gr_post_process_save_zbuffer();
-		gr_zbuffer_clear(TRUE);
 		ship_render_cockpit(Viewer_obj);
 	}
 
@@ -3995,7 +4001,7 @@ void game_simulation_frame()
 
 		physics_set_viewer( &Viewer_obj->phys_info, viewer_direction );
 	} else {
-		physics_set_viewer( NULL, PHYSICS_VIEWER_FRONT );
+		physics_set_viewer( &Objects[Player->objnum].phys_info, PHYSICS_VIEWER_FRONT );
 	}
 
 	// evaluate mission departures and arrivals before we process all objects.
@@ -4191,52 +4197,49 @@ void game_render_hud(camid cid)
 void game_reset_shade_frame()
 {
 	Fade_type = FI_NONE;
-	Fade_delta_time = 1.0f;
 	gr_create_shader(&Viewer_shader, 0, 0, 0, 0);
 }
 
 void game_shade_frame(float frametime)
 {
-	int alpha = 0;
-
 	// only do frame shade if we are actually in a game play state
 	if ( !game_actually_playing() ) {
 		return;
 	}
 
-	if (Fade_type != FI_NONE)
-	{
-		if ( (Viewer_shader.c == 0) && (Fade_type != FI_FADEOUT) ) {
-			return;
-		}
+	if (Fade_type != FI_NONE) {
+		Assert(Fade_start_timestamp > 0);
+		Assert(Fade_end_timestamp > 0);
+		Assert(Fade_end_timestamp > Fade_start_timestamp);
 
-		alpha = Viewer_shader.c;
-
-		// Fade in or out if necessary
-		if (Fade_type == FI_FADEOUT) {
-			alpha += fl2i(frametime * (255.0f / Fade_delta_time) + 0.5f);
-		} else if (Fade_type == FI_FADEIN) {
-			alpha -= fl2i(frametime * (255.0f / Fade_delta_time) + 0.5f);
-		}
-
-		// Limit and set fade type if done
-		if (alpha < 0) {
-			alpha = 0;
-
-			if (Fade_type == FI_FADEIN) {
-				Fade_type = FI_NONE;
-			}
-		}
-
-		if (alpha > 255) {
-			alpha = 255;
+		if( timestamp() >= Fade_start_timestamp ) {
+			int startAlpha = 0;
+			int endAlpha = 0;
 
 			if (Fade_type == FI_FADEOUT) {
-				Fade_type = FI_NONE;
+				endAlpha = 255;
+			} else if (Fade_type == FI_FADEIN) {
+				startAlpha = 255;
 			}
-		}
 
-		Viewer_shader.c = (ubyte)alpha;
+			int alpha = 0;
+
+			if( timestamp() < Fade_end_timestamp ) {
+				int duration = (Fade_end_timestamp - Fade_start_timestamp);
+				int elapsed = (timestamp() - Fade_start_timestamp);
+
+				alpha = fl2i( (float)startAlpha + (((float)endAlpha - (float)startAlpha) / (float)duration) * (float)elapsed );
+			} else {
+				//Fade finished
+				Fade_type = FI_NONE;
+				Fade_start_timestamp = 0;
+				Fade_end_timestamp = 0;
+
+				alpha = endAlpha;
+			}
+
+			Viewer_shader.c = (ubyte)alpha;
+		}
 	}
 
 	gr_flash_alpha(Viewer_shader.r, Viewer_shader.g, Viewer_shader.b, Viewer_shader.c);
@@ -4268,6 +4271,7 @@ void bars_do_frame(float frametime)
 		if (g3_in_frame() == 0) {
 			//Set rectangles
 			gr_set_color(0,0,0);
+			gr_set_bitmap(0); // Valathil - Dont ask me why this has to be here but otherwise the black bars dont draw
 			gr_rect(0, 0, gr_screen.max_w, yborder, false);
 			gr_rect(0, gr_screen.max_h-yborder, gr_screen.max_w, yborder, false);
 		} else {
@@ -4282,6 +4286,7 @@ void bars_do_frame(float frametime)
 
 		if (g3_in_frame() == 0) {
 			gr_set_color(0,0,0);
+			gr_set_bitmap(0); // Valathil - Dont ask me why this has to be here but otherwise the black bars dont draw
 			gr_rect(0, 0, gr_screen.max_w, yborder, false);
 			gr_rect(0, gr_screen.max_h-yborder, gr_screen.max_w, yborder, false);
 		} else {
@@ -4450,6 +4455,9 @@ void game_frame(int paused)
 			
 			camid cid = game_render_frame_setup();
 			game_render_frame( cid );
+			
+			//Cutscene bars
+			clip_frame_view();
 
 			// save the eye position and orientation
 			if ( Game_mode & GM_MULTIPLAYER ) {
@@ -4497,9 +4505,6 @@ void game_frame(int paused)
 					}
 				}
 			}
-
-			//Cutscene bars
-			clip_frame_view();
 
 			DEBUG_GET_TIME( render3_time2 )
 			DEBUG_GET_TIME( render2_time1 )
@@ -5200,6 +5205,15 @@ void game_process_event( int current_state, int event )
 			extern button_info Multi_ship_status_bi;
 			memset(&Multi_ship_status_bi, 0, sizeof(button_info));
 
+			// Make hv.Player available in "On Gameplay Start" hook -zookeeper
+			if(Player_obj)
+				Script_system.SetHookObject("Player", Player_obj);
+
+			Script_system.RunCondition(CHA_GAMEPLAYSTART);
+
+			if (Player_obj)
+				Script_system.RemHookVar("Player");
+
 			Start_time = f2fl(timer_get_approx_seconds());
 			//Framecount = 0;
 			mprintf(("Entering game at time = %7.3f\n", Start_time));
@@ -5394,10 +5408,12 @@ void game_process_event( int current_state, int event )
 				mprintf(( "Hit target speed.  Starting warp effect and moving to stage 2!\n" ));
 				shipfx_warpout_start( Player_obj );
 				Player->control_mode = PCM_WARPOUT_STAGE2;
-				Player->saved_viewer_mode = Viewer_mode;
-				Viewer_mode |= VM_WARP_CHASE;
-				
-				Warp_camera = warp_camera(Player_obj);
+
+				if (!(The_mission.ai_profile->flags2 & AIPF2_NO_WARP_CAMERA)) {
+					Player->saved_viewer_mode = Viewer_mode;
+					Viewer_mode |= VM_WARP_CHASE;
+					Warp_camera = warp_camera(Player_obj);
+				}
 			}
 			break;
 
@@ -7310,8 +7326,7 @@ void game_shutdown(void)
 
 	// load up common multiplayer icons
 	multi_unload_common_icons();
-	hud_close();
-	shockwave_close();			// release any memory used by shockwave system	
+	hud_close();	
 	fireball_close();				// free fireball system
 	particle_close();			// close out the particle system
 	weapon_close();					// free any memory that was allocated for the weapons
@@ -7557,7 +7572,6 @@ void game_do_training_checks()
 		wplp = Training_context_path;
 		if (wplp->get_waypoints().size() > (uint) Training_context_goal_waypoint) {
 			i = Training_context_goal_waypoint;
-			Warning(LOCATION, "The following is very inefficient with the new waypoint code!  Contact Goober5000 if you need to use it.");
 			do {
 				waypoint *wpt = find_waypoint_at_index(wplp, i);
 				Assert(wpt != NULL);

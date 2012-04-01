@@ -248,7 +248,7 @@ void hud_clear_msg_buffer()
 }
 
 HudGaugeMessages::HudGaugeMessages():
-HudGauge(HUD_OBJECT_MESSAGES, HUD_MESSAGE_LINES, true, false, true, (VM_WARP_CHASE), 255, 255, 255)
+HudGauge(HUD_OBJECT_MESSAGES, HUD_MESSAGE_LINES, false, true, (VM_WARP_CHASE), 255, 255, 255)
 {
 }
 
@@ -449,7 +449,7 @@ void HudGaugeMessages::render(float frametime)
 }
 
 //	Similar to HUD printf, but shows only one message at a time, at a fixed location.
-void HUD_fixed_printf(float duration, char * format, ...)
+void HUD_fixed_printf(float duration, color col, char * format, ...)
 {
 	va_list	args;
 	char		tmp[HUD_MSG_LENGTH_MAX];
@@ -483,7 +483,7 @@ void HUD_fixed_printf(float duration, char * format, ...)
 	}
 
 	strncpy(HUD_fixed_text[0].text, tmp, MAX_HUD_LINE_LEN - 1);
-	HUD_fixed_text[0].color = 0xff0000;
+	HUD_fixed_text[0].color = col.red << 16 | col.green << 8 | col.blue; 
 }
 
 //	Clear all pending text.
@@ -1162,7 +1162,7 @@ void hud_scrollback_exit()
 }
 
 HudGaugeTalkingHead::HudGaugeTalkingHead():
-HudGauge(HUD_OBJECT_TALKING_HEAD, HUD_TALKING_HEAD, true, false, true, (VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY), 255, 255, 255)
+HudGauge(HUD_OBJECT_TALKING_HEAD, HUD_TALKING_HEAD, false, true, (VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY), 255, 255, 255)
 {
 }
 
@@ -1294,7 +1294,7 @@ bool HudGaugeTalkingHead::canRender()
 }
 
 HudGaugeFixedMessages::HudGaugeFixedMessages():
-HudGauge(HUD_OBJECT_FIXED_MESSAGES, HUD_MESSAGE_LINES, true, false, true, (VM_WARP_CHASE), 255, 255, 255)
+HudGauge(HUD_OBJECT_FIXED_MESSAGES, HUD_MESSAGE_LINES, false, true, (VM_WARP_CHASE), 255, 255, 255)
 {
 }
 

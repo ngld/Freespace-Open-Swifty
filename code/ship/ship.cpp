@@ -246,7 +246,8 @@ flag_def_list Subsystem_flags[] = {
 	{ "starts locked",          MSS_FLAG_TURRET_LOCKED,     0 },
 	{ "no aggregate",			MSS_FLAG_NO_AGGREGATE,		0 },
 	{ "wait for animation",     MSS_FLAG_TURRET_ANIM_WAIT,  0 },
-	{ "play fire sound for player", MSS_FLAG2_PLAYER_TURRET_SOUND, 1}
+	{ "play fire sound for player", MSS_FLAG2_PLAYER_TURRET_SOUND, 1},
+	{ "only target if can fire",    MSS_FLAG2_TURRET_ONLY_TARGET_IF_CAN_FIRE, 1}
 };
 
 const int Num_subsystem_flags = sizeof(Subsystem_flags)/sizeof(flag_def_list);
@@ -409,7 +410,7 @@ int ship_in_my_squadron(ship *shipp)
 }
 
 /**
- * Initialise ::ship_obj_list
+ * Initialise Ship_obj_list
  */
 void ship_obj_list_init()
 {
@@ -962,15 +963,6 @@ void init_ship_entry(ship_info *sip)
 	sip->pathMetadata.clear();
 
 	sip->selection_effect = Default_ship_select_effect;
-	
-	sip->engine_snd_cockpit = SND_ENGINE;
-	sip->full_throttle_snd = SND_FULL_THROTTLE;
-	sip->zero_throttle_snd = SND_ZERO_THROTTLE;
-	sip->throttle_up_snd = SND_THROTTLE_UP;
-	sip->throttle_down_snd = SND_THROTTLE_DOWN;
-	sip->afterburner_engage_snd = SND_ABURN_ENGAGE;
-	sip->afterburner_loop_snd = SND_ABURN_LOOP;
-	sip->afterburner_fail_snd = SND_ABURN_FAIL;
 }
 
 /**
@@ -982,7 +974,6 @@ int parse_ship(char *filename, bool replace)
 	ship_info *sip;
 	bool create_if_not_found  = true;
 	int rtn = 0;
-	char name_tmp[NAME_LENGTH];
 
 	required_string("$Name:");
 	stuff_string(buf, F_NAME, SHIP_MULTITEXT_LENGTH);
@@ -1084,30 +1075,7 @@ int parse_ship(char *filename, bool replace)
 
 	rtn = parse_ship_values(sip, false, first_time, replace);
 
-	// if we have a ship copy, then check to be sure that our base ship exists
-	// This should really be moved -C
-	// Goober5000 - made nonfatal and a bit clearer
-	if (sip->flags & SIF_SHIP_COPY)
-	{
-		strcpy_s(name_tmp, sip->name);
-
-		if (end_string_at_first_hash_symbol(name_tmp))
-		{
-			if (ship_info_lookup(name_tmp) < 0)
-			{
-				Warning(LOCATION, "Ship %s is a copy, but base ship %s couldn't be found.", sip->name, name_tmp);
-				sip->flags &= ~SIF_SHIP_COPY;
-			}
-		}
-		else
-		{
-			Warning(LOCATION, "Ships %s is a copy, but does not use the ship copy name extension.");
-			sip->flags &= ~SIF_SHIP_COPY;
-		}
-	}
-
 	strcpy_s(parse_error_text, "");
-
 
 	return rtn;	//0 for success
 }
@@ -1177,6 +1145,44 @@ int parse_ship_template()
 	
 	return rtn;
 }
+
+void parse_ship_sound(char *name, int id, ship_info *sip)
+{
+	Assert( name != NULL );
+
+	int temp_index = -1;
+
+	parse_sound(name, &temp_index, sip->name);
+
+	if (temp_index >= 0)
+		sip->ship_sounds.insert(std::pair<int, int>(id, temp_index));
+}
+
+void parse_ship_sounds(ship_info *sip)
+{
+	parse_ship_sound("$CockpitEngineSnd:",                SND_ENGINE, sip);
+	parse_ship_sound("$FullThrottleSnd:",                 SND_FULL_THROTTLE, sip);
+	parse_ship_sound("$ZeroThrottleSnd:",                 SND_ZERO_THROTTLE, sip);
+	parse_ship_sound("$ThrottleUpSnd:",                   SND_THROTTLE_UP, sip);
+	parse_ship_sound("$ThrottleDownSnd:",                 SND_THROTTLE_DOWN, sip);
+	parse_ship_sound("$AfterburnerSnd:",                  SND_ABURN_LOOP, sip);
+	parse_ship_sound("$AfterburnerEngageSnd:",            SND_ABURN_ENGAGE, sip);
+	parse_ship_sound("$AfterburnerFailedSnd:",            SND_ABURN_FAIL, sip);
+	parse_ship_sound("$MissileTrackingSnd:",              SND_MISSILE_TRACKING, sip);
+	parse_ship_sound("$MissileLockedSnd:",                SND_MISSILE_LOCK, sip);
+	parse_ship_sound("$PrimaryCycleSnd:",                 SND_PRIMARY_CYCLE, sip);
+	parse_ship_sound("$SecondaryCycleSnd:",               SND_SECONDARY_CYCLE, sip);
+	parse_ship_sound("$TargetAcquiredSnd:",               SND_TARGET_ACQUIRE, sip);
+	parse_ship_sound("$PrimaryFireFailedSnd:",            SND_OUT_OF_WEAPON_ENERGY, sip);
+	parse_ship_sound("$SecondaryFireFailedSnd:",          SND_OUT_OF_MISSLES, sip);
+	parse_ship_sound("$HeatSeekerLaunchWarningSnd:",      SND_HEATLOCK_WARN, sip);
+	parse_ship_sound("$AspectSeekerLaunchWarningSnd:",    SND_ASPECTLOCK_WARN, sip);
+	parse_ship_sound("$MissileLockWarningSnd:",           SND_THREAT_FLASH, sip);
+	parse_ship_sound("$HeatSeekerProximityWarningSnd:",   SND_PROXIMITY_WARNING, sip);
+	parse_ship_sound("$AspectSeekerProximityWarningSnd:", SND_PROXIMITY_ASPECT_WARNING, sip);
+	parse_ship_sound("$MissileEvadedSnd:",                SND_MISSILE_EVADED_POPUP, sip);
+	parse_ship_sound("$CargoScanningSnd:",                SND_CARGO_SCAN, sip);
+} 
 
 void parse_ship_particle_effect(ship_info* sip, particle_effect* pe, char *id_string)
 {
@@ -1282,6 +1288,52 @@ void parse_ship_particle_effect(ship_info* sip, particle_effect* pe, char *id_st
 }
 
 /**
+ * Common method for parsing ship/subsystem primary/secondary weapons so that the parser doesn't flip out in the event of a problem.
+ *
+ */
+void parse_weapon_bank(ship_info *sip, bool is_primary, int *num_banks, int *bank_default_weapons, int *bank_capacities)
+{
+	Assert(sip != NULL);
+	Assert(bank_default_weapons != NULL);
+	Assert(bank_capacities != NULL);
+	const int max_banks = is_primary ? MAX_SHIP_PRIMARY_BANKS : MAX_SHIP_SECONDARY_BANKS;
+
+	// we initialize to the previous parse, which presumably worked
+	int num_bank_capacities = num_banks != NULL ? *num_banks : 0;
+
+	if (optional_string(const_cast<char*>(is_primary ? "$Default PBanks:" : "$Default SBanks:")))
+	{
+		// get weapon list
+		if (num_banks != NULL)
+			*num_banks = stuff_int_list(bank_default_weapons, max_banks, WEAPON_LIST_TYPE);
+		else
+			stuff_int_list(bank_default_weapons, max_banks, WEAPON_LIST_TYPE);
+	}
+
+	if (optional_string(const_cast<char*>(is_primary ? "$PBank Capacity:" : "$SBank Capacity:")))
+	{
+		// get capacity list
+		num_bank_capacities = stuff_int_list(bank_capacities, max_banks, RAW_INTEGER_TYPE);
+	}
+
+	// num_banks can be null if we're parsing weapons for a turret
+	if ((num_banks != NULL) && (*num_banks != num_bank_capacities))
+	{
+		// okay for a ship to have 0 primary capacities, since it won't be ammo-enabled
+		if (is_primary && num_bank_capacities != 0)
+		{
+			Warning(LOCATION, "Ship class '%s' has %d primary banks, but %d primary capacities... fix this!!", sip->name, *num_banks, num_bank_capacities);
+		}
+
+		// secondaries have no excuse!
+		if (!is_primary)
+		{
+			Warning(LOCATION, "Ship class '%s' has %d secondary banks, but %d secondary capacities... fix this!!", sip->name, *num_banks, num_bank_capacities);
+		}
+	}
+}
+
+/**
  * Puts values into a ship_info.
  */
 int parse_ship_values(ship_info* sip, bool isTemplate, bool first_time, bool replace)
@@ -1290,7 +1342,6 @@ int parse_ship_values(ship_info* sip, bool isTemplate, bool first_time, bool rep
 	char* info_type_name;
 	int i, j, num_allowed;
 	int allowed_weapons[MAX_WEAPON_TYPES];
-	int pbank_capacity_count, sbank_capacity_count;
 	int rtn = 0;
 	char name_tmp[NAME_LENGTH];
 	
@@ -1323,8 +1374,24 @@ int parse_ship_values(ship_info* sip, bool isTemplate, bool first_time, bool rep
 	}
 	diag_printf ("Ship short name -- %s\n", sip->short_name);
 
-	Assert( tspecies_names );
-	find_and_stuff_optional("$Species:", &sip->species, F_NAME, tspecies_names, Species_info.size(), "species names");
+	if (optional_string("$Species:")) {
+		char temp[NAME_LENGTH];
+		stuff_string(temp, F_NAME, NAME_LENGTH);
+		int i = 0;
+		
+		bool found = false;
+		for (SCP_vector<species_info>::iterator sii = Species_info.begin(); sii != Species_info.end(); ++sii, ++i) {
+			if (!stricmp(temp, sii->species_name)) {
+				sip->species = i;
+				found = true;
+				break;
+			}
+		}
+
+		if (!found) {
+			Error(LOCATION, "Invalid Species %s defined in table entry for ship %s.\n", temp, sip->name);
+		}
+	}
 
 	diag_printf ("Ship species -- %s\n", Species_info[sip->species].species_name);
 
@@ -1867,8 +1934,14 @@ int parse_ship_values(ship_info* sip, bool isTemplate, bool first_time, bool rep
 			if(required_string("+Distance:"))
 				stuff_float(&sip->convergence_distance);
 		}
-		if(optional_string("+Offset:"))
+		if(optional_string("+Offset:")) {
 			stuff_vector(&sip->convergence_offset);
+
+			if (IS_VEC_NULL(&sip->convergence_offset))
+				sip->aiming_flags &= ~AIM_FLAG_CONVERGENCE_OFFSET;
+			else
+				sip->aiming_flags |= AIM_FLAG_CONVERGENCE_OFFSET;				
+		}
 	}
 
 	if(optional_string("$Warpin type:"))
@@ -1937,6 +2010,18 @@ int parse_ship_values(ship_info* sip, bool isTemplate, bool first_time, bool rep
 
 	parse_sound("$Warpout Start Sound:", &sip->warpout_snd_start, sip->name);
 	parse_sound("$Warpout End Sound:", &sip->warpout_snd_end, sip->name);
+
+	if(optional_string("$Warpout engage time:"))
+	{
+		float t_time;
+		stuff_float(&t_time);
+		if (t_time >= 0)
+			sip->warpout_engage_time = fl2i(t_time*1000.0f);
+		else
+			Warning(LOCATION, "Warp-out engage time specified as 0 or less on ship '%s'; value ignored", sip->name);
+	} else {
+		sip->warpout_engage_time = -1;
+	}
 
 	if(optional_string("$Warpout speed:"))
 	{
@@ -2195,31 +2280,8 @@ int parse_ship_values(ship_info* sip, bool isTemplate, bool first_time, bool rep
 		}
 	}
 
-	// Get default primary bank weapons
-	if(optional_string("$Default PBanks:"))
-	{
-		strcat_s(parse_error_text,"'s default primary banks");
-		sip->num_primary_banks = stuff_int_list(sip->primary_bank_weapons, MAX_SHIP_PRIMARY_BANKS, WEAPON_LIST_TYPE);
-		strcpy_s(parse_error_text, temp_error);
-
-		// error checking
-		for ( i = 0; i < sip->num_primary_banks; i++ ) {
-			Assertion((sip->primary_bank_weapons[i] >= 0), "%s. No $Default PBanks supplied for bank %d", parse_error_text, i);
-		}
-	}
-
-	// optional ballistic primary imformation (Goober5000)......
-	if(optional_string("$PBank Capacity:"))
-	{
-		// get the capacity of each primary bank
-		strcat_s(parse_error_text,"'s default primary banks' ammo");
-		pbank_capacity_count = stuff_int_list(sip->primary_bank_ammo_capacity, MAX_SHIP_PRIMARY_BANKS, RAW_INTEGER_TYPE);
-		strcpy_s(parse_error_text, temp_error);
-		if (pbank_capacity_count != sip->num_primary_banks)
-		{
-			Warning(LOCATION, "Primary bank capacities have not been completely specified for ship class %s... fix this!!", sip->name);
-		}
-	}
+	// Get primary bank weapons
+	parse_weapon_bank(sip, true, &sip->num_primary_banks, sip->primary_bank_weapons, sip->primary_bank_ammo_capacity);
 
 	if(optional_string("$Show Primary Models:"))
 	{
@@ -2309,24 +2371,8 @@ int parse_ship_values(ship_info* sip, bool isTemplate, bool first_time, bool rep
 		}
 	}
 
-	// Get default secondary bank weapons
-
-	if(optional_string("$Default SBanks:"))
-	{
-		strcat_s(parse_error_text,"'s default secondary banks");
-		sip->num_secondary_banks = stuff_int_list(sip->secondary_bank_weapons, MAX_SHIP_SECONDARY_BANKS, WEAPON_LIST_TYPE);
-		strcpy_s(parse_error_text, temp_error);
-
-		// Get the capacity of each secondary bank
-		required_string("$SBank Capacity:");
-		strcat_s(parse_error_text,"'s secondary banks capacities");
-		sbank_capacity_count = stuff_int_list(sip->secondary_bank_ammo_capacity, MAX_SHIP_SECONDARY_BANKS, RAW_INTEGER_TYPE);
-		strcpy_s(parse_error_text, temp_error);
-		if ( sbank_capacity_count != sip->num_secondary_banks )
-		{
-			Warning(LOCATION, "Secondary bank capacities have not been completely specified for ship class %s... fix this!!", sip->name);
-		}
-	}
+	// Get secondary bank weapons
+	parse_weapon_bank(sip, false, &sip->num_secondary_banks, sip->secondary_bank_weapons, sip->secondary_bank_ammo_capacity);
     
 	if(optional_string("$Show Secondary Models:"))
 	{
@@ -2650,32 +2696,9 @@ int parse_ship_values(ship_info* sip, bool isTemplate, bool first_time, bool rep
 
 	//Parse optional sound to be used for end of a glide
 	parse_sound("$GlideEndSnd:", &sip->glide_end_snd, sip->name);
+
+	parse_ship_sounds(sip);
 	
-	//Parse optional sound to be used for looping engine sound heard in the cockpit
-	parse_sound("$CockpitEngineSnd:", &sip->engine_snd_cockpit, sip->name);
-
-	//Parse optional sound to be used for the sound heard when setting throttle to full power
-	parse_sound("$FullThrottleSnd:", &sip->full_throttle_snd, sip->name);
-
-	//Parse optional sound to be used for the sound heard when setting throttle to zero power
-	parse_sound("$ZeroThrottleSnd:", &sip->full_throttle_snd, sip->name);
-
-	//Parse optional sound to be used for the sound heard when increasing throttle power by 1/3
-	parse_sound("$ThrottleUpSnd:", &sip->throttle_up_snd, sip->name);
-
-	//Parse optional sound to be used for the sound heard when decreasing throttle power by 1/3
-	parse_sound("$ThrottleDownSnd:", &sip->throttle_down_snd, sip->name);
-
-	//Parse optional sound to be used for the looping sound heard when the afterburner is active
-	parse_sound("$AfterburnerSnd:", &sip->afterburner_loop_snd, sip->name);
-
-	//Parse optional sound to be used for the sound heard when the afterburner is engaged
-	parse_sound("$AfterburnerEngageSnd:", &sip->afterburner_engage_snd, sip->name);
-
-	//Parse optional sound to be used for the sound heard when the activation of the afterburner failed
-	parse_sound("$AfterburnerFailedSnd:", &sip->afterburner_fail_snd, sip->name);
-
-
 	if(optional_string("$Closeup_pos:"))
 	{
 		stuff_vector(&sip->closeup_pos);
@@ -3270,33 +3293,11 @@ int parse_ship_values(ship_info* sip, bool isTemplate, bool first_time, bool rep
 					WarningEx(LOCATION, "Ship %s, subsystem %s\nInvalid armor type %s!", sip->name, sp->subobj_name, buf);
 			}
 
-			//	Get default primary bank weapons
-			if (optional_string("$Default PBanks:")){
-				strcat_s(parse_error_text,"'s default primary banks");
-				stuff_int_list(sp->primary_banks, MAX_SHIP_PRIMARY_BANKS, WEAPON_LIST_TYPE);
-				strcpy_s(parse_error_text, temp_error);
-			}
+			//	Get primary bank weapons
+			parse_weapon_bank(sip, true, NULL, sp->primary_banks, sp->primary_bank_capacity);
 
-			// get capacity of each primary bank - Goober5000
-			if (optional_string("$PBank Capacity:")){
-				strcat_s(parse_error_text,"'s primary banks capacities");
-				stuff_int_list(sp->primary_bank_capacity, MAX_SHIP_PRIMARY_BANKS, RAW_INTEGER_TYPE);
-				strcpy_s(parse_error_text, temp_error);
-			}
-
-			//	Get default secondary bank weapons
-			if (optional_string("$Default SBanks:")){
-				strcat_s(parse_error_text,"'s default secondary banks");
-				stuff_int_list(sp->secondary_banks, MAX_SHIP_SECONDARY_BANKS, WEAPON_LIST_TYPE);
-				strcpy_s(parse_error_text, temp_error);
-			}
-
-			// Get the capacity of each secondary bank
-			if (optional_string("$SBank Capacity:")){
-				strcat_s(parse_error_text,"'s secondary banks capacities");
-				stuff_int_list(sp->secondary_bank_capacity, MAX_SHIP_SECONDARY_BANKS, RAW_INTEGER_TYPE);
-				strcpy_s(parse_error_text, temp_error);
-			}
+			//	Get secondary bank weapons
+			parse_weapon_bank(sip, false, NULL, sp->secondary_banks, sp->secondary_bank_capacity);
 
 			// Get optional engine wake info
 			if (optional_string("$Engine Wash:")) {
@@ -3987,6 +3988,21 @@ void parse_shiptype_tbl(char *filename)
 	lcl_ext_close();
 }
 
+// The E - Simple lookup function for FRED.
+int get_default_player_ship_index() 
+{
+	if (strlen(default_player_ship)) 
+	{
+		for (int i = 0; i < Num_ship_classes; i++) 
+		{
+			if (stricmp(default_player_ship, Ship_info[i].name) == 0)
+				return i;
+		}
+		return 0;
+	} else
+		return 0;
+}
+
 // Goober5000 - this works better in its own function
 void ship_set_default_player_ship()
 {
@@ -4106,9 +4122,11 @@ DCF_BOOL( show_velocity_dot, ship_show_velocity_dot )
 void ship_parse_post_cleanup()
 {
 	int i, j;
+	char name_tmp[NAME_LENGTH];
 	ship_info *sip;
 
-	for (i = 0; i < Num_ship_classes; i++) {
+	for (i = 0; i < Num_ship_classes; i++)
+	{
 		sip = &Ship_info[i];
 
 		// ballistic primary fixage...
@@ -4141,7 +4159,7 @@ void ship_parse_post_cleanup()
 					}
 				}
 			}
-		} // ... ballistic primaries
+		}
 
 		// ultra stupid compatbility handling for the once broken "generate hud" flag.
 		// it was previously testing the afterburner flag, so that's what we check for that
@@ -4150,6 +4168,26 @@ void ship_parse_post_cleanup()
 		{
 			Warning(LOCATION, "Compatibility warning:\nNo shield icon specified for '%s' but the \"generate icon\" flag is not specified.\nEnabling flag by default.\n", sip->name);
 			sip->flags2 |= SIF2_GENERATE_HUD_ICON;
+		}
+
+		// if we have a ship copy, then check to be sure that our base ship exists
+		if (sip->flags & SIF_SHIP_COPY)
+		{
+			strcpy_s(name_tmp, sip->name);
+
+			if (end_string_at_first_hash_symbol(name_tmp))
+			{
+				if (ship_info_lookup(name_tmp) < 0)
+				{
+					Warning(LOCATION, "Ship %s is a copy, but base ship %s couldn't be found.", sip->name, name_tmp);
+					sip->flags &= ~SIF_SHIP_COPY;
+				}
+			}
+			else
+			{
+				Warning(LOCATION, "Ships %s is a copy, but does not use the ship copy name extension.");
+				sip->flags &= ~SIF_SHIP_COPY;
+			}
 		}
 	}
 
@@ -4160,7 +4198,7 @@ void ship_parse_post_cleanup()
 		for(i = 0; i < n_tgt_groups; i++) {
 			if (!(Ai_tp_list[i].obj_flags || Ai_tp_list[i].sif_flags || Ai_tp_list[i].sif2_flags || Ai_tp_list[i].wif2_flags || Ai_tp_list[i].wif_flags)) {
 				//had none of these, check next
-				if ((Ai_tp_list[i].obj_type == -1)) {
+				if (Ai_tp_list[i].obj_type == -1) {
 					//didn't have this one
 					if (!(Ai_tp_list[i].ship_class.size() || Ai_tp_list[i].ship_type.size() || Ai_tp_list[i].weapon_class.size())) {
 						// had nothing - time to issue a warning
@@ -4409,7 +4447,6 @@ void ship_add_exited_ship( ship *sp, int reason )
 	entry.obj_signature = Objects[sp->objnum].signature;
 	entry.ship_class = sp->ship_info_index;
 	entry.team = sp->team;
-	entry.ship_class = sp->ship_info_index;
 	entry.flags = reason;
 	// if ship is red alert, flag as such
 	if (sp->flags & SF_RED_ALERT_STORE_STATUS) {
@@ -4664,7 +4701,7 @@ void ship_set(int ship_index, int objnum, int ship_type)
 	ship_weapon	*swp = &shipp->weapons;
 	ship_info	*sip = &(Ship_info[ship_type]);
 
-	Assert(strlen(shipp->ship_name) < NAME_LENGTH - 1);
+	Assert(strlen(shipp->ship_name) <= NAME_LENGTH - 1);
 	shipp->ship_info_index = ship_type;
 	shipp->objnum = objnum;
 	shipp->group = 0;
@@ -5013,6 +5050,13 @@ void ship_set(int ship_index, int objnum, int ship_type)
 	shipp->collision_damage_type_idx =  sip->collision_damage_type_idx;
 	shipp->debris_damage_type_idx = sip->debris_damage_type_idx;
 	sip->shockwave.damage_type_idx = sip->shockwave.damage_type_idx_sav;
+
+	// Reset special hitpoints. Fixes Mantis issue 2573
+	shipp->special_hitpoints = 0;
+	shipp->special_shield = -1;
+
+	// Reset special explosion too.
+	shipp->use_special_explosion = false;
 }
 
 /**
@@ -5168,7 +5212,8 @@ void ship_copy_subsystem_fixup(ship_info *sip)
 /**
  * Set subsystem
  *
- * @param ignore_subsys_info default parameter with value of 0.  This is only set to 1 by the save/restore code
+ * @param objnum				Object number (used as index into Objects[])
+ * @param ignore_subsys_info	Default parameter with value of 0.  This is only set to 1 by the save/restore code
  */
 int subsys_set(int objnum, int ignore_subsys_info)
 {	
@@ -5393,7 +5438,7 @@ int subsys_set(int objnum, int ignore_subsys_info)
 		for (k = 0; k < MAX_TFP; k++)
 			ship_system->turret_swarm_info_index[k] = -1;
 
-		ship_system->turret_swarm_num;
+		ship_system->turret_swarm_num = 0;
 
 		// AWACS stuff
 		ship_system->awacs_intensity = model_system->awacs_intensity;
@@ -5628,6 +5673,7 @@ void ship_render(object * obj)
 	ship_info *sip = &Ship_info[Ships[num].ship_info_index];
 	bool reset_proj_when_done = false;
 	bool is_first_stage_arrival = false;
+	bool show_thrusters = (shipp->flags2 & SF2_NO_THRUSTERS) == 0;
 	dock_function_info dfi;
 
 
@@ -5710,6 +5756,14 @@ void ship_render(object * obj)
 		warp_shipp = &Ships[dfi.maintained_variables.objp_value->instance];
 
 		is_first_stage_arrival = ((warp_shipp->flags & SF_ARRIVING_STAGE_1) > 0);
+
+		// This is a hack to make ships using the hyperspace warpin type to
+		// render even in stage 1, which is used for collision detection
+		// purposes -zookeeper
+		if (Ship_info[warp_shipp->ship_info_index].warpin_type == WT_HYPERSPACE) {
+			warp_shipp = NULL;
+			is_first_stage_arrival = false;
+		}
 	}
 
 
@@ -5872,7 +5926,7 @@ void ship_render(object * obj)
 				}
 			}
 
-			if ( !(shipp->flags & SF_DISABLED) && !ship_subsys_disrupted(shipp, SUBSYSTEM_ENGINE) ) {
+			if ( !(shipp->flags & SF_DISABLED) && !ship_subsys_disrupted(shipp, SUBSYSTEM_ENGINE) && show_thrusters) {
 				mst_info mst;
 
 				mst.length.xyz.z = obj->phys_info.forward_thrust;
@@ -6728,6 +6782,8 @@ void ship_cleanup(int shipnum, int cleanup_mode)
  * @param outer_rad		distance from ship center for which no damage is applied
  * @param max_damage	maximum damage applied
  * @param max_blast		maximum impulse applied from blast
+ * @param damage		damage applied
+ * @param blast			impulse applied from blast
  */
 int ship_explode_area_calc_damage( vec3d *pos1, vec3d *pos2, float inner_rad, float outer_rad, float max_damage, float max_blast, float *damage, float *blast )
 {
@@ -6867,7 +6923,7 @@ void ship_blow_up_area_apply_blast( object *exp_objp)
 /**
  * Only ever called once for any ship that dies
  *
- * This function relies on the "dead dock" list, which replaces the ::dock_objnum_when_dead
+ * This function relies on the "dead dock" list, which replaces the dock_objnum_when_dead
  * used in retail.
  */
 void do_dying_undock_physics(object *dying_objp, ship *dying_shipp) 
@@ -6891,6 +6947,14 @@ void do_dying_undock_physics(object *dying_objp, ship *dying_shipp)
 	while (object_is_dead_docked(dying_objp))
 	{
 		docked_objp = dock_get_first_dead_docked_object(dying_objp);
+		ship *docked_shipp = &Ships[docked_objp->instance];
+		int dockee_index = dock_find_dead_dockpoint_used_by_object(docked_objp, dying_objp);
+
+		// undo all the docking animations for the docked ship only
+		model_anim_start_type(docked_shipp, TRIGGER_TYPE_DOCKED, dockee_index, -1);
+		model_anim_start_type(docked_shipp, TRIGGER_TYPE_DOCKING_STAGE_3, dockee_index, -1);
+		model_anim_start_type(docked_shipp, TRIGGER_TYPE_DOCKING_STAGE_2, dockee_index, -1);
+		model_anim_start_type(docked_shipp, TRIGGER_TYPE_DOCKING_STAGE_1, dockee_index, -1);
 
 		// only consider the mass of these two objects, not the whole assembly
 		// (this is inaccurate, but the alternative is a huge mess of extra code for a very small gain in realism)
@@ -8520,7 +8584,15 @@ int ship_create(matrix *orient, vec3d *pos, int ship_type, char *ship_name)
 	// Goober5000 - if no ship name specified, or if specified ship already exists,
 	// or if specified ship has exited, use a default name
 	if ((ship_name == NULL) || (ship_name_lookup(ship_name) >= 0) || (ship_find_exited_ship_by_name(ship_name) >= 0)) {
-		sprintf(shipp->ship_name, NOX("%s %d"), Ship_info[ship_type].name, n);
+		char suffix[NAME_LENGTH];
+		sprintf(suffix, NOX(" %d"), n);
+
+		// ensure complete ship name doesn't overflow the buffer
+		int name_len = MIN(NAME_LENGTH - strlen(suffix) - 1, strlen(Ship_info[ship_type].name));
+		Assert(name_len > 0);
+
+		strncpy(shipp->ship_name, Ship_info[ship_type].name, name_len);
+		strcpy(shipp->ship_name + name_len, suffix);
 	} else {
 		strcpy_s(shipp->ship_name, ship_name);
 	}
@@ -8703,6 +8775,7 @@ void ship_model_change(int n, int ship_type)
  *
  * @param n			index of ship in ::Ships[] array
  * @param ship_type	ship class (index into ::Ship_info[])
+ * @param by_sexp	SEXP reference
  */
 void change_ship_type(int n, int ship_type, int by_sexp)
 {
@@ -8725,6 +8798,7 @@ void change_ship_type(int n, int ship_type, int by_sexp)
 	swp = &sp->weapons;
 	sip_orig = &Ship_info[sp->ship_info_index];
 	objp = &Objects[sp->objnum];
+	p_objp = mission_parse_get_parse_object(sp->ship_name);
 	ph_inf = objp->phys_info;
 
 
@@ -8791,7 +8865,6 @@ void change_ship_type(int n, int ship_type, int by_sexp)
 
 	// make sure that shields are disabled/enabled if they need to be - Chief1983
 	if (!Fred_running) {
-		p_objp = mission_parse_get_parse_object(sp->ship_name);
 		if ((p_objp->flags2 & P2_OF_FORCE_SHIELDS_ON) && (sp->ship_max_shield_strength > 0.0f)) {
 			objp->flags &= ~OF_NO_SHIELDS;
 		} else if ((p_objp->flags & P_OF_NO_SHIELDS) || (sp->ship_max_shield_strength == 0.0f)) {
@@ -9025,6 +9098,14 @@ void change_ship_type(int n, int ship_type, int by_sexp)
 		sp->shield_recharge_index = sp_orig.shield_recharge_index;
 		sp->engine_recharge_index = sp_orig.engine_recharge_index;
 	}
+
+	// zookeeper - If we're switching in the loadout screen, make sure we retain initial velocity set in FRED
+	if (!(Game_mode & GM_IN_MISSION) && !(Fred_running)) {
+		Objects[sp->objnum].phys_info.speed = (float) p_objp->initial_velocity * sip->max_speed / 100.0f;
+		Objects[sp->objnum].phys_info.vel.xyz.z = Objects[sp->objnum].phys_info.speed;
+		Objects[sp->objnum].phys_info.prev_ramp_vel = Objects[sp->objnum].phys_info.vel;
+		Objects[sp->objnum].phys_info.desired_vel = Objects[sp->objnum].phys_info.vel;
+	}
 }
 
 #ifndef NDEBUG
@@ -9123,7 +9204,7 @@ int ship_launch_countermeasure(object *objp, int rand_val)
 			} else if(shipp->cmeasure_count <= 0) {
 				HUD_sourced_printf(HUD_SOURCE_HIDDEN, XSTR( "No more countermeasure charges.", 485));
 			}
-			snd_play( &Snds[SND_OUT_OF_MISSLES], 0.0f );
+			snd_play( &Snds[ship_get_sound(Player_obj, SND_OUT_OF_MISSLES)], 0.0f );
 		}
 
 		// if we have a player ship, then send the fired packet anyway so that the player
@@ -9185,7 +9266,7 @@ int ship_maybe_play_primary_fail_sound()
 			stampval = 50;
 		}
 		Laser_energy_out_snd_timer = timestamp(stampval);
-		snd_play( &Snds[SND_OUT_OF_WEAPON_ENERGY]);
+		snd_play( &Snds[ship_get_sound(Player_obj, SND_OUT_OF_WEAPON_ENERGY)]);
 		return 1;
 	}
 	return 0;
@@ -9205,7 +9286,7 @@ int ship_maybe_play_secondary_fail_sound(weapon_info *wip)
 		} else {
 			Missile_out_snd_timer = timestamp(50);
 		}
-		snd_play( &Snds[SND_OUT_OF_MISSLES] );
+		snd_play( &Snds[ship_get_sound(Player_obj, SND_OUT_OF_MISSLES)] );
 		return 1;
 	}
 	return 0;
@@ -9393,7 +9474,7 @@ float ship_get_subsystem_strength( ship *shipp, int type );
 // primary.
 int ship_fire_primary(object * obj, int stream_weapons, int force)
 {
-	vec3d		gun_point, pnt, firing_pos;
+	vec3d		gun_point, pnt, firing_pos, target_position, target_velocity_vec;
 	int			n = obj->instance;
 	ship			*shipp;
 	ship_weapon	*swp;
@@ -9405,6 +9486,9 @@ int ship_fire_primary(object * obj, int stream_weapons, int force)
 	have_timeout = 0;			// used to help tell us whether or not we need to send a packet
 	banks_fired = 0;			// used in multiplayer -- bitfield of banks that were fired
 	bool has_fired = false;		// used to determine whether we should fire the scripting hook
+	bool has_autoaim, has_converging_autoaim, needs_target_pos;	// used to flag weapon/ship as having autoaim
+	float autoaim_fov = 0;			// autoaim limit
+	float dist_to_target = 0;		// distance to target, for autoaim & automatic convergence
 
 	int			sound_played;	// used to track what sound is played.  If the player is firing two banks
 										// of the same laser, we only want to play one sound
@@ -9480,6 +9564,33 @@ int ship_fire_primary(object * obj, int stream_weapons, int force)
 			if(i!=swp->current_primary_bank)ship_stop_fire_primary_bank(obj, i);
 		}
 
+	// lets start gun convergence / autoaim code from here - Wanderer
+	has_converging_autoaim = ((sip->aiming_flags & AIM_FLAG_AUTOAIM_CONVERGENCE || (The_mission.ai_profile->player_autoaim_fov[Game_skill_level] > 0.0f)) && aip->target_objnum != -1);
+	has_autoaim = ((has_converging_autoaim || (sip->aiming_flags & AIM_FLAG_AUTOAIM)) && aip->target_objnum != -1);
+	needs_target_pos = ((has_autoaim || (sip->aiming_flags & AIM_FLAG_AUTO_CONVERGENCE)) && aip->target_objnum != -1);
+	
+	if (needs_target_pos) {
+		if (has_autoaim) {
+			autoaim_fov = MAX(sip->autoaim_fov, The_mission.ai_profile->player_autoaim_fov[Game_skill_level]);
+		}
+
+		// If a subsystem is targeted, fire in that direction instead
+		if (aip->targeted_subsys != NULL)
+		{
+			get_subsystem_world_pos(&Objects[aip->target_objnum], aip->targeted_subsys, &target_position);
+		}
+		else
+		{
+			target_position = Objects[aip->target_objnum].pos;
+		}
+
+		target_velocity_vec = Objects[aip->target_objnum].phys_info.vel;
+		if (The_mission.ai_profile->flags & AIPF_USE_ADDITIVE_WEAPON_VELOCITY)
+			vm_vec_sub2(&target_velocity_vec, &obj->phys_info.vel);
+
+		dist_to_target = vm_vec_dist_quick(&target_position, &obj->pos);
+	}
+
 	for ( i = 0; i < num_primary_banks; i++ ) {		
 		// Goober5000 - allow more than two banks
 		bank_to_fire = (swp->current_primary_bank+i) % swp->num_primary_banks;
@@ -9529,10 +9640,6 @@ int ship_fire_primary(object * obj, int stream_weapons, int force)
 
 		// only non-multiplayer clients (single, multi-host) need to do timestamp checking
 		if ( !timestamp_elapsed(swp->next_primary_fire_stamp[bank_to_fire]) ) {
-			if (timestamp_until(swp->next_primary_fire_stamp[bank_to_fire]) > 5000){
-				swp->next_primary_fire_stamp[bank_to_fire] = timestamp(1000);
-			}
-
 			have_timeout = 1;
 			continue;
 		}
@@ -9615,6 +9722,43 @@ int ship_fire_primary(object * obj, int stream_weapons, int force)
 
 		if ( pm->n_guns > 0 ) {
 			int num_slots = pm->gun_banks[bank_to_fire].num_slots;
+			vec3d predicted_target_pos, plr_to_target_vec;
+			vec3d player_forward_vec = obj->orient.vec.fvec;
+			bool in_automatic_aim_fov = false;
+			float dist_to_aim = 0;
+
+			// more autoaim stuff here - Wanderer
+			// needs weapon speed
+			if (needs_target_pos) {
+				float time_to_target, angle_to_target;
+				vec3d last_delta_vec;
+
+				time_to_target = 0.0f;
+
+				if (winfo_p->max_speed != 0)
+				{
+					time_to_target = dist_to_target / winfo_p->max_speed;
+				}
+
+				vm_vec_scale_add(&predicted_target_pos, &target_position, &target_velocity_vec, time_to_target);
+				polish_predicted_target_pos(winfo_p, &Objects[aip->target_objnum], &target_position, &predicted_target_pos, dist_to_target, &last_delta_vec, 1);
+				vm_vec_sub(&plr_to_target_vec, &predicted_target_pos, &obj->pos);
+
+				if (has_autoaim) {
+					angle_to_target = vm_vec_delta_ang(&player_forward_vec, &plr_to_target_vec, NULL);
+					if (angle_to_target < autoaim_fov)
+						in_automatic_aim_fov = true;
+				}
+
+				dist_to_aim = vm_vec_mag_quick(&plr_to_target_vec);
+
+				// minimum convergence distance
+				if (sip->minimum_convergence_distance > dist_to_aim) {
+					float dist_mult;
+					dist_mult = sip->minimum_convergence_distance / dist_to_aim;
+					vm_vec_scale_add(&predicted_target_pos, &obj->pos, &plr_to_target_vec, dist_mult);
+				}
+			}
 			
 			if(winfo_p->wi_flags & WIF_BEAM){		// the big change I made for fighter beams, if there beams fill out the Fire_Info for a targeting laser then fire it, for each point in the weapon bank -Bobboau
 				float t;
@@ -9642,7 +9786,7 @@ int ship_fire_primary(object * obj, int stream_weapons, int force)
 
 				if ( shipp->weapon_energy < points*winfo_p->energy_consumed*flFrametime)
 				{
-					swp->next_primary_fire_stamp[bank_to_fire] = timestamp(swp->next_primary_fire_stamp[bank_to_fire]*2);
+					swp->next_primary_fire_stamp[bank_to_fire] = timestamp((int)(next_fire_delay));
 					if ( obj == Player_obj )
 					{
 						if ( ship_maybe_play_primary_fail_sound() )
@@ -9724,7 +9868,7 @@ int ship_fire_primary(object * obj, int stream_weapons, int force)
 				if ( (shipp->weapon_energy < points*numtimes * winfo_p->energy_consumed)			//was num_slots
 				 && !force ) {
 
-					swp->next_primary_fire_stamp[bank_to_fire] = timestamp(swp->next_primary_fire_stamp[bank_to_fire]);
+					swp->next_primary_fire_stamp[bank_to_fire] = timestamp((int)(next_fire_delay));
 					if ( obj == Player_obj )
 					{
 						if ( ship_maybe_play_primary_fail_sound() )
@@ -9840,136 +9984,80 @@ int ship_fire_primary(object * obj, int stream_weapons, int force)
 							vm_vec_add(&firing_pos, &gun_point, &obj->pos);
 
 							matrix firing_orient;
-							if (!(sip->flags2 & SIF2_GUN_CONVERGENCE))
-							{
-								if ((sip->aiming_flags & AIM_FLAG_AUTOAIM) &&
-									aip->target_objnum != -1)
-								{
-									// Fire weapon in target direction
-									vec3d target_position, target_velocity_vec, predicted_target_pos;
-									vec3d firing_vec, last_delta_vec, player_forward_vec, plr_to_target_vec;
-									float dist_to_target, time_to_target, angle_to_target;
+							
+							/*	I AIM autoaim convergence
+								II AIM autoaim
+								III AIM auto convergence
+								IV AIM std convergence
+								V SIF convergence
+								no convergence or autoaim
+							*/
+							if (has_autoaim && in_automatic_aim_fov) {
+								vec3d firing_vec;
 
-									// If a subsystem is targeted, fire in that direction instead
-									if (aip->targeted_subsys != NULL)
-									{
-										get_subsystem_world_pos(&Objects[aip->target_objnum], aip->targeted_subsys, &target_position);
-									}
-									else
-									{
-										target_position = Objects[aip->target_objnum].pos;
-									}
-
-									target_velocity_vec = Objects[aip->target_objnum].phys_info.vel;
-									if (The_mission.ai_profile->flags & AIPF_USE_ADDITIVE_WEAPON_VELOCITY)
-										vm_vec_sub2(&target_velocity_vec, &obj->phys_info.vel);
-
-									dist_to_target = vm_vec_dist_quick(&target_position, &firing_pos);
-									time_to_target = 0.0f;
-
-									if (winfo_p->max_speed != 0)
-									{
-										time_to_target = dist_to_target / winfo_p->max_speed;
-									}
-
-									vm_vec_scale_add(&predicted_target_pos, &target_position, &target_velocity_vec, time_to_target);
-									polish_predicted_target_pos(winfo_p, &Objects[aip->target_objnum], &target_position, &predicted_target_pos, dist_to_target, &last_delta_vec, 1);
-									vm_vec_sub(&plr_to_target_vec, &predicted_target_pos, &obj->pos);
-
-									// minimum convergence distance
-									if (sip->minimum_convergence_distance > dist_to_target) {
-										float dist_mult;
-										dist_mult = sip->minimum_convergence_distance / dist_to_target;
-										vm_vec_scale_add(&predicted_target_pos, &obj->pos, &plr_to_target_vec, dist_mult);
-									}
-									
-									// setting to autoaim to converge on to the target.
-									if (sip->aiming_flags & AIM_FLAG_AUTOAIM_CONVERGENCE)
-										vm_vec_sub(&firing_vec, &predicted_target_pos, &firing_pos);
-									else
-										vm_vec_sub(&firing_vec, &predicted_target_pos, &obj->pos);
-
-
-									// Deactivate autoaiming if the target leaves the autoaim-FOV cone
-									player_forward_vec = obj->orient.vec.fvec;
-									angle_to_target = vm_vec_delta_ang(&player_forward_vec, &plr_to_target_vec, NULL);
-
-									if (angle_to_target < sip->autoaim_fov)
-									{
-										vm_vector_2_matrix(&firing_orient, &firing_vec, NULL, NULL);
-									}
-									else
-									{
-										firing_orient = obj->orient;
-									}
+								if (has_converging_autoaim) {
+									// converging autoaim
+									vm_vec_sub(&firing_vec, &predicted_target_pos, &firing_pos);
+								} else {
+									// autoaim
+									vm_vec_sub(&firing_vec, &predicted_target_pos, &obj->pos);
 								}
-								else if ((sip->aiming_flags & AIM_FLAG_AUTO_CONVERGENCE) && (aip->target_objnum != -1))
-								{
-									//Write automatic convergence code here!
-									//If set, switch to manual if automatic fails
-									//better idea.. mix it with the above... assume autoaim takes precedence
-									
-									// Fire weapon in target direction
-									vec3d target_position, target_vec;
-									vec3d firing_vec, player_forward_vec, convergence_offset;
-									float dist_to_target;
-	
-									// If a subsystem is targeted, fire in that direction instead
-									if (aip->targeted_subsys != NULL)
-									{
-										get_subsystem_world_pos(&Objects[aip->target_objnum], aip->targeted_subsys, &target_position);
-									}
-									else
-									{
-										target_position = Objects[aip->target_objnum].pos;
-									}
 
-									dist_to_target = vm_vec_dist_quick(&target_position, &firing_pos);
-
-									if (sip->minimum_convergence_distance > dist_to_target)
-										dist_to_target = sip->minimum_convergence_distance;
-
-									player_forward_vec = obj->orient.vec.fvec;
-									// make sure vector is of the set length
-									vm_vec_copy_normalize(&target_vec, &player_forward_vec);
-									vm_vec_scale(&target_vec, dist_to_target);
-									// if there is convergence offset then make use of it)
-									vm_vec_unrotate(&convergence_offset, &sip->convergence_offset, &obj->orient);
-									vm_vec_add2(&target_vec, &convergence_offset);
-									vm_vec_add2(&target_vec, &obj->pos);
-									vm_vec_sub(&firing_vec, &target_vec, &firing_pos);
-
-									// set orientation
-									vm_vector_2_matrix(&firing_orient, &firing_vec, NULL, NULL);
+								vm_vector_2_matrix(&firing_orient, &firing_vec, NULL, NULL);
+							} else if ((sip->aiming_flags & AIM_FLAG_STD_CONVERGENCE) || ((sip->aiming_flags & AIM_FLAG_AUTO_CONVERGENCE) && (aip->target_objnum != -1))) {
+								// std & auto convergence
+								vec3d target_vec, firing_vec, convergence_offset;
 								
-								}
-								else if (sip->aiming_flags & AIM_FLAG_STD_CONVERGENCE)
-								{
-									vec3d player_forward_vec, target_vec, firing_vec, convergence_offset;
-									player_forward_vec = obj->orient.vec.fvec;
-									// make sure vector is of the set length
-									vm_vec_copy_normalize(&target_vec, &player_forward_vec);
+								// make sure vector is of the set length
+								vm_vec_copy_normalize(&target_vec, &player_forward_vec);
+								if ((sip->aiming_flags & AIM_FLAG_AUTO_CONVERGENCE) && (aip->target_objnum != -1)) {
+									// auto convergence
+									vm_vec_scale(&target_vec, dist_to_aim);
+								} else {
+									// std convergence
 									vm_vec_scale(&target_vec, sip->convergence_distance);
-									// if there is convergence offset then make use of it)
+								}
+								
+								// if there is convergence offset then make use of it)
+								if (sip->aiming_flags & AIM_FLAG_CONVERGENCE_OFFSET) {
 									vm_vec_unrotate(&convergence_offset, &sip->convergence_offset, &obj->orient);
 									vm_vec_add2(&target_vec, &convergence_offset);
-									vm_vec_add2(&target_vec, &obj->pos);
-									vm_vec_sub(&firing_vec, &target_vec, &firing_pos);
+								}
 
-									// set orientation
-									vm_vector_2_matrix(&firing_orient, &firing_vec, NULL, NULL);
+								vm_vec_add2(&target_vec, &obj->pos);
+								vm_vec_sub(&firing_vec, &target_vec, &firing_pos);
+
+								// set orientation
+								vm_vector_2_matrix(&firing_orient, &firing_vec, NULL, NULL);
+							} else if (sip->aiming_flags & AIM_FLAG_STD_CONVERGENCE) {
+								// fixed distance convergence
+								vec3d target_vec, firing_vec, convergence_offset;
+																
+								// make sure vector is of the set length
+								vm_vec_copy_normalize(&target_vec, &player_forward_vec);
+								vm_vec_scale(&target_vec, sip->convergence_distance);
+								
+								// if there is convergence offset then make use of it)
+								if (sip->aiming_flags & AIM_FLAG_CONVERGENCE_OFFSET) {
+									vm_vec_unrotate(&convergence_offset, &sip->convergence_offset, &obj->orient);
+									vm_vec_add2(&target_vec, &convergence_offset);
 								}
-								else
-								{
-									firing_orient = obj->orient;
-								}
-							}
-							else
-							{
+
+								vm_vec_add2(&target_vec, &obj->pos);
+								vm_vec_sub(&firing_vec, &target_vec, &firing_pos);
+
+								// set orientation
+								vm_vector_2_matrix(&firing_orient, &firing_vec, NULL, NULL);
+							} else if (sip->flags2 & SIF2_GUN_CONVERGENCE) {
+								// model file defined convergence
 								vec3d firing_vec;
 								vm_vec_unrotate(&firing_vec, &pm->gun_banks[bank_to_fire].norm[pt], &obj->orient);
 								vm_vector_2_matrix(&firing_orient, &firing_vec, NULL, NULL);
+							} else {
+								// no autoaim or convergence
+								firing_orient = obj->orient;
 							}
+							
 							// create the weapon -- the network signature for multiplayer is created inside
 							// of weapon_create
 
@@ -10005,7 +10093,7 @@ int ship_fire_primary(object * obj, int stream_weapons, int force)
 								}
 								else
 								{
-									flak_set_range(&Objects[weapon_objnum], flak_range-20);
+									flak_set_range(&Objects[weapon_objnum], flak_range - winfo_p->untargeted_flak_range_penalty);
 								}
 
 								if ((winfo_p->muzzle_flash>=0) && (((shipp==Player_ship) && (vm_vec_mag(&Player_obj->phys_info.vel)>=45)) || (shipp!=Player_ship)))
@@ -10058,7 +10146,7 @@ int ship_fire_primary(object * obj, int stream_weapons, int force)
 						}
 
 						//Check for pre-launch sound and play if relevant
-						if( (winfo_p->pre_launch_snd != NULL)									//If this weapon type has a pre-fire sound
+						if( (winfo_p->pre_launch_snd != -1)									//If this weapon type has a pre-fire sound
 							&& ((timestamp() - swp->last_primary_fire_sound_stamp[bank_to_fire]) >= winfo_p->pre_launch_snd_min_interval)	//and if we're past our minimum delay from the last cease-fire
 							&& (shipp->was_firing_last_frame[bank_to_fire] == 0)				//and if we are at the beginning of a firing stream
 						){ 
@@ -10242,10 +10330,12 @@ void ship_process_targeting_lasers()
 	}}
 
 /**
- * Attempt to detonate weapon last fired by *shipp.
+ * Attempt to detonate weapon last fired by *src.
  * Only used for weapons that support remote detonation.
  * 
- * @param Return true if detonated, else return false.
+ * @param swp	Ship weapon
+ * @param src	Source of weapon
+ * @return true if detonated, else return false.
  * 
  *	Calls ::weapon_hit() to detonate weapon.
  *	If it's a weapon that spawns particles, those will be released.
@@ -10327,6 +10417,8 @@ int ship_fire_secondary_detonate(object *obj, ship_weapon *swp)
 
 /**
  * Try to switch to a secondary bank that has ammo
+ *
+ * @note: not currently used - mark for removal?
  */
 int ship_select_next_valid_secondary_bank(ship_weapon *swp)
 {
@@ -10504,7 +10596,7 @@ int ship_fire_secondary( object *obj, int allow_swarm )
 						HUD_sourced_printf(HUD_SOURCE_HIDDEN, XSTR( "Cannot fire %s without a lock", 488), missile_name);
 					}
 
-					snd_play( &Snds[SND_OUT_OF_MISSLES] );
+					snd_play( &Snds[ship_get_sound(Player_obj, SND_OUT_OF_MISSLES)] );
 					swp->next_secondary_fire_stamp[bank] = timestamp(800);	// to avoid repeating messages
 					return 0;
 				}
@@ -10527,7 +10619,7 @@ int ship_fire_secondary( object *obj, int allow_swarm )
 				if ( !Weapon_energy_cheat )
 				{
 					HUD_sourced_printf(HUD_SOURCE_HIDDEN, NOX("Cannot fire %s if target is not tagged"),wip->name);
-					snd_play( &Snds[SND_OUT_OF_MISSLES] );
+					snd_play( &Snds[ship_get_sound(Player_obj, SND_OUT_OF_MISSLES)] );
 					swp->next_secondary_fire_stamp[bank] = timestamp(800);	// to avoid repeating messages
 					return 0;
 				}
@@ -10801,8 +10893,11 @@ done_secondary:
 	//then it would have no firedelay. and then add 250 ms of delay. in effect, this way there is no penalty if there is any firedelay remaning in
 	//the next valid bank. the delay is there to prevent things like Trible/Quad Fire Trebuchets.
 	//
-	if ( (obj->flags & OF_PLAYER_SHIP) && (swp->secondary_bank_ammo[bank] <= 0) ) {
-		if ( ship_select_next_valid_secondary_bank(swp) ) {			//DTP here we switch to the next valid bank, but we can't call weapon_info on next fire_wait
+	// niffiwan: only try to switch banks if object has multiple banks
+	if ( (obj->flags & OF_PLAYER_SHIP) && (swp->secondary_bank_ammo[bank] <= 0) && (swp->num_secondary_banks >= 2) ) {
+		// niffiwan: call ship_select_next_secondary instead of ship_select_next_valid_secondary_bank
+		// ensures all "extras" are dealt with, like animations, scripting hooks, etc
+		if (ship_select_next_secondary(obj) ) {			//DTP here we switch to the next valid bank, but we can't call weapon_info on next fire_wait
 
 			if ( timestamp_elapsed(shipp->weapons.next_secondary_fire_stamp[shipp->weapons.current_secondary_bank]) ) {	//DTP, this is simply a copy of the manual cycle functions
 				shipp->weapons.next_secondary_fire_stamp[shipp->weapons.current_secondary_bank] = timestamp(1000);	//Bumped from 250 to 1000 because some people seem to be to triggerhappy :).
@@ -10810,10 +10905,9 @@ done_secondary:
 			}
 						
 			if ( obj == Player_obj ) {
-				snd_play( &Snds[SND_SECONDARY_CYCLE] );		
+				snd_play( &Snds[ship_get_sound(Player_obj, SND_SECONDARY_CYCLE)] );		
 			}
 		}
-
 	}	
 
 	if (has_fired) {
@@ -11028,7 +11122,7 @@ int ship_select_next_primary(object *objp, int direction)
 		{
 			if ( objp == Player_obj )
 			{
-				snd_play( &Snds[SND_PRIMARY_CYCLE], 0.0f );
+				snd_play( &Snds[ship_get_sound(objp, SND_PRIMARY_CYCLE)], 0.0f );
 			}
 			ship_primary_changed(shipp);
 			objp = &Objects[shipp->objnum];
@@ -11056,7 +11150,7 @@ int ship_select_next_primary(object *objp, int direction)
 
 	if ( objp == Player_obj )
 	{
-		snd_play( &Snds[SND_PRIMARY_CYCLE], 0.0f );
+		snd_play( &Snds[ship_get_sound(objp, SND_PRIMARY_CYCLE)], 0.0f );
 	}
 
 	ship_primary_changed(shipp);
@@ -11144,7 +11238,7 @@ int ship_select_next_secondary(object *objp)
 				swp->previous_primary_bank = swp->current_primary_bank;
 			if ( objp == Player_obj )
 			{
-				snd_play( &Snds[SND_SECONDARY_CYCLE], 0.0f );
+				snd_play( &Snds[ship_get_sound(Player_obj, SND_SECONDARY_CYCLE)], 0.0f );
 			}
 			ship_secondary_changed(shipp);
 
@@ -11479,30 +11573,28 @@ int ship_query_state(char *name)
 	return 1;
 }
 
-//	Note: This is not a general purpose routine.
-//	It is specifically used for targeting.
-//	It only returns a subsystem position if it has shields.
-//	Return true/false for subsystem found/not found.
-//	Stuff vector *pos with absolute position.
+// Finds the world position of a subsystem.
+// Return true/false for subsystem found/not found.
+// Stuff vector *pos with absolute position.
 // subsysp is a pointer to the subsystem.
 int get_subsystem_pos(vec3d *pos, object *objp, ship_subsys *subsysp)
 {
-	model_subsystem	*psub;
-	vec3d	pnt;
-	ship		*shipp;
+	if (subsysp == NULL) {
+		*pos = objp->pos;
+		return 0;
+	}
 
-	Assert(objp->type == OBJ_SHIP);
-	shipp = &Ships[objp->instance];
+	model_subsystem *mss = subsysp->system_info;
 
-	Assert ( subsysp != NULL );
+	if (mss->subobj_num == -1) {
+		// If it's a special point subsys, we can use its offset directly
 
-	psub = subsysp->system_info;
+		vm_vec_unrotate(pos, &subsysp->system_info->pnt, &objp->orient);
+		vm_vec_add2(pos, &objp->pos);
+	} else {
+		// Submodel subsystems may require a more complicated calculation
 
-	vm_vec_unrotate(&pnt, &psub->pnt, &objp->orient);
-	vm_vec_add2(&pnt, &objp->pos);
-
-	if ( pos ){
-		*pos = pnt;
+		find_submodel_instance_world_point(pos, objp, mss->subobj_num);
 	}
 
 	return 1;
@@ -11993,7 +12085,7 @@ float ship_get_subsystem_strength( ship *shipp, int type )
  *
  * The strength passed as a parameter is between 0.0 and 1.0
  *
- * NOTE: this function was made to be called by the debug function ::dcf_set_subsys().  If
+ * NOTE: this function was made to be called by the debug function dcf_set_subsys().  If
  * you want to use this, be sure that you test it for all cases.
  */
 void ship_set_subsystem_strength( ship *shipp, int type, float strength )
@@ -12711,6 +12803,18 @@ void ship_close()
 
 	// free info from parsed table data
 	for (i=0; i<MAX_SHIP_CLASSES; i++) {
+		if ( Ship_info[i].subsystems != NULL ) {
+			for(n = 0; n < Ship_info[i].n_subsystems; n++) {
+				if (Ship_info[i].subsystems[n].triggers != NULL) {
+					vm_free(Ship_info[i].subsystems[n].triggers);
+					Ship_info[i].subsystems[n].triggers = NULL;
+				}
+			}
+			
+			vm_free(Ship_info[i].subsystems);
+			Ship_info[i].subsystems = NULL;
+		}
+		
 		if(Ship_info[i].type_str != NULL){
 			vm_free(Ship_info[i].type_str);
 			Ship_info[i].type_str = NULL;
@@ -15406,12 +15510,26 @@ void object_jettison_cargo(object *objp, object *cargo_objp)
 	Assert(dock_check_find_direct_docked_object(objp, cargo_objp));
 
 	vec3d impulse, pos;
+	ship *shipp = &Ships[objp->instance];
+	ship *cargo_shipp = &Ships[cargo_objp->instance];
+	int docker_index = dock_find_dockpoint_used_by_object(objp, cargo_objp);
+	int dockee_index = dock_find_dockpoint_used_by_object(cargo_objp, objp);
+
+	// undo all the docking animations
+	model_anim_start_type(shipp, TRIGGER_TYPE_DOCKED, docker_index, -1);
+	model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_3, docker_index, -1);
+	model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_2, docker_index, -1);
+	model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_1, docker_index, -1);
+	model_anim_start_type(cargo_shipp, TRIGGER_TYPE_DOCKED, dockee_index, -1);
+	model_anim_start_type(cargo_shipp, TRIGGER_TYPE_DOCKING_STAGE_3, dockee_index, -1);
+	model_anim_start_type(cargo_shipp, TRIGGER_TYPE_DOCKING_STAGE_2, dockee_index, -1);
+	model_anim_start_type(cargo_shipp, TRIGGER_TYPE_DOCKING_STAGE_1, dockee_index, -1);
 
 	// undock the objects
 	ai_do_objects_undocked_stuff(objp, cargo_objp);
 
 	// Goober5000 - add log
-	mission_log_add_entry(LOG_SHIP_UNDOCKED, Ships[objp->instance].ship_name, Ships[cargo_objp->instance].ship_name);
+	mission_log_add_entry(LOG_SHIP_UNDOCKED, shipp->ship_name, cargo_shipp->ship_name);
 
 	// physics stuff
 	vm_vec_sub(&pos, &cargo_objp->pos, &objp->pos);
@@ -15890,7 +16008,6 @@ void ship_subsystem_set_new_ai_class(int ship_num, char *subsystem, int new_ai_c
 
 		ss = GET_NEXT( ss );
 	}
-	// Int3();	// subsystem not found
 }
 
 // Goober5000 - will attempt to load an insignia bitmap and set it as active for the wing
@@ -16839,4 +16956,22 @@ int ship_get_subobj_model_num(ship_info* sip, char* subobj_name)
 void init_path_metadata(path_metadata& metadata)
 {
 	vm_vec_zero(&metadata.departure_rvec);
+}
+
+int ship_get_sound(object *objp, int id)
+{
+	Assert( objp != NULL );
+	Assert( id >= 0 && id < (int) Snds.size() );
+
+	Assert( objp->type == OBJ_SHIP );
+
+	ship *shipp = &Ships[objp->instance];
+	ship_info *sip = &Ship_info[shipp->ship_info_index];
+
+	SCP_map<int, int>::iterator element = sip->ship_sounds.find(id);
+
+	if (element == sip->ship_sounds.end())
+		return id;
+	else
+		return (*element).second;
 }

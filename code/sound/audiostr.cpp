@@ -640,7 +640,6 @@ bool WaveFile::Open(char *pszFilename, bool keep_ext)
 
 			default:
 				nprintf(("SOUND", "SOUND => Not supporting %d format for playing wave files\n", m_pwfmt_original->wFormatTag));
-				//Int3();
 				goto OPEN_ERROR;
 				break;
 
@@ -1914,9 +1913,6 @@ int audiostream_done_reading(int i)
 
 	if ( Audio_streams[i].status == ASF_FREE )
 		return 0;
-
-	int done_reading;
-	done_reading = Audio_streams[i].Is_Past_Limit();
 
 	return Audio_streams[i].Is_Past_Limit();
 }

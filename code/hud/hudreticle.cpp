@@ -244,7 +244,7 @@ static int Zero_speed_coords[GR_NUM_RESOLUTIONS][2] = {
 };
 
 HudGaugeReticle::HudGaugeReticle():
-HudGauge(HUD_OBJECT_CENTER_RETICLE, HUD_CENTER_RETICLE, true, true, false, (VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY | VM_TOPDOWN | VM_OTHER_SHIP), 255, 255, 255)
+HudGauge(HUD_OBJECT_CENTER_RETICLE, HUD_CENTER_RETICLE, true, false, (VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY | VM_TOPDOWN | VM_OTHER_SHIP), 255, 255, 255)
 {
 }
 
@@ -337,7 +337,7 @@ void HudGaugeReticle::pageIn()
 }
 
 HudGaugeThrottle::HudGaugeThrottle():
-HudGauge(HUD_OBJECT_THROTTLE, HUD_THROTTLE_GAUGE, true, true, false, (VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY | VM_OTHER_SHIP), 255, 255, 255)
+HudGauge(HUD_OBJECT_THROTTLE, HUD_THROTTLE_GAUGE, true, false, (VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY | VM_OTHER_SHIP), 255, 255, 255)
 {
 
 }
@@ -570,7 +570,7 @@ void HudGaugeThrottle::renderThrottleBackground(int y_end)
 }
 
 HudGaugeThreatIndicator::HudGaugeThreatIndicator():
-HudGauge(HUD_OBJECT_THREAT, HUD_THREAT_GAUGE, true, true, false, (VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY | VM_OTHER_SHIP), 255, 255, 255)
+HudGauge(HUD_OBJECT_THREAT, HUD_THREAT_GAUGE, true, false, (VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY | VM_OTHER_SHIP), 255, 255, 255)
 {
 }
 
@@ -684,7 +684,7 @@ void HudGaugeThreatIndicator::renderLockThreat()
 }
 
 HudGaugeWeaponLinking::HudGaugeWeaponLinking():
-HudGauge(HUD_OBJECT_WEAPON_LINKING, HUD_THREAT_GAUGE, true, true, false, (VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY | VM_OTHER_SHIP), 255, 255, 255)
+HudGauge(HUD_OBJECT_WEAPON_LINKING, HUD_THREAT_GAUGE, true, false, (VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY | VM_OTHER_SHIP), 255, 255, 255)
 {
 }
 
@@ -914,7 +914,7 @@ void hud_update_reticle( player *pp )
 				Threat_lock_frame = 1;
 			}
 			if ( (Threat_lock_frame == 2) && (Player->threat_flags & THREAT_ATTEMPT_LOCK ) ) {
-				snd_play( &Snds[SND_THREAT_FLASH]);
+				snd_play( &Snds[ship_get_sound(Player_obj, SND_THREAT_FLASH)]);
 			}
 		}
 	} 

@@ -297,9 +297,6 @@ typedef	struct ship_subsys {
 	//or higher, an index into the turret weapons is considered to be an index into the secondary weapons
 	//for much of the code. See turret_next_weap_fire_stamp.
 
-	//Note that turret_next_weap_fire_stamp is officially a hack, because turrets use all this crap
-	//ideally, they should make use of the ship_weapon structure below
-	//int		turret_next_weap_fire_stamp[MAX_SHIP_WEAPONS];	//Fire stamps for all weapons on this turret
 	int		turret_best_weapon;				// best weapon for current target; index into prim/secondary banks
 	vec3d	turret_last_fire_direction;		//	direction pointing last time this turret fired
 	int		turret_next_enemy_check_stamp;	//	time at which to next look for a new enemy.
@@ -313,6 +310,7 @@ typedef	struct ship_subsys {
 	float	favor_current_facing;					        
 	ship_subsys	*targeted_subsys;					//	subsystem this turret is attacking
 	bool	scripting_target_override;
+	int		last_fired_weapon_info_index;		// which weapon class was last fired
 
 	int		turret_pick_big_attack_point_timestamp;	//	Next time to pick an attack point for this turret
 	vec3d	turret_big_attack_point;			//	local coordinate of point for this turret to attack on enemy
@@ -393,8 +391,7 @@ typedef struct ship_subsys_info {
 #define	SF_NO_ARRIVAL_MUSIC		(1 << 3)		// don't play arrival music when ship arrives
 #define	SF_NO_ARRIVAL_WARP		(1 << 4)		// no arrival warp in effect
 #define	SF_NO_DEPARTURE_WARP		(1 << 5)		// no departure warp in effect
-#define	SF_LOCKED					(1 << 6)		// can't manipulate ship in loadout screens
-//#define	SF_INVULNERABLE			(1 << 7)
+//#define	SF_LOCKED					(1 << 6)		// can't manipulate ship in loadout screens
 
 // high bits are for internal flags not saved to mission files
 // Go from bit 31 down to bit 3
@@ -456,6 +453,9 @@ typedef struct ship_subsys_info {
 #define SF2_FORCE_SHIELDS_ON				(1<<20)
 #define SF2_NO_ETS							(1<<21)		// The E - This ship does not have an ETS
 #define SF2_CLOAKED							(1<<22)		// The E - This ship will not be rendered
+#define SF2_NO_THRUSTERS					(1<<23)		// The E - Thrusters on this ship are not rendered.
+#define SF2_SHIP_LOCKED						(1<<24)		// Karajorma - Prevents the player from changing the ship class on loadout screen
+#define SF2_WEAPONS_LOCKED					(1<<25)		// Karajorma - Prevents the player from changing the weapons on the ship on the loadout screen
 
 // If any of these bits in the ship->flags are set, ignore this ship when targetting
 extern int TARGET_SHIP_IGNORE_FLAGS;
@@ -519,19 +519,7 @@ typedef struct ship {
 
 	WarpEffect *warpin_effect;
 	WarpEffect *warpout_effect;
-/*
-	int start_warp_time;
-	int	final_warp_time;	// pops when ship is completely warped out or warped in.  Used for both warp in and out.
-	int warp_anim;
-	int warp_anim_nframes;
-	int warp_anim_fps;
-	vec3d	warp_effect_pos;		// where the warp in effect comes in at
-	vec3d	warp_effect_fvec;		// The warp in effect's forward vector
-	float warp_radius;
-	int warp_stage;			//WMC - stage for warp, used by WT_SWEEPER
-	float warp_width;
-	float warp_height;
-*/
+
 	int	next_fireball;
 
 	int	next_hit_spark;
@@ -617,9 +605,6 @@ typedef struct ship {
 	float		wash_intensity;
 	vec3d	wash_rot_axis;
 	int		wash_timestamp;
-
-	// store blast information about shockwaves that hit the ship
-//	ship_shockwave	sw;
 
 	int	num_swarm_missiles_to_fire;	// number of swarm missiles that need to be launched
 	int	next_swarm_fire;					// timestamp of next swarm missile to fire
@@ -710,9 +695,6 @@ typedef struct ship {
 	// that had this same functionality
 	int current_viewpoint;
 
-	//WMC - this one
-	//camid ship_camera;
-
 	trail *ABtrail_ptr[MAX_SHIP_CONTRAILS];		//after burner trails -Bobboau
 	trail_info ab_info[MAX_SHIP_CONTRAILS];
 	int ab_count;
@@ -727,6 +709,7 @@ typedef struct ship {
 	bool shader_effect_active;
 
 	int last_fired_point[MAX_SHIP_PRIMARY_BANKS]; //for fire point cylceing
+	ship_subsys *last_fired_turret; // which turret has fired last
 
 	// fighter bay door stuff, parent side
 	int bay_doors_anim_done_time;		// ammount of time to transition from one animation state to another
@@ -744,12 +727,6 @@ typedef struct ship {
 
 	int thrusters_start[MAX_MAN_THRUSTERS];		//Timestamp of when thrusters started
 	int thrusters_sounds[MAX_MAN_THRUSTERS];	//Sound index for thrusters
-/*
-	flash_ball	*debris_flare;
-	int n_debris_flare;
-	float flare_life;
-	int flare_bm;
-	*/
 
 	SCP_vector<alt_class> s_alt_classes;	
 
@@ -909,6 +886,7 @@ extern int ship_find_exited_ship_by_signature( int signature);
 #define AIM_FLAG_AUTO_CONVERGENCE		(1 << 1)	// has automatic convergence
 #define AIM_FLAG_STD_CONVERGENCE		(1 << 2)	// has standard - ie. non-automatic - convergence
 #define AIM_FLAG_AUTOAIM_CONVERGENCE	(1 << 3)	// has autoaim with convergence
+#define AIM_FLAG_CONVERGENCE_OFFSET		(1 << 4)	// marks that convergence has offset value
 
 typedef struct thruster_particles {
 	generic_anim thruster_bitmap;
@@ -1168,6 +1146,7 @@ typedef struct ship_info {
 	float		warpout_radius;
 	int			warpout_snd_start;
 	int			warpout_snd_end;
+	int			warpout_engage_time;	//in ms
 	float		warpout_speed;
 	int			warpout_time;	//in ms
 	float		warpout_accel_exp;
@@ -1259,19 +1238,6 @@ typedef struct ship_info {
 	float	sup_shield_repair_rate;
 	float	sup_subsys_repair_rate;
 
-	int engine_snd;							// handle to engine sound for ship (-1 if no engine sound)
-	int glide_start_snd;					// handle to sound to play at the beginning of a glide maneuver (default is 0 for regular throttle down sound)
-	int glide_end_snd;						// handle to sound to play at the end of a glide maneuver (default is 0 for regular throttle up sound)
-	
-	int engine_snd_cockpit;					// handle to engine sound heard in cockpit
-	int full_throttle_snd;					// handle to sound played when throttle is set to full power
-	int zero_throttle_snd;					// handle to sound played when throttle is set to zero power
-	int throttle_up_snd;					// handle to sound played when throttle power is increaded by 1/3
-	int throttle_down_snd;					// handle to sound played when throttle power is decreased by 1/3
-	int afterburner_engage_snd;				// handle to sound played when afterburner is engaged
-	int afterburner_loop_snd;				// handle to sound played when afterburner is active
-	int afterburner_fail_snd;				// handle to sound player when afterburner activation failed
-
 	vec3d	closeup_pos;					// position for camera when using ship in closeup view (eg briefing and hud target monitor)
 	float		closeup_zoom;					// zoom when using ship in closeup view (eg briefing and hud target monitor)
 
@@ -1352,6 +1318,12 @@ typedef struct ship_info {
 
 	bool topdown_offset_def;
 	vec3d topdown_offset;
+
+	int engine_snd;							// handle to engine sound for ship (-1 if no engine sound)
+	int glide_start_snd;					// handle to sound to play at the beginning of a glide maneuver (default is 0 for regular throttle down sound)
+	int glide_end_snd;						// handle to sound to play at the end of a glide maneuver (default is 0 for regular throttle up sound)
+
+	SCP_map<int, int> ship_sounds;			// specifies ship-specific sound indexes
 
 	int num_maneuvering;
 	man_thruster maneuvering[MAX_MAN_THRUSTERS];
@@ -1586,12 +1558,6 @@ extern int wing_has_conflicting_teams(int wing_index);
 extern int wing_name_lookup(char *name, int ignore_count = 0);
 
 extern int Player_ship_class;
-
-#define MAX_PLAYER_SHIP_CHOICES	15
-/*
-extern int Num_player_ship_precedence;				// Number of ship types in Player_ship_precedence
-extern int Player_ship_precedence[MAX_PLAYER_SHIP_CHOICES];	// Array of ship types, precedence list for player ship/wing selection
-*/
 
 //	Do the special effect for energy dissipating into the shield for a hit.
 //	model_num	= index in Polygon_models[]
@@ -1923,5 +1889,22 @@ typedef struct ship_effect {
 } ship_effect;
 
 extern SCP_vector<ship_effect> Ship_effects;
+
+/**
+ *  @brief Returns a ship-specific sound index
+ *  
+ *  @param objp An object pointer. Has to be of type OBJ_SHIP
+ *  @param id A sound id as defined in gamsesnd.h. If the given id is unknown then the game_snd with the id as index is returned.
+ *  
+ *  @return An index into the Snds vector, if the specified index could not be found then the id itself will be returned
+ */
+int ship_get_sound(object *objp, int id);
+
+/**
+ * @brief Returns the index of the default player ship
+ *
+ * @return An index into Ship_info[], location of the default player ship.
+ */
+int get_default_player_ship_index();
 
 #endif

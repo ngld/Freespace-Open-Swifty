@@ -802,7 +802,6 @@ int scoring_eval_kill_on_weapon(object *weapon_obj, object *other_obj) {
 	net_player *dead_plr = NULL;
 	float scoring_scale_by_damage = 1;	// percentage to scale the killer's score by if we score based on the amount of damage caused
 	int kill_score; 
-	bool is_enemy_player = false;		// true if the player just killed an enemy player weapon
 
 	weapon *dead_wp;						// the weapon that was killed
 	weapon_info *dead_wip;				// info on the weapon that was killed
@@ -925,13 +924,8 @@ int scoring_eval_kill_on_weapon(object *weapon_obj, object *other_obj) {
 					// don't add a kill for dogfight kills on non-players
 				} else {
 
-					// only computer controlled enemies should scale with difficulty
-					if (is_enemy_player) {
-						kill_score = (int)(dead_wip->score * scoring_scale_by_damage);
-					}
-					else {
-						kill_score = (int)(dead_wip->score * scoring_get_scale_factor() * scoring_scale_by_damage);
-					}
+					// bombs don't scale with difficulty at the moment. If we change this we want to *scoring_get_scale_factor() too
+					kill_score = (int)(dead_wip->score * scoring_scale_by_damage);
 
 					plr->stats.m_score += kill_score;  					
 					hud_gauge_popup_start(HUD_KILLS_GAUGE);

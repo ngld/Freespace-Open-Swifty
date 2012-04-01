@@ -1354,6 +1354,8 @@ void game_process_pause_key()
  */
 void game_process_cheats(int k)
 {
+	size_t i;
+
 	if ( k == 0 ){
 		return;
 	}
@@ -1364,14 +1366,13 @@ void game_process_cheats(int k)
 		return;
 	}
 
-	for (size_t i = 0; i < CHEAT_BUFFER_LEN; i++){
+	for (i = 0; i < CHEAT_BUFFER_LEN; i++){
 		CheatBuffer[i]=CheatBuffer[i+1];
 	}
 
 	CheatBuffer[CHEAT_BUFFER_LEN - 1] = (char)key_to_ascii(k);
 	
 	cheatCode detectedCheatCode = CHEAT_CODE_NONE;
-	int i=0;
 
 	for(i=0; i < CHEATS_TABLE_LEN; i++) {
 		Cheat cheat = cheatsTable[i];
@@ -1712,14 +1713,14 @@ int button_function_critical(int n, net_player *p = NULL)
 				Ships[objp->instance].flags &= ~SF_SECONDARY_DUAL_FIRE;
 				if(at_self) {
 					HUD_sourced_printf(HUD_SOURCE_HIDDEN, XSTR( "Secondary weapon set to normal fire mode", 34));
-					snd_play( &Snds[SND_SECONDARY_CYCLE] );
+					snd_play( &Snds[ship_get_sound(Player_obj, SND_SECONDARY_CYCLE)] );
 					hud_gauge_popup_start(HUD_WEAPONS_GAUGE);
 				}
 			} else {
 				Ships[objp->instance].flags |= SF_SECONDARY_DUAL_FIRE;
 				if(at_self) {
 					HUD_sourced_printf(HUD_SOURCE_HIDDEN, XSTR( "Secondary weapon set to dual fire mode", 35));
-					snd_play( &Snds[SND_SECONDARY_CYCLE] );
+					snd_play( &Snds[ship_get_sound(Player_obj, SND_SECONDARY_CYCLE)] );
 					hud_gauge_popup_start(HUD_WEAPONS_GAUGE);
 				}
 			}
@@ -2032,7 +2033,7 @@ int button_function_demo_valid(int n)
 }
 
 /**
- * Execute function corresponding to action n (BUTTON_ #define from KeyControl.h)
+ * Execute function corresponding to action n (BUTTON_ from KeyControl.h)
  * @return 1 when action was taken
  */
 int button_function(int n)
@@ -2460,10 +2461,10 @@ int button_function(int n)
 				HUD_printf(XSTR("Engine failure.  Cannot engage subspace drive.", 40));
 			} else if (!ship_navigation_ok_to_warp(Player_ship)) {
 				gamesnd_play_iface(SND_GENERAL_FAIL);
-				HUD_printf(XSTR("Navigation failure.  Cannot engage subspace drive.", -1));
+				HUD_printf(XSTR("Navigation failure.  Cannot engage subspace drive.", 1572));
 			} else if (Player_obj != NULL && object_get_gliding(Player_obj)) {
 				gamesnd_play_iface(SND_GENERAL_FAIL);
-				HUD_printf(XSTR("Cannot engage subspace drive while gliding.", -1));			
+				HUD_printf(XSTR("Cannot engage subspace drive while gliding.", 1573));			
 			} else {
 				gameseq_post_event( GS_EVENT_PLAYER_WARPOUT_START );
 			}			
@@ -2723,7 +2724,7 @@ void button_info_do(button_info *bi)
 
 
 /**
- * Set the bit for the corresponding action n (BUTTON_ #define from KeyControl.h)
+ * Set the bit for the corresponding action n (BUTTON_ from KeyControl.h)
  */
 void button_info_set(button_info *bi, int n)
 {
@@ -2736,7 +2737,7 @@ void button_info_set(button_info *bi, int n)
 }
 
 /**
- * Unset the bit for the corresponding action n (BUTTON_ #define from KeyControl.h)
+ * Unset the bit for the corresponding action n (BUTTON_ from KeyControl.h)
  */
 void button_info_unset(button_info *bi, int n)
 {

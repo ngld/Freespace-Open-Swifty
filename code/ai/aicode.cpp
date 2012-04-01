@@ -898,8 +898,8 @@ void init_ai_stealth_info(ai_info *aip, object *stealth_objp)
 
 // -----------------------------------------------------------------------------
 // Check whether Pl_objp can see a stealth ship object
-#define STEALTH_INVISIBLE			0
-#define STEALTH_VISIBLE				1
+#define STEALTH_NOT_IN_FRUSTUM			0
+#define STEALTH_IN_FRUSTUM				1
 #define STEALTH_FULLY_TARGETABLE	2
 
 /**
@@ -980,7 +980,7 @@ int ai_is_stealth_visible(object *viewer_objp, object *stealth_objp)
 		// get max dist at which stealth is visible
 		max_stealth_dist = get_skill_stealth_dist_scaler() * STEALTH_MAX_VIEW_DIST;
 
-		// now check if within view frustrum
+		// now check if within view frustum
 		float needed_dot_to_stealth;
 		if (dist_to_stealth < 100) {
 			needed_dot_to_stealth = 0.0f;
@@ -989,12 +989,12 @@ int ai_is_stealth_visible(object *viewer_objp, object *stealth_objp)
 		}
 		if (dot_to_stealth > needed_dot_to_stealth) {
 			if (dist_to_stealth < max_stealth_dist) {
-				return STEALTH_VISIBLE;
+				return STEALTH_IN_FRUSTUM;
 			}
 		}
 
-		// not within frustrum
-		return STEALTH_INVISIBLE;
+		// not within frustum
+		return STEALTH_NOT_IN_FRUSTUM;
 	}
 
 	// visible by awacs level
@@ -1079,7 +1079,7 @@ void ai_update_danger_weapon(int attacked_objnum, int weapon_objnum)
 	// if my target is a stealth ship and is not visible
 	if (aip->target_objnum >= 0) {
 		if ( is_object_stealth_ship(&Objects[aip->target_objnum]) ) {
-			if ( ai_is_stealth_visible(objp, &Objects[aip->target_objnum]) == STEALTH_INVISIBLE ) {
+			if ( ai_is_stealth_visible(objp, &Objects[aip->target_objnum]) == STEALTH_NOT_IN_FRUSTUM ) {
 				// and the weapon is coming from that stealth ship
 				if (weapon_objp->parent == aip->target_objnum) {
 					// update my position estimate for stealth ship
@@ -1641,26 +1641,21 @@ int	Player_attacking_enabled = 1;
  */
 int object_is_targetable(object *target, ship *viewer)
 {
-	int stealth_ship = 0;
-
 	// if target is ship, check if visible by team
 	if (target->type == OBJ_SHIP)
 	{
-		stealth_ship = (Ships[target->instance].flags2 & SF2_STEALTH);
-
-		if ( ship_is_visible_by_team(target, viewer) == 1)
-		{
+		if (ship_is_visible_by_team(target, viewer)) {
 			return 1;
 		}
-	}
 
-	// for AI partially targetable works as fully targetable, except for stealth ship
-	if (stealth_ship) {
-		// if not team targetable, check if within frustrum
-		if ( ai_is_stealth_visible(&Objects[viewer->objnum], target) == STEALTH_VISIBLE ) {
-			return 1;
-		} else {
-			return 0;
+		// for AI partially targetable works as fully targetable, except for stealth ship
+		if (Ships[target->instance].flags2 & SF2_STEALTH) {
+			// if not team targetable, check if within frustum
+			if ( ai_is_stealth_visible(&Objects[viewer->objnum], target) == STEALTH_IN_FRUSTUM ) {
+				return 1;
+			} else {
+				return 0;
+			}
 		}
 	}
 
@@ -1979,6 +1974,9 @@ void evaluate_object_as_nearest_objnum(eval_nearest_objnum *eno)
  * Given an object and an enemy team, return the index of the nearest enemy object.
  * Unless aip->targeted_subsys != NULL, don't allow to attack objects with OF_PROTECTED bit set.
  *
+ * @param objnum			Object number
+ * @param enemy_team_mask	Mask to apply to enemy team
+ * @param enemy_wing		Enemy wing chosen
  * @param range				Ship must be within range "range".
  * @param max_attackers		Don't attack a ship that already has at least max_attackers attacking it.
  */
@@ -2137,6 +2135,9 @@ int get_enemy_timestamp()
 
 /**
  * Return objnum if enemy found, else return -1;
+ *
+ * @param objnum		Object number
+ * @param range			Range within which to look
  * @param max_attackers Don't attack a ship that already has at least max_attackers attacking it.
  */
 int find_enemy(int objnum, float range, int max_attackers)
@@ -2157,7 +2158,7 @@ int find_enemy(int objnum, float range, int max_attackers)
 
 			// DKA don't undo object as target in nebula missions.
 			// This could cause attack on ship on fringe on nebula to stop if attackee moves our of nebula range.  (BAD)
-			if ( (Objects[target_objnum].signature == aip->target_signature) ) {
+			if ( Objects[target_objnum].signature == aip->target_signature ) {
 				if (iff_matches_mask(Ships[Objects[target_objnum].instance].team, enemy_team_mask)) {
 					if (!(Objects[target_objnum].flags & OF_PROTECTED)) {
 						return target_objnum;
@@ -2338,7 +2339,8 @@ void ai_evade_object(object *evader, object *evaded)
 /**
  * Returns total number of ignored objects.
  *
- * @param "force" means we forget the oldest object
+ * @param aip		AI info
+ * @param force		Means we forget the oldest object
  */
 int compact_ignore_new_objects(ai_info *aip, int force = 0)
 {
@@ -2458,6 +2460,9 @@ void ai_ignore_wing(object *ignorer, int wingnum, int priority)
  * If modify_index == -1, then create a new point.
  * If a new point is created (ie, modify_index == -1), then Ppfp is updated.
  *
+ * @param pos			Position in vector space
+ * @param path_num		Path numbers
+ * @param path_index	Index into path
  * @param modify_index	Index in Path_points at which to store path point.
  */
 void add_path_point(vec3d *pos, int path_num, int path_index, int modify_index)
@@ -2513,7 +2518,11 @@ void bisect_chord(vec3d *p0, vec3d *p1, vec3d *centerp, float radius)
  * It is ok to intersect the current object, but not the goal object.
  * This function is useful for creating a path to an initial point near a large object.
  *
- * @param subsys_path	optional param (default 0), indicates this is a path to a subsystem
+ * @param curpos		Current position in vector space
+ * @param goalpos		Goal position in vector space
+ * @param curobjp		Current object pointer
+ * @param goalobjp		Goal object pointer
+ * @param subsys_path	Optional param (default 0), indicates this is a path to a subsystem
  */
 void create_path_to_point(vec3d *curpos, vec3d *goalpos, object *curobjp, object *goalobjp, int subsys_path)
 {
@@ -2557,7 +2566,13 @@ void create_path_to_point(vec3d *curpos, vec3d *goalpos, object *curobjp, object
  * Given an object and a model path, globalize the points on the model and copy into the global path list.
  * If pnp != NULL, then modify, in place, the path points.  This is used to create new globalized points when the base object has moved.
  *
- * @param randomize_pnt	optional parameter (default value -1), add random vector in sphere to this path point
+ * @param objp			Object pointer
+ * @param mp			Model path
+ * @param dir			Directory type
+ * @param count			Count of items
+ * @param path_num		Path number
+ * @param pnp			Node on a path
+ * @param randomize_pnt	Optional parameter (default value -1), add random vector in sphere to this path point
  */
 void copy_xlate_model_path_points(object *objp, model_path *mp, int dir, int count, int path_num, pnode *pnp, int randomize_pnt)
 {
@@ -2647,7 +2662,10 @@ void copy_xlate_model_path_points(object *objp, model_path *mp, int dir, int cou
  * The tricky part of this problem is creating the entry to the first point on the predefined path.  
  * The points on this entry path are based on the location of Pl_objp relative to the start of the path.
  *
- * @param subsys_path optional param (default 0), indicating this is a path to a subsystem
+ * @param pl_objp		Player object
+ * @param mobjp			Model object
+ * @param path_num		Number of path
+ * @param subsys_path	Optional param (default 0), indicating this is a path to a subsystem
  */
 void create_model_path(object *pl_objp, object *mobjp, int path_num, int subsys_path)
 {	
@@ -3045,12 +3063,14 @@ void ai_dock_with_object(object *docker, int docker_index, object *dockee, int d
 {
 	Assert(docker != NULL);
 	Assert(dockee != NULL);
-	Assert(docker->instance != -1);
-	Assert(dockee->instance != -1);
-	Assert(Ships[docker->instance].ai_index != -1);
-	Assert(Ships[dockee->instance].ai_index != -1);
-	Assert(docker_index != -1);
-	Assert(dockee_index != -1);
+	Assert(docker->type == OBJ_SHIP);
+	Assert(dockee->type == OBJ_SHIP);
+	Assert(docker->instance >= 0);
+	Assert(dockee->instance >= 0);
+	Assert(Ships[docker->instance].ai_index >= 0);
+	Assert(Ships[dockee->instance].ai_index >= 0);
+	Assert(docker_index >= 0);
+	Assert(dockee_index >= 0);
 
 	ai_info *aip = &Ai_info[Ships[docker->instance].ai_index];
 
@@ -3089,6 +3109,20 @@ void ai_dock_with_object(object *docker, int docker_index, object *dockee, int d
 	// dock instantly
 	if (dock_type == AIDO_DOCK_NOW)
 	{
+		// set model animations correctly
+		// (fortunately, this function is called AFTER model_anim_set_initial_states in the sea of ship creation
+		// functions, which is necessary for model animations to start from t=0 at the correct positions)
+		ship *shipp = &Ships[docker->instance];
+		ship *goal_shipp = &Ships[dockee->instance];
+		model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_1, docker_index, 1, true);
+		model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKING_STAGE_1, dockee_index, 1, true);
+		model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_2, docker_index, 1, true);
+		model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKING_STAGE_2, dockee_index, 1, true);
+		model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_3, docker_index, 1, true);
+		model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKING_STAGE_3, dockee_index, 1, true);
+		model_anim_start_type(shipp, TRIGGER_TYPE_DOCKED, docker_index, 1, true);
+		model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKED, dockee_index, 1, true);
+
 		dock_orient_and_approach(docker, docker_index, dockee, dockee_index, DOA_DOCK_STAY);
 		ai_do_objects_docked_stuff( docker, docker_index, dockee, dockee_index, false );
 	}
@@ -7987,8 +8021,8 @@ void ai_chase()
 		if (esip->class_type > -1)
 		{
 			ship_type_info *stp = &Ship_types[sip->class_type];
-			uint ap_size = stp->ai_actively_pursues.size();
-			for(uint i = 0; i < ap_size; i++)
+			size_t ap_size = stp->ai_actively_pursues.size();
+			for(size_t i = 0; i < ap_size; i++)
 			{
 				if(stp->ai_actively_pursues[i] == esip->class_type) {
 					go_after_it = true;
@@ -8247,7 +8281,7 @@ void ai_chase()
 
 	case SM_ATTACK:
 		// if target is stealth and stealth not visible, then enter stealth find mode
-		if ( (aip->ai_flags & AIF_STEALTH_PURSUIT) && (ai_is_stealth_visible(Pl_objp, En_objp) == STEALTH_INVISIBLE) ) {
+		if ( (aip->ai_flags & AIF_STEALTH_PURSUIT) && (ai_is_stealth_visible(Pl_objp, En_objp) == STEALTH_NOT_IN_FRUSTUM) ) {
 			aip->submode = SM_STEALTH_FIND;
 			aip->submode_start_time = Missiontime;
 			aip->submode_parm0 = SM_SF_AHEAD;
@@ -8362,7 +8396,7 @@ void ai_chase()
 
 	case SM_SUPER_ATTACK:
 		// if stealth and invisible, enter stealth find mode
-		if ( (aip->ai_flags & AIF_STEALTH_PURSUIT) && (ai_is_stealth_visible(Pl_objp, En_objp) == STEALTH_INVISIBLE) ) {
+		if ( (aip->ai_flags & AIF_STEALTH_PURSUIT) && (ai_is_stealth_visible(Pl_objp, En_objp) == STEALTH_NOT_IN_FRUSTUM) ) {
 			aip->submode = SM_STEALTH_FIND;
 			aip->submode_start_time = Missiontime;
 			aip->submode_parm0 = SM_SF_AHEAD;
@@ -8469,7 +8503,7 @@ void ai_chase()
 	// Either change to SM_ATTACK or AIM_FIND_STEALTH
 	case SM_STEALTH_FIND:
 		// if time > 5 sec change mode to sweep
-		if ( !(aip->ai_flags & AIF_STEALTH_PURSUIT) || (ai_is_stealth_visible(Pl_objp, En_objp) == STEALTH_VISIBLE) ) {
+		if ( !(aip->ai_flags & AIF_STEALTH_PURSUIT) || (ai_is_stealth_visible(Pl_objp, En_objp) == STEALTH_IN_FRUSTUM) ) {
 			aip->submode = SM_ATTACK;
 			aip->submode_start_time = Missiontime;
 			aip->last_attack_time = Missiontime;
@@ -8484,7 +8518,7 @@ void ai_chase()
 		break;
 
 	case SM_STEALTH_SWEEP:
-		if ( !(aip->ai_flags & AIF_STEALTH_PURSUIT) || (ai_is_stealth_visible(Pl_objp, En_objp) == STEALTH_VISIBLE) ) {
+		if ( !(aip->ai_flags & AIF_STEALTH_PURSUIT) || (ai_is_stealth_visible(Pl_objp, En_objp) == STEALTH_IN_FRUSTUM) ) {
 			aip->submode = SM_ATTACK;
 			aip->submode_start_time = Missiontime;
 			aip->last_attack_time = Missiontime;
@@ -8543,7 +8577,7 @@ void ai_chase()
 	if (aip->ai_stalemate_dist_thresh > 0.0f &&
 			dist_to_enemy < aip->ai_stalemate_dist_thresh && 
 			aip->submode != SM_GET_AWAY && aip->submode != AIS_CHASE_GLIDEATTACK && aip->submode != SM_FLY_AWAY && 
-			(!(aip->ai_flags & AIF_STEALTH_PURSUIT) || (ai_is_stealth_visible(Pl_objp, En_objp) == STEALTH_VISIBLE)))
+			(!(aip->ai_flags & AIF_STEALTH_PURSUIT) || (ai_is_stealth_visible(Pl_objp, En_objp) == STEALTH_IN_FRUSTUM)))
 	{
 		aip->time_enemy_near += flFrametime;
 	}
@@ -8869,7 +8903,6 @@ void find_adjusted_dockpoint_info(vec3d *global_p0, vec3d *global_p1, vec3d *glo
 	}
 }
 
-#define	DOCK_BACKUP_RETURN_VAL	99999.9f
 
 //	Make docker_objp dock with dockee_objp
 //	Returns distance to goal, defined as distance between corresponding dock points, plus 10.0f * rotational velocity vector (DOA_DOCK only)
@@ -8890,6 +8923,7 @@ float dock_orient_and_approach(object *docker_objp, int docker_index, object *do
 	vec3d docker_point, dockee_point;
 	float			fdist = UNINITIALIZED_VALUE;
 
+	aip = &Ai_info[Ships[docker_objp->instance].ai_index];
 
 	docker_objp->phys_info.forward_thrust = 0.0f;		//	Kill thrust so we don't have a sputtering thruster.
 
@@ -8898,7 +8932,11 @@ float dock_orient_and_approach(object *docker_objp, int docker_index, object *do
 		if (ship_get_subsystem_strength(&Ships[docker_objp->instance], SUBSYSTEM_ENGINE) <= 0.0f)
 			return 9999.9f;
 
-	aip = &Ai_info[Ships[docker_objp->instance].ai_index];
+	//	If dockee has moved much, then path will be recreated.
+	//	Might need to change state if moved too far.
+	if ((dock_mode != DOA_DOCK_STAY) && (dock_mode != DOA_DOCK)) {
+		maybe_recreate_path(docker_objp, aip, 0);
+	}
 
 	sip0 = &Ship_info[Ships[docker_objp->instance].ship_info_index];
 	sip1 = &Ship_info[Ships[dockee_objp->instance].ship_info_index];
@@ -8963,14 +9001,6 @@ float dock_orient_and_approach(object *docker_objp, int docker_index, object *do
 	rdinfo->submodel_pos = submodel_pos;
 	rdinfo->submodel_r = submodel_radius;
 	rdinfo->submodel_w = submodel_omega;
-
-
-	//	If dockee has moved much, then path will be recreated.
-	//	Might need to change state if moved too far.
-	if ((dock_mode != DOA_DOCK_STAY) && (dock_mode != DOA_DOCK)) {
-		// Goober5000 - maybe force recreate
-		int force_recreate = (dockee_rotating_submodel >= 0) && ((dock_mode == DOA_APPROACH) || (dock_mode == DOA_UNDOCK_1));
-	}
 
 
 	float speed_scale = 1.0f;
@@ -9062,6 +9092,7 @@ float dock_orient_and_approach(object *docker_objp, int docker_index, object *do
 			vec3d offset;
 
 			Assert(dock_mode == DOA_DOCK_STAY);
+			
 			docker_objp->orient = dom;
 
 			vm_vec_sub(&offset, &dockee_point, &docker_point);
@@ -9313,7 +9344,7 @@ void guard_object_was_hit(object *guard_objp, object *hitter_objp)
 		if ( awacs_get_level(hitter_objp, &Ships[aip->shipnum], 1) < 1 ) {
 			// if he's a stealth and visible, but not targetable, ok to attack.
 			if ( is_object_stealth_ship(hitter_objp) ) {
-				if ( ai_is_stealth_visible(guard_objp, hitter_objp) != STEALTH_VISIBLE ) {
+				if ( ai_is_stealth_visible(guard_objp, hitter_objp) != STEALTH_IN_FRUSTUM ) {
 					return;
 				}
 			}
@@ -10118,15 +10149,127 @@ void ai_do_objects_repairing_stuff( object *repaired_objp, object *repair_objp, 
 	multi_maybe_send_repair_info( repaired_objp, repair_objp, how );
 }
 
+// Goober5000 - helper function that is also called from ai_dock()
+void ai_get_dock_goal_indexes(object *objp, ai_info *aip, ai_goal *aigp, object *goal_objp, int &docker_index, int &dockee_index)
+{
+	// get the indexes
+	switch (aip->submode)
+	{
+		case AIS_DOCK_1:
+		case AIS_DOCK_2:
+		case AIS_DOCK_3:
+			Warning(LOCATION, "Normally dock indexes should be calculated for only AIS_DOCK_0 and AIS_UNDOCK_0.  Trace out and debug.");
+		case AIS_DOCK_0:
+		{
+			// get them from the active goal
+			Assert(aigp != NULL);
+			Assert(aigp->flags & AIGF_DOCK_INDEXES_VALID);
+			docker_index = aigp->docker.index;
+			dockee_index = aigp->dockee.index;
+			Assert(docker_index >= 0);
+			Assert(dockee_index >= 0);
+			break;
+		}
+
+		case AIS_DOCK_4:
+		case AIS_DOCK_4A:
+		case AIS_UNDOCK_1:
+		case AIS_UNDOCK_2:
+			Warning(LOCATION, "Normally dock indexes should be calculated for only AIS_DOCK_0 and AIS_UNDOCK_0.  Trace out and debug.");
+		case AIS_UNDOCK_0:
+		{
+			// get them from the guy I'm docked to
+			Assert(goal_objp != NULL);
+			docker_index = dock_find_dockpoint_used_by_object(objp, goal_objp);
+			dockee_index = dock_find_dockpoint_used_by_object(goal_objp, objp);
+			Assert(docker_index >= 0);
+			Assert(dockee_index >= 0);
+			break;
+		}
+
+		case AIS_UNDOCK_3:
+		case AIS_UNDOCK_4:
+		{
+			Warning(LOCATION, "Normally dock indexes should be calculated for only AIS_DOCK_0 and AIS_UNDOCK_0.  Additionally, dock indexes can't always be determined for AIS_UNDOCK_3 or AIS_UNDOCK_4.  Trace out and debug.");
+			docker_index = -1;
+			dockee_index = -1;
+			break;
+		}
+
+		default:
+		{
+			Error(LOCATION, "Unknown docking submode!");
+			docker_index = -1;
+			dockee_index = -1;
+			break;
+		}
+	}
+}
+
 // Goober5000 - clean up my own dock mode
 void ai_cleanup_dock_mode_subjective(object *objp)
 {
+	ship *shipp = &Ships[objp->instance];
+
 	// get ai of object
-	ai_info *aip = &Ai_info[Ships[objp->instance].ai_index];
+	ai_info *aip = &Ai_info[shipp->ai_index];
 
 	// if the object is in dock mode, force them to near last stage
 	if ( (aip->mode == AIM_DOCK) && (aip->submode < AIS_UNDOCK_3) )
 	{
+		// get the active goal
+		ai_goal *aigp;
+		if (aip->active_goal >= 0)
+			aigp = &aip->goals[aip->active_goal];
+		else
+			aigp = NULL;
+
+		// get the object being acted upon
+		object		*goal_objp;
+		ship		*goal_shipp;
+		if (aip->goal_objnum >= 0)
+		{
+			goal_objp = &Objects[aip->goal_objnum];
+			Assert(goal_objp->type == OBJ_SHIP);
+			goal_shipp = &Ships[goal_objp->instance];
+		}
+		else
+		{
+			goal_objp = NULL;
+			goal_shipp = NULL;
+		}
+
+		// get the indexes from the saved parameters
+		int docker_index = aip->submode_parm0;
+		int dockee_index = aip->submode_parm1;
+
+		// undo all the appropriate triggers
+		switch (aip->submode)
+		{
+			case AIS_UNDOCK_0:
+				model_anim_start_type(shipp, TRIGGER_TYPE_DOCKED, docker_index, -1);
+				model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKED, dockee_index, -1);
+			case AIS_UNDOCK_1:
+				model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_3, docker_index, -1);
+				model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKING_STAGE_3, dockee_index, -1);
+			case AIS_UNDOCK_2:
+				model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_2, docker_index, -1);
+				model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKING_STAGE_2, dockee_index, -1);
+				break;
+
+			case AIS_DOCK_4:
+			case AIS_DOCK_4A:
+				model_anim_start_type(shipp, TRIGGER_TYPE_DOCKED, docker_index, -1);
+				model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKED, dockee_index, -1);
+			case AIS_DOCK_3:
+				model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_3, docker_index, -1);
+				model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKING_STAGE_3, dockee_index, -1);
+			case AIS_DOCK_2:
+				model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_2, docker_index, -1);
+				model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKING_STAGE_2, dockee_index, -1);
+				break;
+		}
+
 		aip->submode = AIS_UNDOCK_3;
 		aip->submode_start_time = Missiontime;
 	}
@@ -10265,7 +10408,7 @@ int maybe_dock_obstructed(object *cur_objp, object *goal_objp, int big_only_flag
 
 
 //	Docking behavior.
-//	Approach a ship, follow path to docking platform, approach platform, after awhile,
+//	Approach a ship, follow path to docking platform, approach platform; after awhile,
 //	undock.
 void ai_dock()
 {
@@ -10275,13 +10418,18 @@ void ai_dock()
 	// Make sure we still have a dock goal.
 	// Make sure the object we're supposed to dock with or undock from still exists.
 	if ( ((aip->active_goal < 0) && (aip->submode != AIS_DOCK_4A))
-		|| (aip->goal_objnum == -1)	|| (Objects[aip->goal_objnum].signature != aip->goal_signature) )
+		|| (aip->goal_objnum < 0)
+		|| (Objects[aip->goal_objnum].signature != aip->goal_signature) )
 	{
 		ai_cleanup_dock_mode_subjective(Pl_objp);
 	}
 
 	ship_info	*sip = &Ship_info[shipp->ship_info_index];
-	int docker_index, dockee_index;
+
+	// we need to keep the dock indexes stored in the submode because the goal may become invalid at any point
+	// (when we first dock or first undock, we'll calculate and overwrite these for the first time)
+	int docker_index = aip->submode_parm0;
+	int dockee_index = aip->submode_parm1;
 
 	// get the active goal
 	ai_goal *aigp;
@@ -10292,33 +10440,19 @@ void ai_dock()
 
 	// get the object being acted upon
 	object		*goal_objp;
+	ship		*goal_shipp;
 	if (aip->goal_objnum >= 0)
+	{
 		goal_objp = &Objects[aip->goal_objnum];
+		Assert(goal_objp->type == OBJ_SHIP);
+		goal_shipp = &Ships[goal_objp->instance];
+	}
 	else
+	{
 		goal_objp = NULL;
+		goal_shipp = NULL;
+	}
 
-	// get the indexes
-	if ((aip->submode == AIS_DOCK_2) || (aip->submode == AIS_DOCK_3) || (aip->submode == AIS_DOCK_4))
-	{
-		// get them from the active goal
-		Assert(aigp != NULL);
-		Assert(aigp->flags & AIGF_DOCK_INDEXES_VALID);
-		docker_index = aigp->docker.index;
-		dockee_index = aigp->dockee.index;
-	}
-	else if ((aip->submode == AIS_UNDOCK_0) || (aip->submode == AIS_UNDOCK_1) || (aip->submode == AIS_UNDOCK_2))
-	{
-		// get them from the guy I'm docked to
-		Assert(goal_objp != NULL);
-		docker_index = dock_find_dockpoint_used_by_object(Pl_objp, goal_objp);
-		dockee_index = dock_find_dockpoint_used_by_object(goal_objp, Pl_objp);
-	}
-	else
-	{
-		// indexes aren't needed or (in case of AIS_UNDOCK_3) aren't actually used
-		docker_index = 0;
-		dockee_index = 0;
-	}
 
 	// For docking submodes (ie, not undocking), follow path.  Once at second last
 	// point on path (point just before point on dock platform), orient into position.
@@ -10331,11 +10465,16 @@ void ai_dock()
 	//	This mode means to find the path to the docking point.
 	case AIS_DOCK_0:
 	{
+		// save the dock indexes we're currently using
+		ai_get_dock_goal_indexes(Pl_objp, aip, aigp, goal_objp, docker_index, dockee_index);
+		aip->submode_parm0 = docker_index;
+		aip->submode_parm1 = dockee_index;
+
 		ai_path();
 		if (aip->path_length < 4)
 		{
 			Assert(goal_objp != NULL);
-			ship_info *goal_sip = &Ship_info[Ships[goal_objp->instance].ship_info_index];
+			ship_info *goal_sip = &Ship_info[goal_shipp->ship_info_index];
 			char *goal_ship_class_name = goal_sip->name;
 			char *goal_dock_path_name = model_get(goal_sip->model_num)->paths[aip->mp_index].name;
 
@@ -10345,6 +10484,9 @@ void ai_dock()
 
 		aip->submode = AIS_DOCK_1;
 		aip->submode_start_time = Missiontime;
+		model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_1, docker_index, 1);
+		model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKING_STAGE_1, dockee_index, 1);
+
 		aip->path_start = -1;
 		break;
 	}
@@ -10368,6 +10510,9 @@ void ai_dock()
 			if (aip->path_cur-aip->path_start >= aip->path_length-1) {		//	If got this far, advance no matter what.
 				aip->submode = AIS_DOCK_2;
 				aip->submode_start_time = Missiontime;
+				model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_2, docker_index, 1);
+				model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKING_STAGE_2, dockee_index, 1);
+
 				aip->path_cur--;
 				Assert(aip->path_cur-aip->path_start >= 0);
 			} else if (aip->path_cur-aip->path_start >= aip->path_length-2) {
@@ -10376,6 +10521,8 @@ void ai_dock()
 				} else {
 					aip->submode = AIS_DOCK_2;
 					aip->submode_start_time = Missiontime;
+					model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_2, docker_index, 1);
+					model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKING_STAGE_2, dockee_index, 1);
 				}
 			}
 		}
@@ -10389,25 +10536,17 @@ void ai_dock()
 		float		dist;
 		int	r;
 
-		if ((r = maybe_dock_obstructed(Pl_objp, goal_objp,0)) != -1) {
+		if ((r = maybe_dock_obstructed(Pl_objp, goal_objp, 0)) != -1) {
 			nprintf(("AI", "Dock 2: Obstructed by %s\n", Ships[Objects[r].instance].ship_name));
 			accelerate_ship(aip, 0.0f);
+
 			aip->submode = AIS_DOCK_1;
 			aip->submode_start_time = Missiontime;
+			model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_2, docker_index, -1);
+			model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKING_STAGE_2, dockee_index, -1);
 		} else {
 			dist = dock_orient_and_approach(Pl_objp, docker_index, goal_objp, dockee_index, DOA_APPROACH);
 			Assert(dist != UNINITIALIZED_VALUE);
-
-			if (dist == DOCK_BACKUP_RETURN_VAL) {
-				Assert(aip->goal_objnum >= 0 && aip->goal_objnum < MAX_OBJECTS);
-				int path_num;
-
-				aip->submode = AIS_DOCK_1;
-				aip->submode_start_time = Missiontime;
-				path_num = ai_return_path_num_from_dockbay(goal_objp, dockee_index);
-				ai_find_path(Pl_objp, aip->goal_objnum, path_num, 0);
-				break;
-			}
 
 			float	tolerance;
 			if (goal_objp->flags & OF_PLAYER_SHIP)
@@ -10418,6 +10557,9 @@ void ai_dock()
 			if ( dist < tolerance) {
 				aip->submode = AIS_DOCK_3;
 				aip->submode_start_time = Missiontime;
+				model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_3, docker_index, 1);
+				model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKING_STAGE_3, dockee_index, 1);
+
 				aip->path_cur++;
 			}
 		}
@@ -10432,19 +10574,16 @@ void ai_dock()
 		if ((r = maybe_dock_obstructed(Pl_objp, goal_objp,0)) != -1) {
 			nprintf(("AI", "Dock 1: Obstructed by %s\n", Ships[Objects[r].instance].ship_name));
 			accelerate_ship(aip, 0.0f);
+
 			aip->submode = AIS_DOCK_2;
 			aip->submode_start_time = Missiontime;
+			model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_3, docker_index, -1);
+			model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKING_STAGE_3, dockee_index, -1);
 		} else {
 			rotating_dockpoint_info rdinfo;
 
 			float dist = dock_orient_and_approach(Pl_objp, docker_index, goal_objp, dockee_index, DOA_DOCK, &rdinfo);
 			Assert(dist != UNINITIALIZED_VALUE);
-
-			if (dist == DOCK_BACKUP_RETURN_VAL) {
-				aip->submode = AIS_DOCK_2;
-				aip->submode_start_time = Missiontime;
-				break;
-			}
 
 			float tolerance = 2*flFrametime * (1.0f + fl_sqrt(goal_objp->phys_info.speed));
 
@@ -10465,7 +10604,12 @@ void ai_dock()
 				ai_do_objects_docked_stuff( Pl_objp, docker_index, goal_objp, dockee_index );
 
 				if (aip->submode == AIS_DOCK_3) {
+					// Play a ship docking attach sound
 					snd_play_3d( &Snds[SND_DOCK_ATTACH], &Pl_objp->pos, &View_position );
+
+					// start the dock animation
+					model_anim_start_type(shipp, TRIGGER_TYPE_DOCKED, docker_index, 1);
+					model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKED, dockee_index, 1);
 
 					if ((Pl_objp == Player_obj) || (goal_objp == Player_obj))
 						joy_ff_docked();  // shake player's joystick a little
@@ -10490,7 +10634,7 @@ void ai_dock()
 		if (aigp == NULL) {	//	Can happen for initially docked ships.
 			ai_do_default_behavior( &Objects[Ships[aip->shipnum].objnum] );		// do the default behavior
 		} else {
-			mission_log_add_entry(LOG_SHIP_DOCKED, Ships[Pl_objp->instance].ship_name, Ships[goal_objp->instance].ship_name);
+			mission_log_add_entry(LOG_SHIP_DOCKED, shipp->ship_name, goal_shipp->ship_name);
 
 			if (aigp->ai_mode == AI_GOAL_DOCK) {
 				ai_mission_goal_complete( aip );					// Note, this calls ai_do_default_behavior().
@@ -10509,8 +10653,6 @@ void ai_dock()
 		float dist = dock_orient_and_approach(Pl_objp, docker_index, goal_objp, dockee_index, DOA_DOCK);
 		Assert(dist != UNINITIALIZED_VALUE);
 
-		Assert(goal_objp->type == OBJ_SHIP);
-		ship		*goal_shipp = &Ships[goal_objp->instance];		
 		ai_info		*goal_aip = &Ai_info[goal_shipp->ai_index];
 
 		// Goober5000 - moved from call_doa
@@ -10530,6 +10672,10 @@ void ai_dock()
 				//	Got real far away from goal, so move back a couple modes and try again.
 				aip->submode = AIS_DOCK_2;
 				aip->submode_start_time = Missiontime;
+				model_anim_start_type(shipp, TRIGGER_TYPE_DOCKED, docker_index, -1);
+				model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKED, dockee_index, -1);
+				model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_3, docker_index, -1);
+				model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKING_STAGE_3, dockee_index, -1);
 			}
 		}
 		else
@@ -10543,8 +10689,33 @@ void ai_dock()
 
 	case AIS_UNDOCK_0:
 	{
-		int path_num;
 		//	First stage of undocking.
+		int path_num;
+
+		// If this is the first frame for this submode, play the animation and set the timestamp
+		if (aip->mode_time < 0)
+		{
+			// save the dock indexes we're currently using
+			ai_get_dock_goal_indexes(Pl_objp, aip, aigp, goal_objp, docker_index, dockee_index);
+			aip->submode_parm0 = docker_index;
+			aip->submode_parm1 = dockee_index;
+
+			// start the detach animation (opposite of the dock animation)
+			model_anim_start_type(shipp, TRIGGER_TYPE_DOCKED, docker_index, -1);
+			model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKED, dockee_index, -1);
+
+			// calculate time until animations elapse
+			int time1 = model_anim_get_time_type(shipp, TRIGGER_TYPE_DOCKED, docker_index);
+			int time2 = model_anim_get_time_type(goal_shipp, TRIGGER_TYPE_DOCKED, dockee_index);
+			aip->mode_time = MAX(time1, time2);
+		}
+
+		// if not enough time has passed, just wait
+		if (!timestamp_elapsed(aip->mode_time))
+			break;
+
+		// clear timestamp
+		aip->mode_time = -1;
 
 		// set up the path points for the undocking procedure
 		path_num = ai_return_path_num_from_dockbay(goal_objp, dockee_index);
@@ -10556,7 +10727,6 @@ void ai_dock()
 
 		aip->submode = AIS_UNDOCK_1;
 		aip->submode_start_time = Missiontime;
-
 		break;
 	}
 
@@ -10566,14 +10736,15 @@ void ai_dock()
 		float	dist;
 		rotating_dockpoint_info rdinfo;
 
+		//	Waiting for one second to elapse to let detach sound effect play out.
 		if (Missiontime - aip->submode_start_time < REARM_BREAKOFF_DELAY)
-		{
-			break;		//	Waiting for one second to elapse to let detach sound effect play out.
-		}
-		else if ( !(aigp->flags & AIGF_DOCK_SOUND_PLAYED))
+			break;		
+
+		// play the depart sound, but only once, since this mode is called multiple times per frame
+		if ( !(aigp->flags & AIGF_DEPART_SOUND_PLAYED))
 		{
 			snd_play_3d( &Snds[SND_DOCK_DEPART], &Pl_objp->pos, &View_position );
-			aigp->flags |= AIGF_DOCK_SOUND_PLAYED;
+			aigp->flags |= AIGF_DEPART_SOUND_PLAYED;
 		}
 
 		dist = dock_orient_and_approach(Pl_objp, docker_index, goal_objp, dockee_index, DOA_UNDOCK_1, &rdinfo);
@@ -10592,6 +10763,8 @@ void ai_dock()
 		if ((dist < 2*flFrametime) || (dist_to_dock > 2*Pl_objp->radius)) {
 			aip->submode = AIS_UNDOCK_2;
 			aip->submode_start_time = Missiontime;
+			model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_3, docker_index, -1);
+			model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKING_STAGE_3, dockee_index, -1);
 		}
 		break;
 	}
@@ -10603,7 +10776,7 @@ void ai_dock()
 
 		// get pointer to docked object's aip to reset flags, etc
 		Assert( aip->goal_objnum != -1 );
-		other_aip = &Ai_info[Ships[goal_objp->instance].ai_index];
+		other_aip = &Ai_info[goal_shipp->ai_index];
 
 		//	Second stage of undocking.
 		dist = dock_orient_and_approach(Pl_objp, docker_index, goal_objp, dockee_index, DOA_UNDOCK_2);
@@ -10620,12 +10793,15 @@ void ai_dock()
 			// clear out dock stuff for both objects.
 			ai_do_objects_undocked_stuff( Pl_objp, goal_objp );
 			physics_ship_init(Pl_objp);
-			aip->submode = AIS_UNDOCK_3;				//	The do-nothing mode, until another order is issued
+
+			aip->submode = AIS_UNDOCK_3;
 			aip->submode_start_time = Missiontime;
+			model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_2, docker_index, -1);
+			model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKING_STAGE_2, dockee_index, -1);
 
 			// don't add undock log entries for support ships.
 			if ( !(sip->flags & SIF_SUPPORT) ) {
-				mission_log_add_entry(LOG_SHIP_UNDOCKED, Ships[Pl_objp->instance].ship_name, Ships[goal_objp->instance].ship_name);
+				mission_log_add_entry(LOG_SHIP_UNDOCKED, shipp->ship_name, goal_shipp->ship_name);
 			}
 		}
 		break;
@@ -10638,6 +10814,8 @@ void ai_dock()
 			// this might happen when a goal is cancelled before docking has finished
 			aip->submode = AIS_UNDOCK_4;
 			aip->submode_start_time = Missiontime;
+			model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_1, docker_index, -1);
+			model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKING_STAGE_1, dockee_index, -1);
 		}
 		else
 		{
@@ -10647,6 +10825,8 @@ void ai_dock()
 			if (dist < Pl_objp->radius/2 + 5.0f) {
 				aip->submode = AIS_UNDOCK_4;
 				aip->submode_start_time = Missiontime;
+				model_anim_start_type(shipp, TRIGGER_TYPE_DOCKING_STAGE_1, docker_index, -1);
+				model_anim_start_type(goal_shipp, TRIGGER_TYPE_DOCKING_STAGE_1, dockee_index, -1);
 			}
 
 			// possible that this flag hasn't been cleared yet.  When aborting a rearm, this submode might
@@ -10692,7 +10872,6 @@ typedef struct ai_render_stuff {
 ai_render_stuff AI_debug_render_stuff[MAX_AI_DEBUG_RENDER_STUFF];
 
 int	Num_AI_debug_render_stuff = 0;
-int	Msg_count_4996 = 0;
 
 void ai_debug_render_stuff()
 {
@@ -10792,13 +10971,8 @@ void process_subobjects(int objnum)
 				if(enemies_present == 1 || pss->turret_enemy_objnum >= 0)
 					ai_fire_from_turret(shipp, pss, objnum);
 			} else {
-#ifndef NDEBUG
-				if (!Msg_count_4996) {
-					Warning( LOCATION, "Ship '%s' has turrets with no guns!\nProbably a model problem, so get an artist!", shipp->ship_name );
-					Msg_count_4996++;
-				}
-#endif
-				}
+				Warning( LOCATION, "Turret %s on ship %s has no firing points assigned to it.\nThis needs to be fixed in the model.\n", psub->name, shipp->ship_name );
+			}
 			break;
 
 		case SUBSYSTEM_ENGINE:
@@ -12890,7 +13064,10 @@ void ai_warp_out(object *objp)
 		aip->submode_start_time = Missiontime;
 		break;
 	case AIS_WARP_2:			//	Make sure won't collide with any object.
-		if (timestamp_elapsed(aip->force_warp_time) || !collide_predict_large_ship(objp, objp->radius*2.0f + 100.0f)) {
+		if (timestamp_elapsed(aip->force_warp_time)
+			|| (!collide_predict_large_ship(objp, objp->radius*2.0f + 100.0f)
+			|| (Ship_info[shipp->ship_info_index].warpout_type == WT_HYPERSPACE
+				&& !collide_predict_large_ship(objp, 100000.0f)))) {
 			aip->submode = AIS_WARP_3;
 			aip->submode_start_time = Missiontime;
 
@@ -12931,9 +13108,12 @@ void ai_warp_out(object *objp)
 		}
 		break;
 	case AIS_WARP_4: {
-		shipfx_warpout_start(objp);
-		aip->submode = AIS_WARP_5;
-		aip->submode_start_time = Missiontime;
+		// Only lets the ship warp after waiting for the warpout engage time
+		if ( (Missiontime / 100) >= (aip->submode_start_time / 100 + Ship_info[shipp->ship_info_index].warpout_engage_time) ) {
+			shipfx_warpout_start(objp);
+			aip->submode = AIS_WARP_5;
+			aip->submode_start_time = Missiontime;
+		}
 		break;
 	}
 	case AIS_WARP_5:
@@ -13541,7 +13721,7 @@ void ai_frame(int objnum)
 				aip->ai_flags |= AIF_STEALTH_PURSUIT;
 			}
 
-			if ( (stealth_state == STEALTH_FULLY_TARGETABLE) || (stealth_state == STEALTH_VISIBLE) ) {
+			if ( (stealth_state == STEALTH_FULLY_TARGETABLE) || (stealth_state == STEALTH_IN_FRUSTUM) ) {
 				aip->stealth_last_visible_stamp = timestamp();
 				aip->stealth_last_cheat_visible_stamp = aip->stealth_last_visible_stamp;
 				aip->stealth_last_pos = En_objp->pos;
@@ -13802,6 +13982,7 @@ void init_ai_object(int objnum)
 	aip->best_dot_from_time = 0;
 	aip->submode_start_time = 0;
 	aip->submode_parm0 = 0;
+	aip->submode_parm1 = 0;
 	aip->active_goal = -1;
 	aip->goal_check_time = timestamp(0);
 	aip->last_predicted_enemy_pos = near_vec;
@@ -14859,8 +15040,8 @@ int ai_abort_rearm_request(object *requester_objp)
 					}
 					else
 					{
-						repair_aip->submode = AIS_UNDOCK_3;
-						repair_aip->submode_start_time = Missiontime;
+						// unwind all the support ship docking operations
+						ai_cleanup_dock_mode_subjective(repair_objp);
 					}
 				} else {
 					nprintf(("AI", "Not aborting rearm since already undocking\n"));

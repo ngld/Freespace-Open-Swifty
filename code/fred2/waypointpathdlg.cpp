@@ -123,6 +123,7 @@ void waypoint_path_dlg::OnClose()
 void waypoint_path_dlg::initialize_data(int full_update)
 {
 	int enable = TRUE;
+	SCP_list<jump_node>::iterator jnp;
 
 	if (!GetSafeHwnd())
 		return;
@@ -136,7 +137,12 @@ void waypoint_path_dlg::initialize_data(int full_update)
 		m_name = _T(cur_waypoint_list->get_name());
 
 	} else if (Objects[cur_object_index].type == OBJ_JUMP_NODE) {
-		m_name = _T(Objects[cur_object_index].jnp->get_name_ptr());
+		for (jnp = Jump_nodes.begin(); jnp != Jump_nodes.end(); ++jnp) {
+			if(jnp->get_obj() == &Objects[cur_object_index])
+				break;
+		}
+		
+		m_name = _T(jnp->get_name_ptr());
 
 	} else {
 		m_name = _T("");
@@ -154,6 +160,7 @@ int waypoint_path_dlg::update_data(int redraw)
 	char *str, old_name[255];
 	int i, z;
 	object *ptr;
+	SCP_list<jump_node>::iterator jnp;
 
 	if (!GetSafeHwnd())
 		return 0;
@@ -303,7 +310,10 @@ int waypoint_path_dlg::update_data(int redraw)
 		}
 
 	} else if (Objects[cur_object_index].type == OBJ_JUMP_NODE) {
-		jump_node *jnp = Objects[cur_object_index].jnp;
+		for (jnp = Jump_nodes.begin(); jnp != Jump_nodes.end(); ++jnp) {
+			if(jnp->get_obj() == &Objects[cur_object_index])
+				break;
+		}
 
 		for (i=0; i<MAX_WINGS; i++)
 		{
@@ -410,10 +420,8 @@ int waypoint_path_dlg::update_data(int redraw)
 			UpdateData(FALSE);
 		}
 
-		strcpy_s(old_name, jnp->get_name_ptr());
-		string_copy(jnp->get_name_ptr(), m_name, NAME_LENGTH, 1);
-
-		if(jumpnode_check_for_duplicates())
+		jump_node* found = jumpnode_get_by_name(m_name);
+		if(found != NULL && &(*jnp) != found)
 		{
 			if (bypass_errors)
 				return 1;
@@ -422,14 +430,15 @@ int waypoint_path_dlg::update_data(int redraw)
 			z = MessageBox("This jump node name is already being used by another jump node\n"
 				"Press OK to restore old name", "Error", MB_ICONEXCLAMATION | MB_OKCANCEL);
 
-			strcpy(jnp->get_name_ptr(), old_name);
-
 			if (z == IDCANCEL)
 				return -1;
 
-			m_name = _T(old_name);
+			m_name = _T(jnp->get_name_ptr());
 			UpdateData(FALSE);
 		}
+		
+		strcpy_s(old_name, jnp->get_name_ptr());
+		jnp->set_name(const_cast<char *>((const char *) m_name));
 		
 		str = (char *) (LPCTSTR) m_name;
 		if (strcmp(old_name, str)) {
@@ -467,7 +476,7 @@ BOOL waypoint_path_dlg::OnCommand(WPARAM wParam, LPARAM lParam)
 		}
 	}
 
-	if ((id >= ID_JUMP_NODE_MENU) && (id < ID_JUMP_NODE_MENU + Jump_nodes.size())) {
+	if ((id >= ID_JUMP_NODE_MENU) && (id < ID_JUMP_NODE_MENU + (int) Jump_nodes.size())) {
 		if (!update_data()) {
 			point = id - ID_JUMP_NODE_MENU;
 			unmark_all();

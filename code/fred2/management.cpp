@@ -471,12 +471,9 @@ bool fred_init()
 	gr_reset_clip();
 	g3_start_frame(0);
 	g3_set_view_matrix(&eye_pos, &eye_orient, 0.5f);
-
-	for (i=0; i<Num_ship_classes; i++)
-		if (Ship_info[i].flags & SIF_DEFAULT_PLAYER_SHIP) {
-			Default_player_model = cur_model_index = i;
-			break;
-		}
+	
+	// Get the default player ship
+	Default_player_model = cur_model_index = get_default_player_ship_index();
 
 	Id_select_type_start = Num_ship_classes + 2;
 	Id_select_type_jump_node = Num_ship_classes + 1;
@@ -753,7 +750,9 @@ int create_object(vec3d *pos, int waypoint_instance)
 			obj = create_player(Player_starts, pos, NULL, Default_player_model);
 
 	} else if (cur_model_index == Id_select_type_jump_node) {
-		obj = (new jump_node(pos))->get_objnum();
+		jump_node* jnp = new jump_node(pos);
+		obj = jnp->get_objnum();
+		Jump_nodes.push_back(*jnp);
 	} else if(Ship_info[cur_model_index].flags & SIF_NO_FRED){		
 		obj = -1;
 	} else {  // creating a ship
@@ -1259,6 +1258,7 @@ int common_object_delete(int obj)
 	char msg[255], *name;
 	int i, z, r, type;
 	object *objp;
+	SCP_list<jump_node>::iterator jnp;
 
 	type = Objects[obj].type;
 	if (type == OBJ_START) {
@@ -1379,7 +1379,12 @@ int common_object_delete(int obj)
 		return 0;
 
 	} else if (type == OBJ_JUMP_NODE) {
-		delete Objects[obj].jnp;
+		for (jnp = Jump_nodes.begin(); jnp != Jump_nodes.end(); ++jnp) {
+			if(jnp->get_obj() == &Objects[obj])
+				break;
+		}
+		
+		Jump_nodes.erase(jnp);
 	}
 
 	unmark_object(obj);
