@@ -250,4 +250,7 @@ void clear_key_binding(short key);
 void control_check_indicate();
 void control_config_clear_used_status();
 
+
+void control_config_common_load_overrides();
+
 #endif

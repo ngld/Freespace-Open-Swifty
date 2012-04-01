@@ -528,7 +528,6 @@ char *textify_scancode(int code)
 }
 //XSTR:ON
 
-void control_config_common_load_overrides();
 
 // initialize common control config stuff - call at game startup after localization has been initialized
 void control_config_common_init()
