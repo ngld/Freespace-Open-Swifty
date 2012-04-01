@@ -290,7 +290,7 @@ static int Damage_flash_bright;
 static int Damage_flash_timer;
 
 HudGauge::HudGauge():
-base_w(0), base_h(0), gauge_config(-1), font_num(FONT1), reticle_follow(false),
+base_w(0), base_h(0), gauge_config(-1), font_num(FONT1), reticle_follow(false), lock_color(false), sexp_lock_color(false),
 active(false), off_by_default(false), sexp_override(false), pop_up(false), disabled_views(0), custom_gauge(false),
 texture_target(-1), canvas_w(-1), canvas_h(-1), target_w(-1), target_h(-1)
 {
@@ -307,7 +307,7 @@ texture_target(-1), canvas_w(-1), canvas_h(-1), target_w(-1), target_h(-1)
 	texture_target_fname[0] = '\0';
 
 	custom_name[0] = '\0';
-	custom_text[0] = '\0';
+	custom_text.clear();
 	custom_frame.first_frame = -1;
 	custom_frame.num_frames = 0;
 	custom_frame_offset = 0;
@@ -315,7 +315,7 @@ texture_target(-1), canvas_w(-1), canvas_h(-1), target_w(-1), target_h(-1)
 
 HudGauge::HudGauge(int _gauge_object, int _gauge_config, bool _slew, bool _message, int _disabled_views, int r, int g, int b):
 base_w(0), base_h(0), gauge_config(_gauge_config), gauge_object(_gauge_object), font_num(FONT1),
-reticle_follow(_slew), active(false), off_by_default(false), sexp_override(false), pop_up(false), message_gauge(_message),
+reticle_follow(_slew), lock_color(false), sexp_lock_color(false), active(false), off_by_default(false), sexp_override(false), pop_up(false), message_gauge(_message),
 disabled_views(_disabled_views), custom_gauge(false), textoffset_x(0), textoffset_y(0), texture_target(-1),
 canvas_w(-1), canvas_h(-1), target_w(-1), target_h(-1)
 {
@@ -341,8 +341,8 @@ canvas_w(-1), canvas_h(-1), target_w(-1), target_h(-1)
 	texture_target_fname[0] = '\0';
 
 	custom_name[0] = '\0';
-	custom_text[0] = '\0';
-	default_text[0] = '\0';
+	custom_text.clear();
+	default_text.clear();
 	custom_frame.first_frame = -1;
 	custom_frame.num_frames = 0;
 	custom_frame_offset = 0;
@@ -351,7 +351,7 @@ canvas_w(-1), canvas_h(-1), target_w(-1), target_h(-1)
 // constructor for custom gauges
 HudGauge::HudGauge(int _gauge_config, bool _slew, int r, int g, int b, char* _custom_name, char* _custom_text, char* frame_fname, int txtoffset_x, int txtoffset_y):
 base_w(0), base_h(0), gauge_config(_gauge_config), gauge_object(HUD_OBJECT_CUSTOM), font_num(FONT1), 
-reticle_follow(_slew), active(false), off_by_default(false), sexp_override(false), pop_up(false), message_gauge(false),
+reticle_follow(_slew), lock_color(false), sexp_lock_color(false), active(false), off_by_default(false), sexp_override(false), pop_up(false), message_gauge(false),
 disabled_views(VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY), custom_gauge(true), textoffset_x(txtoffset_x),
  textoffset_y(txtoffset_y), texture_target(-1), canvas_w(-1), canvas_h(-1), target_w(-1), target_h(-1)
 {
@@ -379,11 +379,11 @@ disabled_views(VM_EXTERNAL | VM_DEAD_VIEW | VM_WARP_CHASE | VM_PADLOCK_ANY), cus
 	}
 
 	if(_custom_text) {
-		strcpy_s(custom_text, _custom_text);
-		strcpy_s(default_text, _custom_text);
+		custom_text = _custom_text;
+		default_text = _custom_text;
 	} else {
-		custom_text[0] = '\0';
-		default_text[0] = '\0';
+		custom_text.clear();
+		default_text.clear();
 	}
 
 	custom_frame.first_frame = -1;
@@ -431,9 +431,9 @@ char* HudGauge::getCustomGaugeName()
 	return custom_name;
 }
 
-char* HudGauge::getCustomGaugeText()
+const char* HudGauge::getCustomGaugeText()
 {
-	return custom_text;
+	return custom_text.c_str();
 }
 
 void HudGauge::updateCustomGaugeCoords(int _x, int _y)
@@ -455,13 +455,22 @@ void HudGauge::updateCustomGaugeFrame(int frame_offset)
 	custom_frame_offset = frame_offset;
 }
 
-void HudGauge::updateCustomGaugeText(char* txt)
+void HudGauge::updateCustomGaugeText(const char* txt)
 {
 	if(!custom_gauge) {
 		return;
 	}
 
-	strcpy_s(custom_text, txt);
+	custom_text = txt;
+}
+
+void HudGauge::updateCustomGaugeText(SCP_string& txt)
+{
+	if(!custom_gauge) {
+		return;
+	}
+
+	custom_text = txt;
 }
 
 void HudGauge::setFont()
@@ -544,8 +553,21 @@ int HudGauge::getObjectType()
 	return gauge_object;
 }
 
+void HudGauge::lockConfigColor(bool lock)
+{
+	lock_color = lock;
+}
+
+void HudGauge::sexpLockConfigColor(bool lock)
+{
+	sexp_lock_color = lock;
+}
+
 void HudGauge::updateColor(int r, int g, int b, int a)
 {
+	if(sexp_lock_color || lock_color)
+		return;
+
 	gr_init_alphacolor(&gauge_color, r, g, b, a);
 }
 
@@ -648,6 +670,11 @@ void HudGauge::preprocess()
 
 }
 
+void HudGauge::onFrame(float frametime)
+{
+	
+}
+
 void HudGauge::render(float frametime)
 {
 	if(!custom_gauge) {
@@ -656,11 +683,14 @@ void HudGauge::render(float frametime)
 
 	setGaugeColor();
 
-	if(custom_text) {
-		if(custom_text[0] != '\0') {
-			hud_num_make_mono(custom_text);
-			renderString(position[0] + textoffset_x, position[1] + textoffset_y, custom_text);
-		}
+	if( !custom_text.empty() ) {
+		char *text = new char[custom_text.size()+1];
+		strcpy(text, custom_text.c_str());
+
+		hud_num_make_mono(text);
+		renderString(position[0] + textoffset_x, position[1] + textoffset_y, text);
+
+		delete[] text;
 	}
 
 	if(custom_frame.first_frame > -1) {
@@ -1011,7 +1041,9 @@ void HudGauge::pageIn()
 void HudGauge::initialize()
 {
 	//Reset text to default
-	strcpy_s(custom_text, default_text);
+	custom_text = default_text;
+
+	sexp_lock_color = false;
 }
 
 bool HudGauge::canRender()
@@ -1719,6 +1751,8 @@ void hud_render_gauges(int cockpit_display_num)
 				sip->hud_gauges[j]->preprocess();
 			}
 
+			sip->hud_gauges[j]->onFrame(flFrametime);
+
 			if ( !sip->hud_gauges[j]->setupRenderCanvas(render_target) ) {
 				continue;
 			}
@@ -1736,6 +1770,8 @@ void hud_render_gauges(int cockpit_display_num)
 
 		for(j = 0; j < num_gauges; j++) {
 			default_hud_gauges[j]->preprocess();
+
+			default_hud_gauges[j]->onFrame(flFrametime);
 
 			if ( !default_hud_gauges[j]->canRender() ) {
 				continue;
@@ -1920,6 +1956,8 @@ void HudGaugeDamage::initialize()
 	Damage_flash_timer = timestamp(1);
 	next_flash = timestamp(1);
 	flash_status = false;
+
+	HudGauge::initialize();
 }
 
 void HudGaugeDamage::pageIn()
@@ -2268,6 +2306,8 @@ void HudGaugeTextWarnings::initialize()
 {
 	next_flash = timestamp(0);
 	flash_flags = false;
+
+	HudGauge::initialize();
 }
 
 int HudGaugeTextWarnings::maybeTextFlash()
@@ -3239,6 +3279,8 @@ void HudGaugeObjectiveNotify::initialize()
 	flash_timer[0] = timestamp(1);
 	flash_timer[1] = timestamp(1);
 	flash_flag = false;
+
+	HudGauge::initialize();
 }
 
 void HudGaugeObjectiveNotify::pageIn()

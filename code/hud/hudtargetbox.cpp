@@ -281,6 +281,8 @@ void HudGaugeTargetBox::initialize()
 	for(int i = 0; i < NUM_TBOX_FLASH_TIMERS; i++) {
 		initFlashTimer(i);
 	}
+
+	HudGauge::initialize();
 }
 
 void HudGaugeTargetBox::initFlashTimer(int index)
@@ -1064,6 +1066,8 @@ HudGauge(HUD_OBJECT_EXTRA_TARGET_DATA, HUD_TARGET_MONITOR_EXTRA_DATA, false, fal
 void HudGaugeExtraTargetData::initialize()
 {
 	initDockFlashTimer();
+
+	HudGauge::initialize();
 }
 
 void HudGaugeExtraTargetData::initBracketOffsets(int x, int y)
@@ -1459,8 +1463,7 @@ int hud_targetbox_subsystem_in_view(object *target_objp, int *sx, int *sy)
 
 	subsys = Player_ai->targeted_subsys;
 	if (subsys != NULL ) {
-		find_submodel_instance_point(&subobj_pos, target_objp, subsys->system_info->subobj_num);
-		vm_vec_add2(&subobj_pos, &target_objp->pos);
+		get_subsystem_pos(&subobj_pos, target_objp, subsys);
 
 		// is it subsystem in view
 		if ( Player->subsys_in_view == -1 ) {

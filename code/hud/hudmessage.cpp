@@ -293,6 +293,8 @@ void HudGaugeMessages::initialize()
 	Scroll_needed = false;
 	Scroll_in_progress = false;
 	Scroll_time_id = 1;
+
+	HudGauge::initialize();
 }
 
 void HudGaugeMessages::pageIn()
@@ -411,6 +413,11 @@ void HudGaugeMessages::scrollMessages()
 	if (Scroll_in_progress) {
 		Scroll_time_id = timestamp(Scroll_time);
 	}
+}
+
+void HudGaugeMessages::clearMessages()
+{
+	active_messages.clear();
 }
 
 void HudGaugeMessages::preprocess()
@@ -1170,6 +1177,8 @@ void HudGaugeTalkingHead::initialize()
 {
 	head_anim = NULL;
 	msg_id = -1;
+
+	HudGauge::initialize();
 }
 
 void HudGaugeTalkingHead::initHeaderOffsets(int x, int y)
