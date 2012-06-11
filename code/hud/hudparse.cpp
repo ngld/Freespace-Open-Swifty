@@ -24,7 +24,6 @@
 #include "hud/hudlock.h"
 #include "mission/missiontraining.h"
 #include "mission/missionmessage.h"
-//#include "weapon/emp.h"
 #include "hud/hudparse.h" //Duh.
 #include "radar/radarsetup.h"
 #include "radar/radar.h"
@@ -50,7 +49,7 @@ bool Hud_retail = true;
 int Hud_font = -1;
 
 //WARNING: If you add gauges to this array, make sure to bump num_default_gauges!
-int num_default_gauges = 44;
+int num_default_gauges = 42;
 static int retail_gauges[] = {
 	HUD_OBJECT_MESSAGES,
 	HUD_OBJECT_TRAINING_MESSAGES,
@@ -71,9 +70,6 @@ static int retail_gauges[] = {
 	HUD_OBJECT_TARGET_SHIELD,
 	HUD_OBJECT_ESCORT,
 	HUD_OBJECT_MISSION_TIME,
-	HUD_OBJECT_ETS_WEAPONS,
-	HUD_OBJECT_ETS_SHIELDS,
-	HUD_OBJECT_ETS_ENGINES,
 	HUD_OBJECT_TARGET_MONITOR,
 	HUD_OBJECT_EXTRA_TARGET_DATA,
 	HUD_OBJECT_AFTERBURNER,
@@ -95,7 +91,8 @@ static int retail_gauges[] = {
 	HUD_OBJECT_TARGET_TRI,
 	HUD_OBJECT_MISSILE_TRI,
 	HUD_OBJECT_KILLS,
-	HUD_OBJECT_FIXED_MESSAGES
+	HUD_OBJECT_FIXED_MESSAGES,
+	HUD_OBJECT_ETS_RETAIL
 };
 
 flag_def_list Hud_gauge_types[] = {
@@ -147,7 +144,8 @@ flag_def_list Hud_gauge_types[] = {
 	{ "Target direction",	HUD_OBJECT_TARGET_TRI,			0},
 	{ "Missile indicator",	HUD_OBJECT_MISSILE_TRI,			0},
 	{ "Kills",				HUD_OBJECT_KILLS,				0},
-	{ "Fixed messages",		HUD_OBJECT_FIXED_MESSAGES,		0}
+	{ "Fixed messages",		HUD_OBJECT_FIXED_MESSAGES,		0},
+	{ "Ets retail",			HUD_OBJECT_ETS_RETAIL,			0}
 };
 
 int Num_hud_gauge_types = sizeof(Hud_gauge_types)/sizeof(flag_def_list);
@@ -365,14 +363,14 @@ void parse_hud_gauges_tbl(char *filename)
 
 		// check maximum resolution
 		if(optional_string("$Max:")) {
-			int base_res[2];
-			stuff_int_list(base_res, 2, RAW_INTEGER_TYPE);
+			int max_res[2];
+			stuff_int_list(max_res, 2, RAW_INTEGER_TYPE);
 
-			if(base_res[0] < gr_screen.max_w) {
+			if(max_res[0] < gr_screen.max_w) {
 				skip_to_start_of_string("#Gauge Config");
 				continue;
-			} else if (base_res[0] == gr_screen.max_w) {
-				if(base_res[1] < gr_screen.max_h) {
+			} else if (max_res[0] == gr_screen.max_w) {
+				if(max_res[1] < gr_screen.max_h) {
 					skip_to_start_of_string("#Gauge Config");
 					continue;
 				}
@@ -447,6 +445,7 @@ void load_missing_retail_gauges()
 			for(int j = 0; j < num_loaded_gauges; j++) {
 				if(retail_gauges[i] == default_hud_gauges[j]->getObjectType()) {
 					retail_gauge_loaded = true;
+					break;
 				}
 			}
 
@@ -708,6 +707,9 @@ int parse_gauge_type()
 	if(optional_string("+ETS Engines:")) 
 		return HUD_OBJECT_ETS_ENGINES;
 
+	if(optional_string("+ETS Retail:"))
+		return HUD_OBJECT_ETS_RETAIL;
+
 	if(optional_string("+Target Monitor:")) 
 		return HUD_OBJECT_TARGET_MONITOR;
 
@@ -812,158 +814,161 @@ int parse_gauge_type()
 	return -1;
 }
 
-void load_gauge(int gauge, int base_w, int base_h, int font, int ship_idx, color *use_clr)
+void load_gauge(int gauge, int base_w, int base_h, int hud_font, int ship_idx, color *use_clr)
 {
 	switch(gauge) {
 	case HUD_OBJECT_CUSTOM:
-		load_gauge_custom(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_custom(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_MESSAGES:
-		load_gauge_messages(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_messages(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_TRAINING_MESSAGES:
-		load_gauge_training_messages(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_training_messages(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_SUPPORT:
-		load_gauge_support(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_support(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_DAMAGE:
-		load_gauge_damage(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_damage(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_WINGMAN_STATUS:
-		load_gauge_wingman_status(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_wingman_status(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_AUTO_SPEED:
-		load_gauge_auto_speed(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_auto_speed(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_AUTO_TARGET:
-		load_gauge_auto_target(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_auto_target(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_CMEASURES:
-		load_gauge_countermeasures(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_countermeasures(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_TALKING_HEAD:
-		load_gauge_talking_head(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_talking_head(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_DIRECTIVES:
-		load_gauge_directives(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_directives(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_WEAPONS:
-		load_gauge_weapons(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_weapons(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_OBJ_NOTIFY:
-		load_gauge_objective_notify(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_objective_notify(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_SQUAD_MSG:
-		load_gauge_squad_message(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_squad_message(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_LAG:
-		load_gauge_lag(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_lag(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_MINI_SHIELD:
-		load_gauge_mini_shields(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_mini_shields(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_PLAYER_SHIELD:
-		load_gauge_player_shields(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_player_shields(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_TARGET_SHIELD:
-		load_gauge_target_shields(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_target_shields(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_ESCORT:
-		load_gauge_escort_view(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_escort_view(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_MISSION_TIME:
-		load_gauge_mission_time(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_mission_time(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_ETS_WEAPONS:
-		load_gauge_ets_weapons(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_ets_weapons(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_ETS_SHIELDS:
-		load_gauge_ets_shields(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_ets_shields(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_ETS_ENGINES:
-		load_gauge_ets_engines(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_ets_engines(base_w, base_h, hud_font, ship_idx, use_clr);
+		break;
+	case HUD_OBJECT_ETS_RETAIL:
+		load_gauge_ets_retail(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_TARGET_MONITOR:
-		load_gauge_target_monitor(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_target_monitor(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_EXTRA_TARGET_DATA:
-		load_gauge_extra_target_data(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_extra_target_data(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_RADAR_STD:
-		load_gauge_radar_std(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_radar_std(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_RADAR_ORB:
-		load_gauge_radar_orb(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_radar_orb(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_RADAR_BSG:
-		load_gauge_radar_dradis(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_radar_dradis(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_AFTERBURNER:
-		load_gauge_afterburner(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_afterburner(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_WEAPON_ENERGY:
-		load_gauge_weapon_energy(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_weapon_energy(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_TEXT_WARNINGS:
-		load_gauge_text_warnings(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_text_warnings(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_CENTER_RETICLE:
-		load_gauge_center_reticle(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_center_reticle(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_THROTTLE:
-		load_gauge_throttle(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_throttle(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_THREAT:
-		load_gauge_threat_indicator(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_threat_indicator(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_LEAD:
-		load_gauge_lead(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_lead(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_LEAD_SIGHT:
-		load_gauge_lead_sight(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_lead_sight(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_LOCK:
-		load_gauge_lock(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_lock(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_WEAPON_LINKING:
-		load_gauge_weapon_linking(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_weapon_linking(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_MULTI_MSG:
-		load_gauge_multi_msg(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_multi_msg(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_VOICE_STATUS:
-		load_gauge_voice_status(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_voice_status(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_PING:
-		load_gauge_ping(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_ping(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_SUPERNOVA:
-		load_gauge_supernova(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_supernova(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_OFFSCREEN:
-		load_gauge_offscreen(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_offscreen(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_BRACKETS:
-		load_gauge_brackets(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_brackets(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_ORIENTATION_TEE:
-		load_gauge_orientation_tee(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_orientation_tee(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_HOSTILE_TRI:
-		load_gauge_hostile_tri(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_hostile_tri(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_TARGET_TRI:
-		load_gauge_target_tri(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_target_tri(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_MISSILE_TRI:
-		load_gauge_missile_tri(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_missile_tri(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_KILLS:
-		load_gauge_kills(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_kills(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_FIXED_MESSAGES:
-		load_gauge_fixed_messages(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_fixed_messages(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_FLIGHT_PATH:
 		load_gauge_flight_path(base_w, base_h, font, ship_idx, use_clr);
@@ -991,24 +996,24 @@ inline bool check_base_res(int w, int h)
 	return (w >= 640) && (h >= 480);
 }
 
-void check_color(int *color)
+void check_color(int *colorp)
 {
 	int i;
 
 	for ( i = 0; i < 3; ++i ) {
-		if ( color[i] > 255 ) {
-			color[i] = 255;
-		} else if ( color[i] < 0 ) {
-			color[i] = 0;
+		if ( colorp[i] > 255 ) {
+			colorp[i] = 255;
+		} else if ( colorp[i] < 0 ) {
+			colorp[i] = 0;
 		}
 	}
 }
 
-void load_gauge_custom(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_custom(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int i;
 	int coords[2];
-	int base_res[2];
+	int base_res[2] = {640, 480};
 	char gauge_string[MAX_FILENAME_LEN];
 	char name[MAX_FILENAME_LEN];
 	char text[MAX_FILENAME_LEN];
@@ -1047,8 +1052,8 @@ void load_gauge_custom(int base_w, int base_h, int font, int ship_index, color *
 		if ( optional_string("Font:") ) {
 			stuff_int(&font_num);
 		} else {
-			if ( font >=0 ) {
-				font_num = font;
+			if ( hud_font >=0 ) {
+				font_num = hud_font;
 			}
 		}
 
@@ -1103,7 +1108,7 @@ void load_gauge_custom(int base_w, int base_h, int font, int ship_index, color *
 	}
 }
 
-void load_gauge_lag(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_lag(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -1153,8 +1158,8 @@ void load_gauge_lag(int base_w, int base_h, int font, int ship_index, color *use
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 
@@ -1181,7 +1186,7 @@ void load_gauge_lag(int base_w, int base_h, int font, int ship_index, color *use
 	}
 }
 
-void load_gauge_mini_shields(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_mini_shields(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -1248,8 +1253,8 @@ void load_gauge_mini_shields(int base_w, int base_h, int font, int ship_index, c
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -1287,7 +1292,7 @@ void load_gauge_mini_shields(int base_w, int base_h, int font, int ship_index, c
 	}
 }
 
-void load_gauge_weapon_energy(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_weapon_energy(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -1371,8 +1376,8 @@ void load_gauge_weapon_energy(int base_w, int base_h, int font, int ship_index, 
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -1440,7 +1445,7 @@ void load_gauge_weapon_energy(int base_w, int base_h, int font, int ship_index, 
 	}
 }
 
-void load_gauge_target_shields(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_target_shields(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -1489,8 +1494,8 @@ void load_gauge_target_shields(int base_w, int base_h, int font, int ship_index,
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -1512,7 +1517,7 @@ void load_gauge_target_shields(int base_w, int base_h, int font, int ship_index,
 	}
 }
 
-void load_gauge_player_shields(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_player_shields(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -1561,8 +1566,8 @@ void load_gauge_player_shields(int base_w, int base_h, int font, int ship_index,
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -1584,7 +1589,7 @@ void load_gauge_player_shields(int base_w, int base_h, int font, int ship_index,
 	}
 }
 
-void load_gauge_escort_view(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_escort_view(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -1671,8 +1676,8 @@ void load_gauge_escort_view(int base_w, int base_h, int font, int ship_index, co
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -1740,7 +1745,7 @@ void load_gauge_escort_view(int base_w, int base_h, int font, int ship_index, co
 	}
 }
 
-void load_gauge_afterburner(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_afterburner(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -1809,8 +1814,8 @@ void load_gauge_afterburner(int base_w, int base_h, int font, int ship_index, co
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -1842,7 +1847,7 @@ void load_gauge_afterburner(int base_w, int base_h, int font, int ship_index, co
 }
 
 
-void load_gauge_mission_time(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_mission_time(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -1900,8 +1905,8 @@ void load_gauge_mission_time(int base_w, int base_h, int font, int ship_index, c
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -1935,7 +1940,7 @@ void load_gauge_mission_time(int base_w, int base_h, int font, int ship_index, c
 	}
 }
 
-void load_gauge_threat_indicator(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_threat_indicator(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -2045,8 +2050,8 @@ void load_gauge_threat_indicator(int base_w, int base_h, int font, int ship_inde
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -2086,7 +2091,7 @@ void load_gauge_threat_indicator(int base_w, int base_h, int font, int ship_inde
 	}
 }
 
-void load_gauge_center_reticle(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_center_reticle(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -2163,8 +2168,8 @@ void load_gauge_center_reticle(int base_w, int base_h, int font, int ship_index,
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Filename:")) {
@@ -2199,7 +2204,7 @@ void load_gauge_center_reticle(int base_w, int base_h, int font, int ship_index,
 	}
 }
 
-void load_gauge_throttle(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_throttle(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -2337,8 +2342,8 @@ void load_gauge_throttle(int base_w, int base_h, int font, int ship_index, color
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -2428,7 +2433,140 @@ void load_gauge_throttle(int base_w, int base_h, int font, int ship_index, color
 	}
 }
 
-void load_gauge_ets_weapons(int base_w, int base_h, int font, int ship_index, color *use_clr)
+/**
+ * Load retail style ETS gauge
+ * i.e. treats weapons, shields & engines gauges as a single gauge
+ */
+void load_gauge_ets_retail(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
+{
+	int coords[2];
+	int base_res[2];
+	int bar_h;
+	int letter_offsets[2];
+	int top_offsets[2];
+	int bottom_offsets[2];
+	char ets_letters[num_retail_ets_gauges];
+	char fname[MAX_FILENAME_LEN] = "energy1";
+	bool slew = false;
+	int font_num = FONT1;
+	int colors[3] = {255, 255, 255};
+	bool lock_color = false;
+	int gauge_offset; // distance between micro gauges
+	int i;
+	int gauge_positions[num_retail_ets_gauges];
+
+	if (Lcl_gr) {
+		ets_letters[0] = 'G'; ets_letters[1] = 'S'; ets_letters[2] = 'A'; // German
+	} else if (Lcl_fr) {
+		ets_letters[0] = 'C'; ets_letters[1] = 'B'; ets_letters[2] = 'M'; // French
+	} else {
+		ets_letters[0] = 'G'; ets_letters[1] = 'S'; ets_letters[2] = 'E'; // English
+	}
+
+	// default values which may be overwritten by .tbl
+	if(gr_screen.res == GR_640) {
+		coords[0] = 523;
+		coords[1] = 380;
+
+		base_res[0] = 640;
+		base_res[1] = 480;
+	} else {
+		coords[0] = 880;
+		coords[1] = 648;
+
+		base_res[0] = 1024;
+		base_res[1] = 768;
+	}
+	bar_h = 41;
+	letter_offsets[0] = 2;
+	letter_offsets[1] = 42;
+	top_offsets[0] = 0;
+	top_offsets[1] = 0;
+	bottom_offsets[0] = 0;
+	bottom_offsets[1] = 50;
+	gauge_offset = 20;
+
+	// parse data from .tbl
+	if(check_base_res(base_w, base_h)) {
+		base_res[0] = base_w;
+		base_res[1] = base_h;
+
+		if(optional_string("Position:")) {
+			stuff_int_list(coords, 2);
+		}
+	}
+
+	if ( use_clr != NULL ) {
+		colors[0] = use_clr->red;
+		colors[1] = use_clr->green;
+		colors[2] = use_clr->blue;
+
+		lock_color = true;
+	} else if ( optional_string("Color:") ) {
+		stuff_int_list(colors, 3);
+
+		check_color(colors);
+
+		lock_color = true;
+	}
+
+	if ( optional_string("Font:") ) {
+		stuff_int(&font_num);
+	} else {
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
+		}
+	}
+	if(optional_string("Slew:")) {
+		stuff_boolean(&slew);
+	}
+	if(optional_string("Filename:")) {
+		stuff_string(fname, F_NAME, MAX_FILENAME_LEN);
+	}
+	if(optional_string("Foreground Clip Height:")) {
+		stuff_int(&bar_h);
+	}
+	if(optional_string("Letter Offsets:")) {
+		stuff_int_list(letter_offsets, 2);
+	}
+	if(optional_string("Top Offsets:")) {
+		stuff_int_list(top_offsets, 2);
+	}
+	if(optional_string("Bottom Offsets:")) {
+		stuff_int_list(bottom_offsets, 2);
+	}
+	if(optional_string("Gauge Offset:")) {
+		stuff_int(&gauge_offset);
+	}
+
+	// calculate offsets for the three gauges
+	for (i = 0; i < num_retail_ets_gauges; ++i)
+		gauge_positions[i] = coords[0] + gauge_offset * i;
+
+	HudGaugeEtsRetail* hud_gauge = new HudGaugeEtsRetail();
+
+	hud_gauge->initPosition(coords[0], coords[1]);
+	hud_gauge->initLetters(ets_letters);
+	hud_gauge->initBaseResolution(base_res[0], base_res[1]);
+	hud_gauge->initLetterOffsets(letter_offsets[0], letter_offsets[1]);
+	hud_gauge->initTopOffsets(top_offsets[0], top_offsets[1]);
+	hud_gauge->initBottomOffsets(bottom_offsets[0], bottom_offsets[1]);
+	hud_gauge->initBarHeight(bar_h);
+	hud_gauge->initBitmaps(fname);
+	hud_gauge->initSlew(slew);
+	hud_gauge->initFont(font_num);
+	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
+	hud_gauge->lockConfigColor(lock_color);
+	hud_gauge->initGaugePositions(gauge_positions);
+
+	if(ship_index >= 0) {
+		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
+	} else {
+		default_hud_gauges.push_back(hud_gauge);
+	}
+}
+
+void load_gauge_ets_weapons(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -2501,8 +2639,8 @@ void load_gauge_ets_weapons(int base_w, int base_h, int font, int ship_index, co
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -2545,7 +2683,7 @@ void load_gauge_ets_weapons(int base_w, int base_h, int font, int ship_index, co
 	}
 }
 
-void load_gauge_ets_shields(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_ets_shields(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -2619,8 +2757,8 @@ void load_gauge_ets_shields(int base_w, int base_h, int font, int ship_index, co
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -2664,7 +2802,7 @@ void load_gauge_ets_shields(int base_w, int base_h, int font, int ship_index, co
 	}
 }
 
-void load_gauge_ets_engines(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_ets_engines(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -2739,8 +2877,8 @@ void load_gauge_ets_engines(int base_w, int base_h, int font, int ship_index, co
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -2784,7 +2922,7 @@ void load_gauge_ets_engines(int base_w, int base_h, int font, int ship_index, co
 	}
 }
 
-void load_gauge_extra_target_data(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_extra_target_data(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -2856,8 +2994,8 @@ void load_gauge_extra_target_data(int base_w, int base_h, int font, int ship_ind
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -2900,7 +3038,7 @@ void load_gauge_extra_target_data(int base_w, int base_h, int font, int ship_ind
 	}
 }
 
-void load_gauge_radar_std(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_radar_std(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -2994,8 +3132,8 @@ void load_gauge_radar_std(int base_w, int base_h, int font, int ship_index, colo
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Filename:")) {
@@ -3035,7 +3173,7 @@ void load_gauge_radar_std(int base_w, int base_h, int font, int ship_index, colo
 	}
 }
 
-void load_gauge_radar_orb(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_radar_orb(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -3129,8 +3267,8 @@ void load_gauge_radar_orb(int base_w, int base_h, int font, int ship_index, colo
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Filename:")) {
@@ -3170,7 +3308,7 @@ void load_gauge_radar_orb(int base_w, int base_h, int font, int ship_index, colo
 	}
 }
 
-void load_gauge_radar_dradis(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_radar_dradis(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	// basic radar gauge info
 	int coords[2];
@@ -3233,8 +3371,8 @@ void load_gauge_radar_dradis(int base_w, int base_h, int font, int ship_index, c
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Size:")) {
@@ -3326,7 +3464,7 @@ void load_gauge_radar_dradis(int base_w, int base_h, int font, int ship_index, c
 	}
 }
 
-void load_gauge_text_warnings(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_text_warnings(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -3375,8 +3513,8 @@ void load_gauge_text_warnings(int base_w, int base_h, int font, int ship_index, 
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -3398,7 +3536,7 @@ void load_gauge_text_warnings(int base_w, int base_h, int font, int ship_index, 
 	}
 }
 
-void load_gauge_target_monitor(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_target_monitor(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -3496,8 +3634,8 @@ void load_gauge_target_monitor(int base_w, int base_h, int font, int ship_index,
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Monitor Filename:")) {
@@ -3577,7 +3715,7 @@ void load_gauge_target_monitor(int base_w, int base_h, int font, int ship_index,
 	}
 }
 
-void load_gauge_squad_message(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_squad_message(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -3655,8 +3793,8 @@ void load_gauge_squad_message(int base_w, int base_h, int font, int ship_index, 
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -3720,7 +3858,7 @@ void load_gauge_squad_message(int base_w, int base_h, int font, int ship_index, 
 	}
 }
 
-void load_gauge_objective_notify(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_objective_notify(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -3790,8 +3928,8 @@ void load_gauge_objective_notify(int base_w, int base_h, int font, int ship_inde
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -3841,7 +3979,7 @@ void load_gauge_objective_notify(int base_w, int base_h, int font, int ship_inde
 	}
 }
 
-void load_gauge_weapons(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_weapons(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -3950,8 +4088,8 @@ void load_gauge_weapons(int base_w, int base_h, int font, int ship_index, color 
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -4084,7 +4222,7 @@ void load_gauge_weapons(int base_w, int base_h, int font, int ship_index, color 
 	}
 }
 
-void load_gauge_directives(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_directives(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -4146,8 +4284,8 @@ void load_gauge_directives(int base_w, int base_h, int font, int ship_index, col
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -4199,7 +4337,7 @@ void load_gauge_directives(int base_w, int base_h, int font, int ship_index, col
 	}
 }
 
-void load_gauge_talking_head(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_talking_head(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -4256,8 +4394,8 @@ void load_gauge_talking_head(int base_w, int base_h, int font, int ship_index, c
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Filename:")) {
@@ -4291,7 +4429,7 @@ void load_gauge_talking_head(int base_w, int base_h, int font, int ship_index, c
 	}
 }
 
-void load_gauge_countermeasures(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_countermeasures(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -4345,8 +4483,8 @@ void load_gauge_countermeasures(int base_w, int base_h, int font, int ship_index
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -4380,7 +4518,7 @@ void load_gauge_countermeasures(int base_w, int base_h, int font, int ship_index
 	}
 }
 
-void load_gauge_auto_target(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_auto_target(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -4438,8 +4576,8 @@ void load_gauge_auto_target(int base_w, int base_h, int font, int ship_index, co
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -4483,7 +4621,7 @@ void load_gauge_auto_target(int base_w, int base_h, int font, int ship_index, co
 	}
 }
 
-void load_gauge_auto_speed(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_auto_speed(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -4540,8 +4678,8 @@ void load_gauge_auto_speed(int base_w, int base_h, int font, int ship_index, col
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -4585,7 +4723,7 @@ void load_gauge_auto_speed(int base_w, int base_h, int font, int ship_index, col
 	}
 }
 
-void load_gauge_wingman_status(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_wingman_status(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -4674,8 +4812,8 @@ void load_gauge_wingman_status(int base_w, int base_h, int font, int ship_index,
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -4771,7 +4909,7 @@ void load_gauge_wingman_status(int base_w, int base_h, int font, int ship_index,
 	}
 }
 
-void load_gauge_damage(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_damage(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -4839,8 +4977,8 @@ void load_gauge_damage(int base_w, int base_h, int font, int ship_index, color *
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -4904,7 +5042,7 @@ void load_gauge_damage(int base_w, int base_h, int font, int ship_index, color *
 	}
 }
 
-void load_gauge_support(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_support(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -4970,8 +5108,8 @@ void load_gauge_support(int base_w, int base_h, int font, int ship_index, color 
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -5013,7 +5151,7 @@ void load_gauge_support(int base_w, int base_h, int font, int ship_index, color 
 	}
 }
 
-void load_gauge_training_messages(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_training_messages(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -5045,8 +5183,8 @@ void load_gauge_training_messages(int base_w, int base_h, int font, int ship_ind
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 
@@ -5062,7 +5200,7 @@ void load_gauge_training_messages(int base_w, int base_h, int font, int ship_ind
 	}
 }
 
-void load_gauge_messages(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_messages(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -5119,8 +5257,8 @@ void load_gauge_messages(int base_w, int base_h, int font, int ship_index, color
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 
@@ -5167,7 +5305,7 @@ void load_gauge_messages(int base_w, int base_h, int font, int ship_index, color
 	}
 }
 
-void load_gauge_fixed_messages(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_fixed_messages(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -5199,8 +5337,8 @@ void load_gauge_fixed_messages(int base_w, int base_h, int font, int ship_index,
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 
@@ -5216,7 +5354,7 @@ void load_gauge_fixed_messages(int base_w, int base_h, int font, int ship_index,
 	}
 }
 
-void load_gauge_weapon_linking(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_weapon_linking(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -5308,8 +5446,8 @@ void load_gauge_weapon_linking(int base_w, int base_h, int font, int ship_index,
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -5370,7 +5508,7 @@ void load_gauge_weapon_linking(int base_w, int base_h, int font, int ship_index,
 	}
 }
 
-void load_gauge_multi_msg(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_multi_msg(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -5402,8 +5540,8 @@ void load_gauge_multi_msg(int base_w, int base_h, int font, int ship_index, colo
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 
@@ -5419,7 +5557,7 @@ void load_gauge_multi_msg(int base_w, int base_h, int font, int ship_index, colo
 	}
 }
 
-void load_gauge_voice_status(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_voice_status(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -5468,8 +5606,8 @@ void load_gauge_voice_status(int base_w, int base_h, int font, int ship_index, c
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -5491,7 +5629,7 @@ void load_gauge_voice_status(int base_w, int base_h, int font, int ship_index, c
 	}
 }
 
-void load_gauge_ping(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_ping(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -5540,8 +5678,8 @@ void load_gauge_ping(int base_w, int base_h, int font, int ship_index, color *us
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -5563,7 +5701,7 @@ void load_gauge_ping(int base_w, int base_h, int font, int ship_index, color *us
 	}
 }
 
-void load_gauge_supernova(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_supernova(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -5612,8 +5750,8 @@ void load_gauge_supernova(int base_w, int base_h, int font, int ship_index, colo
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -5635,7 +5773,7 @@ void load_gauge_supernova(int base_w, int base_h, int font, int ship_index, colo
 	}
 }
 
-void load_gauge_lock(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_lock(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int base_res[2];
 	int Lock_gauge_half_w;
@@ -5729,8 +5867,8 @@ void load_gauge_lock(int base_w, int base_h, int font, int ship_index, color *us
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Lock Filename:")) {
@@ -5774,7 +5912,7 @@ void load_gauge_lock(int base_w, int base_h, int font, int ship_index, color *us
 	}
 }
 
-void load_gauge_offscreen(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_offscreen(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int base_res[2];
 	float Max_offscreen_tri_seperation;
@@ -5809,8 +5947,8 @@ void load_gauge_offscreen(int base_w, int base_h, int font, int ship_index, colo
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 
@@ -5829,7 +5967,7 @@ void load_gauge_offscreen(int base_w, int base_h, int font, int ship_index, colo
 	}
 }
 
-void load_gauge_brackets(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_brackets(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int base_res[2];
 	int min_target_box[2];
@@ -5861,8 +5999,8 @@ void load_gauge_brackets(int base_w, int base_h, int font, int ship_index, color
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Dot Filename:")) {
@@ -5883,7 +6021,7 @@ void load_gauge_brackets(int base_w, int base_h, int font, int ship_index, color
 	}
 }
 
-void load_gauge_hostile_tri(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_hostile_tri(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -5927,8 +6065,8 @@ void load_gauge_hostile_tri(int base_w, int base_h, int font, int ship_index, co
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -5960,7 +6098,7 @@ void load_gauge_hostile_tri(int base_w, int base_h, int font, int ship_index, co
 	}
 }
 
-void load_gauge_target_tri(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_target_tri(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -6004,8 +6142,8 @@ void load_gauge_target_tri(int base_w, int base_h, int font, int ship_index, col
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -6037,7 +6175,7 @@ void load_gauge_target_tri(int base_w, int base_h, int font, int ship_index, col
 	}
 }
 
-void load_gauge_missile_tri(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_missile_tri(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -6081,8 +6219,8 @@ void load_gauge_missile_tri(int base_w, int base_h, int font, int ship_index, co
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -6114,7 +6252,7 @@ void load_gauge_missile_tri(int base_w, int base_h, int font, int ship_index, co
 	}
 }
 
-void load_gauge_lead(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_lead(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int base_res[2];
 	float Lead_indicator_half[2];
@@ -6167,8 +6305,8 @@ void load_gauge_lead(int base_w, int base_h, int font, int ship_index, color *us
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Filename:")) {
@@ -6196,7 +6334,7 @@ void load_gauge_lead(int base_w, int base_h, int font, int ship_index, color *us
 	}
 }
 
-void load_gauge_orientation_tee(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_orientation_tee(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -6234,8 +6372,8 @@ void load_gauge_orientation_tee(int base_w, int base_h, int font, int ship_index
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
@@ -6259,7 +6397,7 @@ void load_gauge_orientation_tee(int base_w, int base_h, int font, int ship_index
 	}
 }
 
-void load_gauge_lead_sight(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_lead_sight(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -6308,8 +6446,8 @@ void load_gauge_lead_sight(int base_w, int base_h, int font, int ship_index, col
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Filename:")) {
@@ -6331,7 +6469,7 @@ void load_gauge_lead_sight(int base_w, int base_h, int font, int ship_index, col
 	}
 }
 
-void load_gauge_kills(int base_w, int base_h, int font, int ship_index, color *use_clr)
+void load_gauge_kills(int base_w, int base_h, int hud_font, int ship_index, color *use_clr)
 {
 	int coords[2];
 	int base_res[2];
@@ -6391,8 +6529,8 @@ void load_gauge_kills(int base_w, int base_h, int font, int ship_index, color *u
 	if ( optional_string("Font:") ) {
 		stuff_int(&font_num);
 	} else {
-		if ( font >=0 ) {
-			font_num = font;
+		if ( hud_font >=0 ) {
+			font_num = hud_font;
 		}
 	}
 	if(optional_string("Slew:")) {
