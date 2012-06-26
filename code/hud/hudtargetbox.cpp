@@ -259,6 +259,11 @@ void HudGaugeTargetBox::initCargoScanSize(int w, int h)
 	Cargo_scan_h = h;
 }
 
+void HudGaugeTargetBox::initDesaturate(bool desaturate)
+{
+	Desaturated = desaturate;
+}
+
 void HudGaugeTargetBox::initBitmaps(char *fname_monitor, char *fname_monitor_mask, char *fname_integrity, char *fname_static)
 {
 	Monitor_frame.first_frame = bm_load_animation(fname_monitor, &Monitor_frame.num_frames);
@@ -545,8 +550,11 @@ void HudGaugeTargetBox::renderTargetShip(object *target_objp)
 
 			opengl_shader_set_animated_effect(Targetbox_shader_effect);
 		}
-		gr_stencil_set(GR_STENCIL_READ);
-		Interp_desaturate = true;
+
+		if ( Monitor_mask >= 0 ) {
+			gr_stencil_set(GR_STENCIL_READ);
+		}
+		Interp_desaturate = Desaturated;
 		// maybe render a special hud-target-only model
 		if(target_sip->model_num_hud >= 0){
 			model_render( target_sip->model_num_hud, &target_objp->orient, &obj_pos, flags | MR_LOCK_DETAIL | MR_AUTOCENTER | MR_NO_FOGGING);
@@ -555,7 +563,10 @@ void HudGaugeTargetBox::renderTargetShip(object *target_objp)
 		}
 		Interp_desaturate = false;
 		ship_model_stop( target_objp );
-		gr_stencil_set(GR_STENCIL_NONE);
+
+		if ( Monitor_mask >= 0 ) {
+			gr_stencil_set(GR_STENCIL_NONE);
+		}
 
 		sx = 0;
 		sy = 0;
@@ -661,8 +672,21 @@ void HudGaugeTargetBox::renderTargetDebris(object *target_objp)
 			opengl_shader_set_animated_effect(Targetbox_shader_effect);
 		}
 
+		if ( Monitor_mask >= 0 ) {
+			gr_stencil_set(GR_STENCIL_READ);
+		}
+
+		Interp_desaturate = Desaturated;
+
 		// This calls the colour that doesn't get reset
 		submodel_render( debrisp->model_num, debrisp->submodel_num, &target_objp->orient, &obj_pos, flags | MR_LOCK_DETAIL | MR_NO_FOGGING );
+
+		Interp_desaturate = false;
+
+		if ( Monitor_mask >= 0 ) {
+			gr_stencil_set(GR_STENCIL_NONE);
+		}
+
 		renderTargetClose();
 	}
 	renderTargetForeground();
@@ -787,7 +811,20 @@ void HudGaugeTargetBox::renderTargetWeapon(object *target_objp)
 			opengl_shader_set_animated_effect(Targetbox_shader_effect);
 		}
 
+		if ( Monitor_mask >= 0 ) {
+			gr_stencil_set(GR_STENCIL_READ);
+		}
+
+		Interp_desaturate = Desaturated;
+
 		model_render( viewed_model_num, &viewed_obj->orient, &obj_pos, flags | MR_LOCK_DETAIL | MR_AUTOCENTER | MR_IS_MISSILE | MR_NO_FOGGING, -1, -1, replacement_textures);
+
+		Interp_desaturate = false;
+
+		if ( Monitor_mask >= 0 ) {
+			gr_stencil_set(GR_STENCIL_NONE);
+		}
+
 		renderTargetClose();
 	}
 	renderTargetForeground(); 
@@ -895,7 +932,20 @@ void HudGaugeTargetBox::renderTargetAsteroid(object *target_objp)
 			opengl_shader_set_animated_effect(Targetbox_shader_effect);
 		}
 
+		if ( Monitor_mask >= 0 ) {
+			gr_stencil_set(GR_STENCIL_READ);
+		}
+
+		Interp_desaturate = Desaturated;
+
 		model_render(Asteroid_info[asteroidp->asteroid_type].model_num[pof], &target_objp->orient, &obj_pos, flags | MR_LOCK_DETAIL | MR_NO_FOGGING );
+
+		Interp_desaturate = false;
+
+		if ( Monitor_mask >= 0 ) {
+			gr_stencil_set(GR_STENCIL_NONE);
+		}
+
 		renderTargetClose();
 	}
 	renderTargetForeground();
@@ -964,7 +1014,17 @@ void HudGaugeTargetBox::renderTargetJumpNode(object *target_objp)
 			vm_vec_copy_scale(&obj_pos,&orient_vec,factor);
 
 			renderTargetSetup(&camera_eye, &camera_orient, 0.5f);
+
+			if ( Monitor_mask >= 0 ) {
+				gr_stencil_set(GR_STENCIL_READ);
+			}
+
 			jnp->Render( &obj_pos );
+
+			if ( Monitor_mask >= 0 ) {
+				gr_stencil_set(GR_STENCIL_NONE);
+			}
+
 			renderTargetClose();
 		}
 
