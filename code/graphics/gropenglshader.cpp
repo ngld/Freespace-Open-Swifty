@@ -60,7 +60,7 @@ struct opengl_shader_uniform_reference_t {
 static opengl_shader_uniform_reference_t GL_Uniform_Reference_Main[] = {
 	{ SDR_FLAG_LIGHT,		1, {"n_lights"}, 0, {}, "Lighting" },
 	{ SDR_FLAG_FOG,			0, {}, 0, {}, "Fog Effect" },
-	{ SDR_FLAG_DIFFUSE_MAP, 1, {"sBasemap"}, 0, {}, "Diffuse Mapping"},
+	{ SDR_FLAG_DIFFUSE_MAP, 5, {"sBasemap", "desaturate", "desaturate_r", "desaturate_g", "desaturate_b"}, 0, {}, "Diffuse Mapping"},
 	{ SDR_FLAG_GLOW_MAP,	1, {"sGlowmap"}, 0, {}, "Glow Mapping" },
 	{ SDR_FLAG_SPEC_MAP,	1, {"sSpecmap"}, 0, {}, "Specular Mapping" },
 	{ SDR_FLAG_NORMAL_MAP,	1, {"sNormalmap"}, 0, {}, "Normal Mapping" },

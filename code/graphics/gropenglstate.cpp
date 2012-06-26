@@ -746,12 +746,12 @@ void opengl_state::SetStencilType(gr_stencil_type st)
     switch (st) {
         case STENCIL_TYPE_NONE:
             glStencilFunc( GL_NEVER, 1, 0xFFFF );
-            glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
+            glStencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
             break;
             	
         case STENCIL_TYPE_READ:
             glStencilFunc( GL_NOTEQUAL, 1, 0XFFFF );
-            glStencilOp( GL_KEEP, GL_KEEP, GL_REPLACE );
+            glStencilOp( GL_KEEP, GL_KEEP, GL_KEEP );
             break;
             			
         case STENCIL_TYPE_WRITE:
@@ -786,7 +786,7 @@ void opengl_setup_render_states(int &r, int &g, int &b, int &alpha, int &tmap_ty
 
 	tmap_type = TCACHE_TYPE_NORMAL;
 
-	if ( flags & TMAP_FLAG_TEXTURED && !(flags & TMAP_FLAG_DESATURATE) ) {
+	if ( flags & TMAP_FLAG_TEXTURED ) {
 		r = g = b = 255;
 	} else {
 		r = gr_screen.current_color.red;
