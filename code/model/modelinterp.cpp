@@ -82,6 +82,7 @@ static float Interp_box_scale = 1.0f; // this is used to scale both detail boxes
 static vec3d Interp_render_box_min = ZERO_VECTOR;
 static vec3d Interp_render_box_max = ZERO_VECTOR;
 static float Interp_render_sphere_radius = 0.0f;
+static vec3d Interp_render_sphere_offset = ZERO_VECTOR;
 
 // -------------------------------------------------------------------
 // lighting save stuff 
@@ -363,6 +364,7 @@ void interp_clear_instance()
 	Interp_render_box_min = vmd_zero_vector;
 	Interp_render_box_max = vmd_zero_vector;
 	Interp_render_sphere_radius = 0.0f;
+	Interp_render_sphere_offset = vmd_zero_vector;
 }
 
 /**
@@ -855,6 +857,7 @@ void model_interp_tmappoly(ubyte * p,polymodel * pm)
 				SPECMAP = -1;
 				NORMMAP = -1;
 				HEIGHTMAP = -1;
+				MISCMAP = -1;
 			} else {
 
 				int vertnum = verts[i].vertnum;
@@ -948,6 +951,8 @@ void model_interp_tmappoly(ubyte * p,polymodel * pm)
 							NORMMAP = model_interp_get_texture(&tmap->textures[TM_NORMAL_TYPE], Interp_base_frametime);
 							HEIGHTMAP = model_interp_get_texture(&tmap->textures[TM_HEIGHT_TYPE], Interp_base_frametime);
 						}
+
+						MISCMAP = model_interp_get_texture(&tmap->textures[TM_MISC_TYPE], Interp_base_frametime);
 					}
 
 					//*****
@@ -979,6 +984,8 @@ void model_interp_tmappoly(ubyte * p,polymodel * pm)
 								case TM_HEIGHT_TYPE:
 									HEIGHTMAP = tex;
 									break;
+								case TM_MISC_TYPE:
+									MISCMAP = tex;
 								default:
 									break;
 							}
@@ -1018,6 +1025,7 @@ void model_interp_tmappoly(ubyte * p,polymodel * pm)
 	SPECMAP = -1;
 	NORMMAP = -1;
 	HEIGHTMAP = -1;
+	MISCMAP = -1;
 
 	if (Interp_flags & (MR_SHOW_OUTLINE|MR_SHOW_OUTLINE_PRESET) )	{
 	
@@ -1787,13 +1795,9 @@ void model_render_insignias(polymodel *pm, int detail_level)
 	int idx, s_idx;
 	vertex vecs[3];
 	vertex *vlist[3] = { &vecs[0], &vecs[1], &vecs[2] };
-	vec3d t1, t2, t3, x;
+	vec3d t1, t2, t3;
 	int i1, i2, i3;
 	int tmap_flags = TMAP_FLAG_TEXTURED | TMAP_FLAG_CORRECT | TMAP_HTL_3D_UNLIT;
-
-	x.xyz.x=0;
-	x.xyz.y=0;
-	x.xyz.z=0;
 
 	// set the proper texture	
 	gr_set_bitmap(Interp_insignia_bitmap, GR_ALPHABLEND_NONE, GR_BITBLT_MODE_NORMAL, 0.65f);
@@ -2008,10 +2012,8 @@ void model_render(int model_num, matrix *orient, vec3d * pos, uint flags, int ob
 		Interp_light = 1.0f;
 	}
 
-	int num_lights = 0;
-
 	if ( !(flags & MR_NO_LIGHTING ) )	{
-		num_lights = light_filter_push( objnum, pos, pm->rad );
+		light_filter_push( objnum, pos, pm->rad );
 	}
 
 	model_really_render(model_num, orient, pos, flags, objnum);
@@ -2496,42 +2498,32 @@ void model_render_glow_points(polymodel *pm, ship *shipp, matrix *orient, vec3d 
 
 				if (flick == 1) {
 					glow_point *gpt = &bank->points[j];
-					vec3d pnt = gpt->pnt;
-					vec3d norm = gpt->norm;
-				
-					if (bank->submodel_parent > 0) { //this is where it rotates for the submodel parent-Bobboau
-						if (pm->submodel[bank->submodel_parent].blown_off)
-							continue;
+                    vec3d loc_offset = gpt->pnt;
+                    vec3d loc_norm = gpt->norm;
+                    vec3d world_pnt;
+                    vec3d world_norm;
+                    vec3d tempv;
+                    vec3d submodel_static_offset; // The associated submodel's static offset in the ship's frame of reference
+                    bool submodel_rotation = false;
 
-						angles angs = pm->submodel[bank->submodel_parent].angs;
-						angs.b = PI2 - angs.b;
-						angs.p = PI2 - angs.p;
-						angs.h = PI2 - angs.h;
+					if ( bank->submodel_parent > 0 && pm->submodel[bank->submodel_parent].can_move && (gameseq_get_state_idx(GS_STATE_LAB) == -1) && shipp != NULL ) {
+						model_find_submodel_offset(&submodel_static_offset, Ship_info[shipp->ship_info_index].model_num, bank->submodel_parent);
 
-						// Compute final submodel orientation by using the orientation
-						// matrix and the rotation angles.
-						// By using this kind of computation, the rotational angles can
-						// always be computed relative to the submodel itself, instead
-						// of relative to the parent - KeldorKatarn
-						matrix rotation_matrix = pm->submodel[bank->submodel_parent].orientation;
-						vm_rotate_matrix_by_angles(&rotation_matrix, &angs);
-
-						matrix inv_orientation;
-						vm_copy_transpose_matrix(&inv_orientation, &pm->submodel[bank->submodel_parent].orientation);
-
-						matrix submodel_matrix;
-						vm_matrix_x_matrix(&submodel_matrix, &rotation_matrix, &inv_orientation);
-
-						vec3d offset = pm->submodel[bank->submodel_parent].offset;
-						vm_vec_sub(&pnt, &pnt, &offset);
-						vec3d p = pnt;
-						vec3d n = norm;
-						vm_vec_rotate(&pnt, &p, &submodel_matrix);
-						vm_vec_rotate(&norm, &n, &submodel_matrix);
-						vm_vec_add2(&pnt, &offset);
+						submodel_rotation = true;
 					}
 
-					vec3d tempv;
+					if ( submodel_rotation ) {
+						vm_vec_sub(&loc_offset, &gpt->pnt, &submodel_static_offset);
+
+						tempv = loc_offset;
+						find_submodel_instance_point_normal(&loc_offset, &loc_norm, &Objects[shipp->objnum], bank->submodel_parent, &tempv, &loc_norm);
+					}
+
+					vm_vec_unrotate(&world_pnt, &loc_offset, orient);
+					vm_vec_add2(&world_pnt, pos);
+					vm_vec_sub(&tempv, &View_position, &world_pnt);
+					vm_vec_normalize(&tempv);
+					vm_vec_unrotate(&world_norm, &loc_norm, orient);
 
 					switch (bank->type)
 					{
@@ -2539,13 +2531,13 @@ void model_render_glow_points(polymodel *pm, ship *shipp, matrix *orient, vec3d 
 						{
 							float d;
 
-							if ( IS_VEC_NULL(&norm) ) {
+							if ( IS_VEC_NULL(&loc_norm) ) {
 								d = 1.0f;	//if given a nul vector then always show it
 							} else {
-								vm_vec_sub(&tempv,&View_position,&pnt);
+								vm_vec_sub(&tempv,&View_position,&loc_offset);
 								vm_vec_normalize(&tempv);
 
-								d = vm_vec_dot(&tempv,&norm);
+								d = vm_vec_dot(&tempv,&loc_norm);
 								d -= 0.25;	
 							}
 					
@@ -2562,7 +2554,7 @@ void model_render_glow_points(polymodel *pm, ship *shipp, matrix *orient, vec3d 
 								// fade them in the nebula as well
 								if (The_mission.flags & MISSION_FLAG_FULLNEB) {
 									vec3d npnt;
-									vm_vec_add(&npnt, &pnt, pos);
+									vm_vec_add(&npnt, &loc_offset, pos);
 
 									d *= (1.0f - neb2_get_fog_intensity(&npnt));
 									w *= 1.5;	//make it bigger in a nebula
@@ -2573,13 +2565,20 @@ void model_render_glow_points(polymodel *pm, ship *shipp, matrix *orient, vec3d 
 									gr_fog_set(GR_FOGMODE_NONE, 0, 0, 0);
 	
 								if (!Cmdline_nohtl) {
-									g3_transfer_vertex(&p, &pnt);
+									g3_transfer_vertex(&p, &world_pnt);
 								} else {
-									g3_rotate_vertex(&p, &pnt);
+									g3_rotate_vertex(&p, &world_pnt);
 								}
-
-								gr_set_bitmap( bank->glow_bitmap, GR_ALPHABLEND_FILTER, GR_BITBLT_MODE_NORMAL, d );
-								g3_draw_bitmap(&p, 0, (w * 0.5f), TMAP_FLAG_TEXTURED | TMAP_HTL_3D_UNLIT, w);
+ 
+								p.r = p.g = p.b = p.a = (ubyte)(255.0f * d);
+								batch_add_bitmap(
+									bank->glow_bitmap,
+									TMAP_FLAG_GOURAUD | TMAP_FLAG_RGB | TMAP_FLAG_TEXTURED | TMAP_HTL_3D_UNLIT | TMAP_FLAG_SOFT_QUAD,  
+									&p,
+									0,
+									(w * 0.5f),
+									d
+								);
 							} //d>0.0f
 
 							break;
@@ -2590,16 +2589,16 @@ void model_render_glow_points(polymodel *pm, ship *shipp, matrix *orient, vec3d 
 							vertex verts[4];
 							vec3d fvec, top1, bottom1, top2, bottom2, start, end;
 
-							vm_vec_add2(&norm, &pnt);
+							vm_vec_add2(&loc_norm, &loc_offset);
 
-							vm_vec_rotate(&start, &pnt, orient);
-							vm_vec_rotate(&end, &norm, orient);
+							vm_vec_rotate(&start, &loc_offset, orient);
+							vm_vec_rotate(&end, &loc_norm, orient);
 							vm_vec_sub(&fvec, &end, &start);
 
 							vm_vec_normalize(&fvec);
 
-							moldel_calc_facing_pts(&top1, &bottom1, &fvec, &pnt, gpt->radius, 1.0f, &View_position);
-							moldel_calc_facing_pts(&top2, &bottom2, &fvec, &norm, gpt->radius, 1.0f, &View_position);
+							moldel_calc_facing_pts(&top1, &bottom1, &fvec, &loc_offset, gpt->radius, 1.0f, &View_position);
+							moldel_calc_facing_pts(&top2, &bottom2, &fvec, &loc_norm, gpt->radius, 1.0f, &View_position);
 
 							int idx = 0;
 
@@ -2631,7 +2630,7 @@ void model_render_glow_points(polymodel *pm, ship *shipp, matrix *orient, vec3d 
 							verts[3].texture_position.u = 0.0f;
 							verts[3].texture_position.v = 1.0f;
 
-							vm_vec_sub(&tempv,&View_position,&pnt);
+							vm_vec_sub(&tempv,&View_position,&loc_offset);
 							vm_vec_normalize(&tempv);
 
 							if (The_mission.flags & MISSION_FLAG_FULLNEB) {
@@ -2977,6 +2976,7 @@ void model_really_render(int model_num, matrix *orient, vec3d * pos, uint flags,
 	if (is_outlines_only_htl || (!Cmdline_nohtl && !is_outlines_only)) {
 		transparent_submodel ts;
 		ts.is_submodel = false;
+		ts.pop_matrix = false;
 		transparent_submodels.push_back(ts);
 		model_render_buffers(pm, pm->detail[Interp_detail_level]);
 	} else {
@@ -2993,6 +2993,7 @@ void model_really_render(int model_num, matrix *orient, vec3d * pos, uint flags,
 				if (is_outlines_only_htl || (!Cmdline_nohtl && !is_outlines_only)) {
 					transparent_submodel ts;
 					ts.is_submodel = false;
+					ts.pop_matrix = false;
 					transparent_submodels.push_back(ts);
 					model_render_children_buffers( pm, i, Interp_detail_level );
 				} else {
@@ -3018,6 +3019,7 @@ void model_really_render(int model_num, matrix *orient, vec3d * pos, uint flags,
 			SPECMAP = obj->spec_map;
 			NORMMAP = obj->norm_map;
 			HEIGHTMAP = obj->height_map;
+			MISCMAP = obj->misc_map;
 
 			gr_push_scale_matrix(&obj->scale);
 			gr_set_bitmap(obj->texture, obj->blend_filter, GR_BITBLT_MODE_NORMAL, obj->alpha);
@@ -3033,10 +3035,11 @@ void model_really_render(int model_num, matrix *orient, vec3d * pos, uint flags,
 			SPECMAP = -1;
 			NORMMAP = -1;
 			HEIGHTMAP = -1;
+			MISCMAP = -1;
 		}
 		ts->transparent_objects.clear();
 		
-		if(ts->is_submodel)
+		if(ts->pop_matrix)
 			g3_done_instance(true);
 	}
 	transparent_submodels.clear();
@@ -3086,11 +3089,6 @@ void model_really_render(int model_num, matrix *orient, vec3d * pos, uint flags,
 		model_render_shields(pm);
 	}	
 
-	// start rendering glow points -Bobboau
-	if ( (pm->n_glow_point_banks) && !is_outlines_only && !is_outlines_only_htl && !Glowpoint_override ) {
-		model_render_glow_points(pm, shipp, orient, pos);
-	}
-
 	if ( Interp_flags & MR_SHOW_PATHS ){
 		if (Cmdline_nohtl) model_draw_paths(model_num);
 		else model_draw_paths_htl(model_num);
@@ -3106,6 +3104,11 @@ void model_really_render(int model_num, matrix *orient, vec3d * pos, uint flags,
 	}
 
 	g3_done_instance(use_api);
+
+	// start rendering glow points -Bobboau
+	if ( (pm->n_glow_point_banks) && !is_outlines_only && !is_outlines_only_htl && !Glowpoint_override ) {
+		model_render_glow_points(pm, shipp, orient, pos);
+	}
 
 	// Draw the thruster glow
 	if ( !is_outlines_only && !is_outlines_only_htl ) {
@@ -3237,6 +3240,7 @@ void submodel_render(int model_num, int submodel_num, matrix *orient, vec3d * po
 
 		transparent_submodel ts;
 		ts.is_submodel = false;
+		ts.pop_matrix = false;
 		transparent_submodels.push_back(ts);
 
 		model_render_buffers(pm, submodel_num);
@@ -3250,6 +3254,7 @@ void submodel_render(int model_num, int submodel_num, matrix *orient, vec3d * po
 			SPECMAP = obj->spec_map;
 			NORMMAP = obj->norm_map;
 			HEIGHTMAP = obj->height_map;
+			MISCMAP = obj->misc_map;
 
 			gr_push_scale_matrix(&obj->scale);
 			gr_set_bitmap(obj->texture, obj->blend_filter, GR_BITBLT_MODE_NORMAL, obj->alpha);
@@ -3265,6 +3270,7 @@ void submodel_render(int model_num, int submodel_num, matrix *orient, vec3d * po
 			SPECMAP = -1;
 			NORMMAP = -1;
 			HEIGHTMAP = -1;
+			MISCMAP = -1;
 		}
 		ts_i->transparent_objects.clear();
 		transparent_submodels.clear();
@@ -4303,11 +4309,7 @@ inline int in_box(vec3d *min, vec3d *max, vec3d *pos)
 
 inline int in_sphere(vec3d *pos, float radius)
 {
-	vec3d point;
-
-	vm_vec_sub(&point, &View_position, pos);
-
-	if ( vm_vec_dist(&point, pos) <= radius )
+	if ( vm_vec_dist(&View_position, pos) <= radius )
 		return 1;
 	else
 		return -1;
@@ -4352,7 +4354,12 @@ void model_render_children_buffers(polymodel *pm, int mn, int detail_level)
 	if ( !(Interp_flags & MR_FULL_DETAIL) && model->use_render_sphere ) {
 		Interp_render_sphere_radius = model->render_sphere_radius * Interp_box_scale;
 
-		if ( (-model->use_render_sphere + in_sphere(&model->offset, Interp_render_sphere_radius)) )
+		// TODO: doesn't consider submodel rotations yet -zookeeper
+		vec3d offset;
+		model_find_submodel_offset(&offset, pm->id, mn);
+		vm_vec_add2(&offset, &model->render_sphere_offset);
+
+		if ( (-model->use_render_sphere + in_sphere(&offset, Interp_render_sphere_radius)) )
 			return;
 	}
 
@@ -4390,6 +4397,19 @@ void model_render_children_buffers(polymodel *pm, int mn, int detail_level)
 	
 	transparent_submodel ts;
 	ts.is_submodel = true;
+	ts.pop_matrix = true;
+
+	bool childs = false;
+	i = model->first_child;
+	while (i >= 0) {
+		if ( !pm->submodel[i].is_thruster ) {
+			childs = true;
+			ts.pop_matrix = false;
+			break;
+		}
+
+		i = pm->submodel[i].next_sibling;
+	}
 	ts.model = model;
 	
 	memcpy(&ts.orient,&submodel_matrix,sizeof(matrix));
@@ -4410,6 +4430,15 @@ void model_render_children_buffers(polymodel *pm, int mn, int detail_level)
 		}
 
 		i = pm->submodel[i].next_sibling;
+	}
+
+	if(childs)
+	{
+		ts.is_submodel = false;
+		ts.pop_matrix = true;
+		ts.model = 0;
+		ts.transparent_objects.clear();
+		transparent_submodels.push_back(ts);
 	}
 
 	Interp_flags = fl;
@@ -4448,7 +4477,12 @@ void model_render_buffers(polymodel *pm, int mn, bool is_child)
 	if ( !is_child && !(Interp_flags & MR_FULL_DETAIL) && model->use_render_sphere ) {
 		Interp_render_sphere_radius = model->render_sphere_radius * Interp_box_scale;
 
-		if ( (-model->use_render_sphere + in_sphere(&model->offset, Interp_render_sphere_radius)) )
+		// TODO: doesn't consider submodel rotations yet -zookeeper
+		vec3d offset;
+		model_find_submodel_offset(&offset, pm->id, mn);
+		vm_vec_add2(&offset, &model->render_sphere_offset);
+
+		if ( (-model->use_render_sphere + in_sphere(&offset, Interp_render_sphere_radius)) )
 			return;
 	}
 
@@ -4543,6 +4577,7 @@ void model_render_buffers(polymodel *pm, int mn, bool is_child)
 				texture_info *spec_map = &tmap->textures[TM_SPECULAR_TYPE];
 				texture_info *norm_map = &tmap->textures[TM_NORMAL_TYPE];
 				texture_info *height_map = &tmap->textures[TM_HEIGHT_TYPE];
+				texture_info *misc_map = &tmap->textures[TM_MISC_TYPE];
 
 				if (Interp_new_replacement_textures != NULL) {
 					if (Interp_new_replacement_textures[rt_begin_index + TM_SPECULAR_TYPE] >= 0) {
@@ -4559,11 +4594,17 @@ void model_render_buffers(polymodel *pm, int mn, bool is_child)
 						tex_replace[TM_HEIGHT_TYPE] = texture_info(Interp_new_replacement_textures[rt_begin_index + TM_HEIGHT_TYPE]);
 						height_map = &tex_replace[TM_HEIGHT_TYPE];
 					}
+
+					if (Interp_new_replacement_textures[rt_begin_index + TM_MISC_TYPE] >= 0) {
+						tex_replace[TM_MISC_TYPE] = texture_info(Interp_new_replacement_textures[rt_begin_index + TM_MISC_TYPE]);
+						misc_map = &tex_replace[TM_MISC_TYPE];
+					}
 				}
 
 				SPECMAP = model_interp_get_texture(spec_map, Interp_base_frametime);
 				NORMMAP = model_interp_get_texture(norm_map, Interp_base_frametime);
 				HEIGHTMAP = model_interp_get_texture(height_map, Interp_base_frametime);
+				MISCMAP = model_interp_get_texture(misc_map, Interp_base_frametime);
 			}
 		}
 
@@ -4584,6 +4625,7 @@ void model_render_buffers(polymodel *pm, int mn, bool is_child)
 			tobj.buffer = &model->buffer;
 			tobj.glow_map = GLOWMAP;
 			tobj.height_map = HEIGHTMAP;
+			tobj.misc_map = MISCMAP;
 			tobj.i = i;
 			tobj.norm_map = NORMMAP;
 			tobj.spec_map = SPECMAP;
@@ -4607,6 +4649,7 @@ void model_render_buffers(polymodel *pm, int mn, bool is_child)
 		SPECMAP = -1;
 		NORMMAP = -1;
 		HEIGHTMAP = -1;
+		MISCMAP = -1;
 	}
 
 	gr_pop_scale_matrix();
