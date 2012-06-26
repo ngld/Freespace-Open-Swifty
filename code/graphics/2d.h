@@ -27,12 +27,6 @@ extern int Gr_inited;
 extern int gr_zbuffering, gr_zbuffering_mode;
 extern int gr_global_zbuffering;
 
-// stencil buffering stuff
-extern int gr_stencil_mode;
-
-// alpha test
-extern int gr_alpha_test;
-
 // Shader flags
 #define SDR_FLAG_LIGHT			(1<<0)
 #define SDR_FLAG_FOG			(1<<1)
@@ -46,6 +40,12 @@ extern int gr_alpha_test;
 #define SDR_FLAG_SOFT_QUAD		(1<<9)
 #define SDR_FLAG_DISTORTION		(1<<10)
 #define SDR_FLAG_MISC_MAP		(1<<11)
+
+// stencil buffering stuff
+extern int gr_stencil_mode;
+
+// alpha test
+extern int gr_alpha_test;
 
 /**
  * This is a structure used by the shader to keep track
