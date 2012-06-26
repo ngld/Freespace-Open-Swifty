@@ -95,7 +95,7 @@
 extern int Num_medals;
 
 // object.h
-#define MAX_OBJECTS			3000		
+#define MAX_OBJECTS			3500		
 
 // from lighting.cpp
 #define MAX_LIGHTS 256
