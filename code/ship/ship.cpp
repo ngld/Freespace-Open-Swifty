@@ -514,7 +514,6 @@ void parse_engine_wash(bool replace)
 	engine_wash_info ewt;
 	engine_wash_info *ewp;
 	bool create_if_not_found  = true;
-	bool first_time = true;
 
 	// name of engine wash info
 	required_string("$Name:");
@@ -541,7 +540,6 @@ void parse_engine_wash(bool replace)
 		{
 			Error(LOCATION, "Error:  Engine wash %s already exists.  All engine wash names must be unique.", ewt.name);
 		}
-		first_time = false;
 	}
 	else
 	{
@@ -9557,8 +9555,7 @@ int ship_fire_primary(object * obj, int stream_weapons, int force)
 	ai_info		*aip;
 	int			weapon, i, j, w, v, weapon_objnum;
 	int			bank_to_fire, num_fired = 0;	
-	int			banks_fired, have_timeout;				// used for multiplayer to help determine whether or not to send packet
-	have_timeout = 0;			// used to help tell us whether or not we need to send a packet
+	int			banks_fired;				// used for multiplayer to help determine whether or not to send packet
 	banks_fired = 0;			// used in multiplayer -- bitfield of banks that were fired
 	bool has_fired = false;		// used to determine whether we should fire the scripting hook
 	bool has_autoaim, has_converging_autoaim, needs_target_pos;	// used to flag weapon/ship as having autoaim
@@ -9715,7 +9712,6 @@ int ship_fire_primary(object * obj, int stream_weapons, int force)
 
 		// only non-multiplayer clients (single, multi-host) need to do timestamp checking
 		if ( !timestamp_elapsed(swp->next_primary_fire_stamp[bank_to_fire]) ) {
-			have_timeout = 1;
 			continue;
 		}
 
@@ -10544,7 +10540,7 @@ extern void ai_maybe_announce_shockwave_weapon(object *firing_objp, int weapon_i
 //                need to avoid firing when normally called
 int ship_fire_secondary( object *obj, int allow_swarm )
 {
-	int			n, weapon, j, bank, have_timeout, starting_bank_count = -1, num_fired;
+	int			n, weapon, j, bank, starting_bank_count = -1, num_fired;
 	ushort		starting_sig = 0;
 	ship			*shipp;
 	ship_weapon *swp;
@@ -10631,8 +10627,6 @@ int ship_fire_secondary( object *obj, int allow_swarm )
 	}
 	wip = &Weapon_info[weapon];
 
-	have_timeout = 0;			// used to help tell whether or not we have a timeout
-
 	if ( MULTIPLAYER_MASTER ) {
 		starting_sig = multi_get_next_network_signature( MULTI_SIG_NON_PERMANENT );
 		starting_bank_count = swp->secondary_bank_ammo[bank];
@@ -10665,7 +10659,6 @@ int ship_fire_secondary( object *obj, int allow_swarm )
 		if (timestamp_until(swp->next_secondary_fire_stamp[bank]) > 60000){
 			swp->next_secondary_fire_stamp[bank] = timestamp(1000);
 		}
-		have_timeout = 1;
 		goto done_secondary;
 	}
 
@@ -13067,17 +13060,11 @@ void ship_assign_sound_all()
  */
 DCF(set_shield,"Change player ship shield strength")
 {
-	ship_info	*sip;
-	
-	sip = &Ship_info[Ships[Player_obj->instance].ship_info_index];
 	if ( Dc_command )	{
 		dc_get_arg(ARG_FLOAT|ARG_NONE);
 
 		if ( Dc_arg_type & ARG_FLOAT ) {
-			if ( Dc_arg_float < 0 ) 
-				Dc_arg_float = 0.0f;
-			if ( Dc_arg_float > 1.0 )
-				Dc_arg_float = 1.0f;
+            CLAMP(Dc_arg_float, 0.0f, 1.0f);
 			shield_set_strength(Player_obj, Dc_arg_float * Player_ship->ship_max_shield_strength);
 			dc_printf("Shields set to %.2f\n", shield_get_strength(Player_obj) );
 		}
@@ -13100,17 +13087,11 @@ DCF(set_shield,"Change player ship shield strength")
  */
 DCF(set_hull, "Change player ship hull strength")
 {
-	ship_info	*sip;
-	
-	sip = &Ship_info[Ships[Player_obj->instance].ship_info_index];
 	if ( Dc_command )	{
 		dc_get_arg(ARG_FLOAT|ARG_NONE);
 
 		if ( Dc_arg_type & ARG_FLOAT ) {
-			if ( Dc_arg_float < 0 ) 
-				Dc_arg_float = 0.0f;
-			if ( Dc_arg_float > 1.0 )
-				Dc_arg_float = 1.0f;
+			CLAMP(Dc_arg_float, 0.0f, 1.0f);
 			Player_obj->hull_strength = Dc_arg_float * Player_ship->ship_max_hull_strength;
 			dc_printf("Hull set to %.2f\n", Player_obj->hull_strength );
 		}
@@ -14235,9 +14216,7 @@ next_cargo:
 //
 // NOTE: there are no filters on enemy_sp, so it could be any ship type
 //
-#define PLAYER_ALLOW_WARN_INTERVAL		60000		// minimum time between warnings
 #define PLAYER_CHECK_WARN_INTERVAL		300		// how often we check for warnings
-#define PLAYER_MAX_WARNINGS				2			// max number of warnings player can receive in a mission
 #define PLAYER_MIN_WARN_DIST				100		// minimum distance attacking ship can be from player and still allow warning
 #define PLAYER_MAX_WARN_DIST				1000		// maximum distance attacking ship can be from plyaer and still allow warning
 
@@ -14248,7 +14227,7 @@ void ship_maybe_warn_player(ship *enemy_sp, float dist)
 	int		msg_type; //, on_right;
 
 	// First check if the player has reached the maximum number of warnings for a mission
-	if ( Player->warn_count >= PLAYER_MAX_WARNINGS ) {
+	if ((Builtin_messages[MESSAGE_CHECK_6].max_count > -1) && ( Player->warn_count >= Builtin_messages[MESSAGE_CHECK_6].max_count )) {
 		return;
 	}
 
@@ -14309,14 +14288,13 @@ void ship_maybe_warn_player(ship *enemy_sp, float dist)
 			} else {
 				message_send_builtin_to_player(msg_type, &Ships[ship_index], MESSAGE_PRIORITY_HIGH, MESSAGE_TIME_IMMEDIATE, 0, 0, -1, -1);
 			}
-			Player->allow_warn_timestamp = timestamp(PLAYER_ALLOW_WARN_INTERVAL);
+			Player->allow_warn_timestamp = timestamp(Builtin_messages[MESSAGE_CHECK_6].min_delay);
 			Player->warn_count++;
 		}
 	}
 }
 
 // player has just killed a ship, maybe offer send a 'good job' message
-#define PLAYER_MAX_PRAISES					10			// max number of praises player can receive in a mission
 void ship_maybe_praise_player(ship *deader_sp)
 {
 	if ( myrand()&1 ) {
@@ -14324,7 +14302,7 @@ void ship_maybe_praise_player(ship *deader_sp)
 	}
 
 	// First check if the player has reached the maximum number of praises for a mission
-	if ( Player->praise_count >= PLAYER_MAX_PRAISES ) {
+	if ((Builtin_messages[MESSAGE_PRAISE].max_count > -1) && (Player->praise_count >= Builtin_messages[MESSAGE_PRAISE].max_count )) {
 		return;
 	}
 
@@ -14362,11 +14340,19 @@ void ship_maybe_praise_self(ship *deader_sp, ship *killer_sp)
 	int j; 
 	bool wingman = false;
 
-	if ( (int)(frand()*100) > Praise_self_percentage ) {
+	if ( (int)(frand()*100) > Builtin_messages[MESSAGE_PRAISE_SELF].occurrence_chance ) {
 		return;
 	}
 
 	if (Game_mode & GM_MULTIPLAYER) {
+		return;
+	}
+
+	if ((Builtin_messages[MESSAGE_PRAISE_SELF].max_count > -1) && (Player->praise_self_count >= Builtin_messages[MESSAGE_PRAISE_SELF].max_count)) {
+		return;
+	}
+
+	if (!timestamp_elapsed(Player->praise_self_timestamp)) {
 		return;
 	}
 
@@ -14402,11 +14388,10 @@ void ship_maybe_praise_self(ship *deader_sp, ship *killer_sp)
 	}
 
 	message_send_builtin_to_player(MESSAGE_PRAISE_SELF, killer_sp, MESSAGE_PRIORITY_HIGH, MESSAGE_TIME_SOON, 0, 0, -1, -1);
-				
+	Player->praise_self_timestamp = timestamp(Builtin_messages[MESSAGE_PRAISE_SELF].min_delay);
+	Player->praise_self_count++;			
 }
 
-#define PLAYER_ASK_HELP_INTERVAL			60000		// minimum time between praises
-#define PLAYER_MAX_ASK_HELP				10			// max number of warnings player can receive in a mission
 #define ASK_HELP_SHIELD_PERCENT			0.1		// percent shields at which ship will ask for help
 #define ASK_HELP_HULL_PERCENT				0.3		// percent hull at which ship will ask for help
 #define AWACS_HELP_HULL_HI					0.75		// percent hull at which ship will ask for help
@@ -14440,7 +14425,7 @@ void awacs_maybe_ask_for_help(ship *sp, int multi_team_filter)
 
 	if (message >= 0) {
 		message_send_builtin_to_player(message, sp, MESSAGE_PRIORITY_HIGH, MESSAGE_TIME_IMMEDIATE, 0, 0, -1, multi_team_filter);
-		Player->allow_ask_help_timestamp = timestamp(PLAYER_ASK_HELP_INTERVAL);
+		Player->allow_ask_help_timestamp = timestamp(Builtin_messages[MESSAGE_HELP].min_delay);
 		Player->ask_help_count++;
 	}
 }
@@ -14452,7 +14437,7 @@ void ship_maybe_ask_for_help(ship *sp)
 	int multi_team_filter = -1;
 
 	// First check if the player has reached the maximum number of ask_help's for a mission
-	if (Player->ask_help_count >= PLAYER_MAX_ASK_HELP)
+	if ((Builtin_messages[MESSAGE_HELP].max_count > -1) && (Player->ask_help_count >= Builtin_messages[MESSAGE_HELP].max_count))
 		return;
 
 	// Check if enough time has elapsed since last help request, if not - leave
@@ -14503,7 +14488,7 @@ play_ask_help:
 	if (!(sp->flags2 & SF2_NO_BUILTIN_MESSAGES)) // Karajorma - Only unsilenced ships should ask for help
 	{
 	message_send_builtin_to_player(MESSAGE_HELP, sp, MESSAGE_PRIORITY_HIGH, MESSAGE_TIME_IMMEDIATE, 0, 0, -1, multi_team_filter);
-	Player->allow_ask_help_timestamp = timestamp(PLAYER_ASK_HELP_INTERVAL);
+	Player->allow_ask_help_timestamp = timestamp(Builtin_messages[MESSAGE_HELP].min_delay);
 
 	// prevent overlap with death message
 	if (timestamp_until(Player->allow_scream_timestamp) < 15000)
@@ -14532,9 +14517,6 @@ void ship_maybe_lament()
 	}
 }
 
-#define PLAYER_SCREAM_INTERVAL		60000
-#define PLAYER_MAX_SCREAMS				10
-
 /**
  * Play a death scream for a ship
  */
@@ -14557,7 +14539,7 @@ void ship_scream(ship *sp)
 	}
 
 	message_send_builtin_to_player(MESSAGE_WINGMAN_SCREAM, sp, MESSAGE_PRIORITY_HIGH, MESSAGE_TIME_IMMEDIATE, 0, 0, -1, multi_team_filter);
-	Player->allow_scream_timestamp = timestamp(PLAYER_SCREAM_INTERVAL);
+	Player->allow_scream_timestamp = timestamp(Builtin_messages[MESSAGE_WINGMAN_SCREAM].min_delay);
 	Player->scream_count++;
 
 	sp->flags |= SF_SHIP_HAS_SCREAMED;
@@ -14579,9 +14561,10 @@ void ship_maybe_scream(ship *sp)
 	// if screaming is enabled, skip all checks
 	if (!(sp->flags2 & SF2_ALWAYS_DEATH_SCREAM))
 	{
-		// only scream 50% of the time
-		if (rand() & 1)
+		// only scream x% of the time 
+		if ( (int)(frand()*100) > Builtin_messages[MESSAGE_WINGMAN_SCREAM].occurrence_chance ) {
 			return;
+		}
 
 		// check if enough time has elapsed since last scream; if not, leave
 		if (!timestamp_elapsed(Player->allow_scream_timestamp))
@@ -14595,8 +14578,9 @@ void ship_maybe_scream(ship *sp)
 				return;
 
 			// first check if the player has reached the maximum number of screams for a mission
-			if (Player->scream_count >= PLAYER_MAX_SCREAMS)
+			if ((Builtin_messages[MESSAGE_WINGMAN_SCREAM].max_count > -1) && (Player->scream_count >= Builtin_messages[MESSAGE_WINGMAN_SCREAM].max_count)) {
 				return;
+			}
 
 			// if on different teams (i.e. team v. team games in multiplayer), no scream
 			if (Player_ship->team != sp->team)
@@ -14612,7 +14596,11 @@ void ship_maybe_scream(ship *sp)
 #define PLAYER_REQUEST_REPAIR_MSG_INTERVAL	240000
 #define PLAYER_MAX_LOW_AMMO_MSGS			5
 
-void	ship_maybe_tell_about_low_ammo(ship *sp)
+/**
+ * This function is only for notifying the player that the ship's ammo is low, without necessarily requesting support (e.g. if support
+ * is disallowed for this mission).  It is not called if support was successfully requested in maybe_request_support.
+ */
+void ship_maybe_tell_about_low_ammo(ship *sp)
 {
 	weapon_info *wip;
 	int i;
@@ -14633,6 +14621,10 @@ void	ship_maybe_tell_about_low_ammo(ship *sp)
 	if (sp->flags2 & SF2_NO_BUILTIN_MESSAGES) {
 		return;
 	}
+
+	// don't mention low ammo if we're docked, for the same reason as in maybe_request_support
+	if (object_is_docked(&Objects[sp->objnum]))
+		return;
 
 	// for now, each ship can only complain about low ammo once a mission to stop it getting repetitive
 	if (sp->ammo_low_complaint_count) {
@@ -14696,9 +14688,7 @@ void ship_maybe_tell_about_rearm(ship *sp)
 
 	// Silent ships should remain just that
 	if (sp->flags2 & SF2_NO_BUILTIN_MESSAGES)
-	{
 		return;
-	}
 
 	// AL 1-4-98:	If ship integrity is low, tell player you want to get repaired.  Otherwise, tell
 	// the player you want to get re-armed.
@@ -15843,7 +15833,6 @@ DCF(art, "")
 void ship_update_artillery_lock()
 {
 	ai_info *aip = NULL;
-	weapon_info *tlaser = NULL;
 	mc_info *cinfo = NULL;
 	int c_objnum;
 	vec3d temp, local_hit;
@@ -15886,8 +15875,7 @@ void ship_update_artillery_lock()
 		Assert((Weapon_info[shipp->weapons.primary_bank_weapons[shipp->weapons.current_primary_bank]].wi_flags & WIF_BEAM) && (Weapon_info[shipp->weapons.primary_bank_weapons[shipp->weapons.current_primary_bank]].b_info.beam_type == BEAM_TYPE_C));
 		if(!(Weapon_info[shipp->weapons.primary_bank_weapons[shipp->weapons.current_primary_bank]].wi_flags & WIF_BEAM) || (Weapon_info[shipp->weapons.primary_bank_weapons[shipp->weapons.current_primary_bank]].b_info.beam_type != BEAM_TYPE_C)){
 			continue;
-		}
-		tlaser = &Weapon_info[shipp->weapons.primary_bank_weapons[shipp->weapons.current_primary_bank]];	
+		}	
 
 		// get collision info
 		if(!beam_get_collision(shipp->targeting_laser_objnum, 0, &c_objnum, &cinfo)){
@@ -17086,8 +17074,6 @@ void parse_ai_target_priorities()
 
 	required_string("$Name:");
 	ai_target_priority temp_priority = init_ai_target_priorities();
-	ai_target_priority *temp_priority_p;
-	temp_priority_p = &temp_priority;
 
 	stuff_string(temp_priority.name, F_NAME, NAME_LENGTH);
 	if (first_time == false) {
