@@ -971,19 +971,19 @@ void load_gauge(int gauge, int base_w, int base_h, int hud_font, int ship_idx, c
 		load_gauge_fixed_messages(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_FLIGHT_PATH:
-		load_gauge_flight_path(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_flight_path(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_WARHEAD_COUNT:
-		load_gauge_warhead_count(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_warhead_count(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_HARDPOINTS:
-		load_gauge_hardpoints(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_hardpoints(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_PRIMARY_WEAPONS:
-		load_gauge_primary_weapons(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_primary_weapons(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	case HUD_OBJECT_SECONDARY_WEAPONS:
-		load_gauge_secondary_weapons(base_w, base_h, font, ship_idx, use_clr);
+		load_gauge_secondary_weapons(base_w, base_h, hud_font, ship_idx, use_clr);
 		break;
 	default:
 		Warning(LOCATION, "Invalid gauge found in hud_gauges.tbl");
