@@ -3553,6 +3553,16 @@ void load_gauge_target_monitor(int base_w, int base_h, int hud_font, int ship_in
 	int Hull_offsets[2];
 	int Cargo_scan_start_offsets[2];
 	int Cargo_scan_size[2];
+
+	int Subsys_name_offsets[2];
+	bool Use_subsys_name_offsets = false;
+	
+	int Subsys_integrity_offsets[2];
+	bool Use_subsys_integrity_offsets = false;
+
+	int Disabled_status_offsets[2];
+	bool Use_disabled_status_offsets = false;
+
 	int colors[3] = {255, 255, 255};
 	bool lock_color = false;
 	bool desaturate = false;
@@ -3608,6 +3618,15 @@ void load_gauge_target_monitor(int base_w, int base_h, int hud_font, int ship_in
 	Cargo_scan_start_offsets[1] = 45;
 	Cargo_scan_size[0] = 130;
 	Cargo_scan_size[1] = 109;
+
+	/*Subsys_name_offsets[0] = Viewport_offsets[0] + 2;
+	Subsys_name_offsets[1] = Viewport_offsets[1] + Viewport_size[1];
+	
+	Subsys_integrity_offsets[0] = Viewport_offsets[0] + Viewport_size[0] - 1;
+	Subsys_integrity_offsets[1] = Viewport_offsets[1] + Viewport_size[1];
+
+	Disabled_status_offsets[0] = Viewport_offsets[0] + Viewport_size[0]/2;
+	Disabled_status_offsets[1] = Viewport_offsets[1] + Viewport_size[1]/2 - 24;*/
 
 	if(check_base_res(base_w, base_h)) {
 		base_res[0] = base_w;
@@ -3687,6 +3706,18 @@ void load_gauge_target_monitor(int base_w, int base_h, int hud_font, int ship_in
 	if(optional_string("Cargo Scan Size:")) {
 		stuff_int_list(Cargo_scan_size, 2);
 	}
+	if ( optional_string("Subsystem Name Offsets:") ) {
+		stuff_int_list(Subsys_name_offsets, 2);
+		Use_subsys_name_offsets = true;
+	}
+	if ( optional_string("Subsystem Integrity Offsets:") ) {
+		stuff_int_list(Subsys_integrity_offsets, 2);
+		Use_subsys_integrity_offsets = true;
+	}
+	if ( optional_string("Disabled Status Offsets:") ) {
+		stuff_int_list(Disabled_status_offsets, 2);
+		Use_disabled_status_offsets = true;
+	}
 	if ( optional_string("Desaturate:") ) {
 		stuff_boolean(&desaturate);
 	}
@@ -3707,6 +3738,9 @@ void load_gauge_target_monitor(int base_w, int base_h, int hud_font, int ship_in
 	hud_gauge->initHullOffsets(Hull_offsets[0], Hull_offsets[1]);
 	hud_gauge->initCargoScanStartOffsets(Cargo_scan_start_offsets[0], Cargo_scan_start_offsets[1]);
 	hud_gauge->initCargoScanSize(Cargo_scan_size[0], Cargo_scan_size[1]);
+	hud_gauge->initSubsysNameOffsets(Subsys_name_offsets[0], Subsys_name_offsets[1], Use_subsys_name_offsets);
+	hud_gauge->initSubsysIntegrityOffsets(Subsys_integrity_offsets[0], Subsys_integrity_offsets[1], Use_subsys_integrity_offsets);
+	hud_gauge->initDisabledStatusOffsets(Disabled_status_offsets[0], Disabled_status_offsets[1], Use_disabled_status_offsets);
 	hud_gauge->initDesaturate(desaturate);
 	hud_gauge->initBitmaps(fname_monitor, fname_monitor_mask, fname_integrity, fname_static);
 	hud_gauge->initFont(font_num);

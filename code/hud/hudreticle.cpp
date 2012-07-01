@@ -544,7 +544,7 @@ void HudGaugeThrottle::renderThrottleSpeed(float current_speed, int y_end)
 
 	if ( object_get_gliding(Player_obj) ) { 
 		if ( Use_custom_glide ) {
-			renderString(sx + Glide_offsets[0], sy + Glide_offsets[1], "GLIDE");
+			renderString(position[0] + Glide_offsets[0], position[1] + Glide_offsets[1], "GLIDE");
 		} else {
 			int offset;
 			if ( current_speed <= 9.5 ) {
@@ -562,9 +562,9 @@ void HudGaugeThrottle::renderThrottleSpeed(float current_speed, int y_end)
 			if (Lcl_gr) {
 				// print an m, cuz the voice says its an m.  
 				// its a normal m cuz the german font has no special m (its an a)
-				renderString(sx + Match_speed_offsets[0], sy + Match_speed_offsets[1], "m");
+				renderString(position[0] + Match_speed_offsets[0], position[1] + Match_speed_offsets[1], "m");
 			} else {
-				renderPrintf(sx + Match_speed_offsets[0], sy + Match_speed_offsets[1], "%c", Lcl_special_chars + 3);
+				renderPrintf(position[0] + Match_speed_offsets[0], position[1] + Match_speed_offsets[1], "%c", Lcl_special_chars + 3);
 			}
 		} else {
 			int offset;

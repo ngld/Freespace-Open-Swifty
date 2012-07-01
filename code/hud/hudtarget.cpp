@@ -6849,6 +6849,13 @@ void HudGaugePrimaryWeapons::render(float frametime)
 		bg_y_offset += _background_entry_h;
 	}
 
+	if ( num_primaries == 0 ) {
+		renderBitmap(_background_entry.first_frame, position[0], position[1] + bg_y_offset);
+		renderString(position[0] + _pname_offset_x, position[1] + text_y_offset, EG_WEAPON_P1, XSTR( "<none>", 329));
+
+		bg_y_offset += _background_entry_h;
+	}
+
 	renderBitmap(_background_last.first_frame, position[0], position[1] + bg_y_offset + _bg_last_offset_y);
 }
 
