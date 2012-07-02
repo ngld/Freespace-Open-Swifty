@@ -39,6 +39,7 @@ protected:
 	int bottom_bg_offset;
 	int text_start_offsets[2];
 	int text_h;
+	int max_line_width;
 public:
 	HudGaugeDirectives();
 	void initBitmaps(char *fname_top, char *fname_middle, char *fname_bottom);
@@ -47,6 +48,7 @@ public:
 	void initBottomBgOffset(int offset);
 	void initTextStartOffsets(int x, int y);
 	void initTextHeight(int h);
+	void initMaxLineWidth(int w);
 	void render(float frametime);
 	void pageIn();
 	bool canRender();

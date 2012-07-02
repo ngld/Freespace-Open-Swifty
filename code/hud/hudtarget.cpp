@@ -5677,9 +5677,24 @@ void HudGaugeWeaponEnergy::render(float frametime)
 		setGaugeColor();
 
 		// list currently armed primary banks if we have to
-		if ( Player_ship->flags & SF_PRIMARY_LINKED ) {
-			// show all primary banks
-			for ( i = 0; i < Player_ship->weapons.num_primary_banks; i++ ) {
+		if ( Show_armed ) {
+			if ( Player_ship->flags & SF_PRIMARY_LINKED ) {
+				// show all primary banks
+				for ( i = 0; i < Player_ship->weapons.num_primary_banks; i++ ) {
+					wip = &Weapon_info[sw->primary_bank_weapons[i]];
+					strcpy_s(buf, (wip->alt_name[0]) ? wip->alt_name : wip->name);
+
+					if ( Armed_alignment ) {
+						gr_get_string_size(&w, &h, buf);
+					} else {
+						w = 0;
+					}
+					
+					renderString(position[0] + Armed_name_offsets[0] - w, position[1] + Armed_name_offsets[1] + Armed_name_h * i, buf);
+				}
+			} else {
+				// just show the current armed bank
+				i = Player_ship->weapons.current_primary_bank;
 				wip = &Weapon_info[sw->primary_bank_weapons[i]];
 				strcpy_s(buf, (wip->alt_name[0]) ? wip->alt_name : wip->name);
 
@@ -5688,22 +5703,9 @@ void HudGaugeWeaponEnergy::render(float frametime)
 				} else {
 					w = 0;
 				}
-					
-				renderString(position[0] + Armed_name_offsets[0] - w, position[1] + Armed_name_offsets[1] + Armed_name_h * i, buf);
-			}
-		} else {
-			// just show the current armed bank
-			i = Player_ship->weapons.current_primary_bank;
-			wip = &Weapon_info[sw->primary_bank_weapons[i]];
-			strcpy_s(buf, (wip->alt_name[0]) ? wip->alt_name : wip->name);
 
-			if ( Armed_alignment ) {
-				gr_get_string_size(&w, &h, buf);
-			} else {
-				w = 0;
+				renderString(position[0] + Armed_name_offsets[0] - w, position[1] + Armed_name_offsets[1], buf);
 			}
-
-			renderString(position[0] + Armed_name_offsets[0] - w, position[1] + Armed_name_offsets[1], buf);
 		}
 
 		for ( i = 0; i < sw->num_primary_banks; i++ )

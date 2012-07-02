@@ -1392,7 +1392,7 @@ void load_gauge_weapon_energy(int base_w, int base_h, int hud_font, int ship_ind
 	if(optional_string("Text Offsets:")) {
 		stuff_int_list(Wenergy_text_offsets, 2);
 
-		if(optional_string("Alignment:")) {
+		if(optional_string("Text Alignment:")) {
 			if(required_string("Right")) {
 				text_alignment = 1;
 			}
@@ -1407,17 +1407,17 @@ void load_gauge_weapon_energy(int base_w, int base_h, int hud_font, int ship_ind
 	if(optional_string("Show Ballistic Ammo:")) {
 		stuff_boolean(&show_ballistic);
 	}
-	if(optional_string("Armed Weapons Offsets:")) {
+	if(optional_string("Armed Guns List Offsets:")) {
 		stuff_int_list(armed_weapon_offsets, 2);
 		show_weapons = true;
 
-		if(optional_string("Alignment:")) {
+		if(optional_string("Armed Guns List Alignment:")) {
 			if(required_string("Right")) {
 				weapon_alignment = 1;
 			}
 		}
 
-		if(optional_string("Entry Height:")) {
+		if(optional_string("Armed Guns List Entry Height:")) {
 			stuff_int(&armed_weapon_h);
 		}
 	}
@@ -1599,6 +1599,7 @@ void load_gauge_escort_view(int base_w, int base_h, int hud_font, int ship_index
 	int entry_stagger_w;
 	int bottom_bg_offset = 0;
 	int ship_name_offsets[2];
+	int ship_name_max_w = 100;
 	int ship_integrity_offsets[2];
 	int ship_status_offsets[2];
 	char header_text[MAX_FILENAME_LEN] = "monitoring";
@@ -1720,6 +1721,10 @@ void load_gauge_escort_view(int base_w, int base_h, int hud_font, int ship_index
 		stuff_int(&ship_status_offsets[0]);
 	}
 
+	if ( optional_string("Ship Name Max Width:") ) {
+		stuff_int(&ship_name_max_w);
+	}
+
 	HudGaugeEscort* hud_gauge = new HudGaugeEscort();
 	hud_gauge->initPosition(coords[0], coords[1]);
 	hud_gauge->initBaseResolution(base_res[0], base_res[1]);
@@ -1733,6 +1738,7 @@ void load_gauge_escort_view(int base_w, int base_h, int hud_font, int ship_index
 	hud_gauge->initShipIntegrityOffsets(ship_integrity_offsets[0], ship_integrity_offsets[1]);
 	hud_gauge->initShipNameOffsets(ship_name_offsets[0], ship_name_offsets[1]);
 	hud_gauge->initShipStatusOffsets(ship_status_offsets[0], ship_status_offsets[1]);
+	hud_gauge->initShipNameMaxWidth(ship_name_max_w);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
 	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
@@ -4269,6 +4275,7 @@ void load_gauge_directives(int base_w, int base_h, int hud_font, int ship_index,
 	int middle_frame_offset_y;
 	int text_start_offsets[2];
 	int text_h;
+	int max_line_width = 167;
 	char fname_top[MAX_FILENAME_LEN] = "directives1";
 	char fname_middle[MAX_FILENAME_LEN] = "directives2";
 	char fname_bottom[MAX_FILENAME_LEN] = "directives3";
@@ -4354,6 +4361,9 @@ void load_gauge_directives(int base_w, int base_h, int hud_font, int ship_index,
 	if(optional_string("Bottom Background Offset:")) {
 		stuff_int(&bottom_bg_offset);
 	}
+	if ( optional_string("Max Line Width:") ) {
+		stuff_int(&max_line_width);
+	}
 
 	HudGaugeDirectives* hud_gauge = new HudGaugeDirectives();
 	hud_gauge->initBaseResolution(base_res[0], base_res[1]);
@@ -4364,11 +4374,12 @@ void load_gauge_directives(int base_w, int base_h, int hud_font, int ship_index,
 	hud_gauge->initBottomBgOffset(bottom_bg_offset);
 	hud_gauge->initTextStartOffsets(text_start_offsets[0], text_start_offsets[1]);
 	hud_gauge->initHeaderOffsets(header_offsets[0], header_offsets[1]);
+	hud_gauge->initMaxLineWidth(max_line_width);
 	hud_gauge->initSlew(slew);
 	hud_gauge->initFont(font_num);
 	hud_gauge->updateColor(colors[0], colors[1], colors[2]);
 	hud_gauge->lockConfigColor(lock_color);
-
+	
 	if(ship_index >= 0) {
 		Ship_info[ship_index].hud_gauges.push_back(hud_gauge);
 	} else {
@@ -6765,7 +6776,7 @@ void load_gauge_warhead_count(int base_w, int base_h, int font, int ship_index, 
 		stuff_int(&max_columns);
 	}
 
-	if ( optional_string("Alignment:") ) {
+	if ( optional_string("Name Alignment:") ) {
 		if ( optional_string("Right") ) {
 			alignment = 1;
 		} else {

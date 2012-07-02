@@ -146,6 +146,11 @@ void HudGaugeDirectives::initTextHeight(int h)
 	text_h = h;
 }
 
+void HudGaugeDirectives::initMaxLineWidth(int w)
+{
+	max_line_width = w;
+}
+
 void HudGaugeDirectives::initBottomBgOffset(int offset)
 {
 	bottom_bg_offset = offset;
@@ -293,7 +298,7 @@ void HudGaugeDirectives::render(float frametime)
 		}
 
 		// maybe split the directives line
-		second_line = split_str_once(buf, 167);
+		second_line = split_str_once(buf, max_line_width);
 		Assert( second_line != buf );
 
 		// blit the background frames
