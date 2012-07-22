@@ -2597,7 +2597,7 @@ bool HudGaugeSquadMessage::canRender()
 		return false;
 	}
 
-	if (!( Players->flags & PLAYER_FLAGS_MSG_MODE )) {
+	if (!( Player->flags & PLAYER_FLAGS_MSG_MODE )) {
 		return false;
 	}
 
