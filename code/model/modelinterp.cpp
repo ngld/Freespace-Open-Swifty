@@ -170,6 +170,9 @@ int Interp_detail_level = 0;
 
 static int FULLCLOAK = -1;
 
+// current transformation texture
+int Interp_no_flush = 0;
+
 // forward references
 int model_interp_sub(void *model_ptr, polymodel * pm, bsp_info *sm, int do_box_check);
 void model_really_render(int model_num, matrix *orient, vec3d * pos, uint flags, int objnum = -1);
@@ -2524,6 +2527,11 @@ void model_render_glow_points(polymodel *pm, ship *shipp, matrix *orient, vec3d 
 					vm_vec_add2(&world_pnt, pos);
 
 					vm_vec_unrotate(&world_norm, &loc_norm, orient);
+					
+					if ( (shipp != NULL) && (shipp->flags & (SF_ARRIVING | SF_DEPART_WARP) ) && (shipp->warpin_effect) && Ship_info[shipp->ship_info_index].warpin_type != WT_HYPERSPACE) {
+						if (g3_point_behind_user_plane(&world_pnt))
+							continue;
+					}
 
 					switch (bank->type)
 					{
@@ -3052,8 +3060,12 @@ void model_really_render(int model_num, matrix *orient, vec3d * pos, uint flags,
 	}
 	transparent_submodels.clear();
 
-	if (is_outlines_only_htl || (!Cmdline_nohtl && !is_outlines_only)) {
-		gr_set_buffer(-1);
+	if ( !Interp_no_flush ) {
+		gr_flush_data_states();
+
+		if (is_outlines_only_htl || (!Cmdline_nohtl && !is_outlines_only)) {
+			gr_set_buffer(-1);
+		}
 	}
 
 	if (is_outlines_only_htl) {
@@ -3418,6 +3430,37 @@ void submodel_get_two_random_points(int model_num, int submodel_num, vec3d *v1, 
 	if(n2 != NULL){
 		*n2 = *Interp_norms[vn2];
 	}
+}
+
+void submodel_get_two_random_points_better(int model_num, int submodel_num, vec3d *v1, vec3d *v2)
+{
+	polymodel *pm = model_get(model_num);
+
+	if ( submodel_num < 0 )	{
+		submodel_num = pm->detail[0];
+	}
+
+	bsp_collision_tree *tree = model_get_bsp_collision_tree(pm->submodel[submodel_num].collision_tree_index);
+
+	int nv = tree->n_verts;
+
+	// this is not only because of the immediate div-0 error but also because of the less immediate expectation for at least one point (preferably two) to be found
+	if (nv <= 0) {
+		Error(LOCATION, "Model %d ('%s') must have at least one point from submodel_get_points_internal!", model_num, (pm == NULL) ? "<null model?!?>" : pm->filename);
+
+		// in case people ignore the error...
+		vm_vec_zero(v1);
+		vm_vec_zero(v2);
+
+		return;
+	}
+
+	Assert(nv > 0);	// Goober5000 - to avoid div-0 error
+	int vn1 = (myrand()>>5) % nv;
+	int vn2 = (myrand()>>5) % nv;
+
+	*v1 = tree->point_list[vn1];
+	*v2 = tree->point_list[vn2];
 }
 
 // If MR_FLAG_OUTLINE bit set this color will be used for outlines.

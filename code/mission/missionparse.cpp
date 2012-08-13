@@ -27,6 +27,7 @@
 #include "mission/missionlog.h"
 #include "mission/missionmessage.h"
 #include "globalincs/linklist.h"
+#include "globalincs/alphacolors.h"
 #include "io/timer.h"
 #include "ship/ship.h"
 #include "ai/aigoals.h"
@@ -701,9 +702,15 @@ void parse_mission_info(mission *pm, bool basic = false)
 	}
 
 	strcpy_s(pm->skybox_model, "");
-	if (optional_string("$Skybox model:"))
+	if (optional_string("$Skybox Model:"))
 	{
 		stuff_string(pm->skybox_model, F_NAME, MAX_FILENAME_LEN);
+	}
+
+	vm_set_identity(&pm->skybox_orientation);
+	if (optional_string("+Skybox Orientation:"))
+	{
+		stuff_matrix(&pm->skybox_orientation);
 	}
 
 	if (optional_string("+Skybox Flags:")){
@@ -1887,6 +1894,8 @@ int parse_create_object_sub(p_object *p_objp)
 	shipp->score = p_objp->score;
 	shipp->assist_score_pct = p_objp->assist_score_pct;
 	shipp->persona_index = p_objp->persona_index;
+	if (Ship_info[shipp->ship_info_index].uses_team_colors && !p_objp->team_color_setting.empty())
+		shipp->team_name = p_objp->team_color_setting;
 
 	// reset texture animations
 	shipp->base_texture_anim_frametime = game_get_overall_frametime();
@@ -2234,7 +2243,11 @@ int parse_create_object_sub(p_object *p_objp)
 			vec3d v1, v2;
 
 			// DA 10/20/98 - sparks must be chosen on the hull and not any submodel
-			submodel_get_two_random_points(sip->model_num, pm->detail[0], &v1, &v2);
+			if ( Cmdline_old_collision_sys ) {
+				submodel_get_two_random_points(sip->model_num, pm->detail[0], &v1, &v2);
+			} else {
+				submodel_get_two_random_points_better(sip->model_num, pm->detail[0], &v1, &v2);
+			}
 			ship_hit_sparks_no_rotate(&Objects[objnum], &v1);
 		}
 	}
@@ -2676,6 +2689,17 @@ int parse_object(mission *pm, int flag, p_object *p_objp)
 		temp_team_names[i] = Iff_info[i].iff_name;
 
 	find_and_stuff("$Team:", &p_objp->team, F_NAME, temp_team_names, Num_iffs, "team name");
+
+	if (optional_string("$Team Color Setting:")) {
+		char temp[NAME_LENGTH];
+		stuff_string(temp, F_NAME, NAME_LENGTH);
+		p_objp->team_color_setting = temp;
+
+		if (Team_Colors.find(p_objp->team_color_setting) == Team_Colors.end()) {
+			mprintf(("Invalid team color specified in mission file for ship %s, resetting to default\n", p_objp->name));
+			p_objp->team_color_setting = Ship_info[p_objp->ship_class].default_team_name;
+		}
+	}
 
 	required_string("$Location:");
 	stuff_vec3d(&p_objp->pos);

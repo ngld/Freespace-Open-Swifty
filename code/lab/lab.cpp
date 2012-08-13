@@ -313,8 +313,14 @@ void labviewer_add_model_arcs()
 		int n, n_arcs = ((rand() >> 5) % 3) + 1;		// Create 1-3 sparks
 
 		vec3d v1, v2, v3, v4;
-		submodel_get_two_random_points(Lab_model_num, -1, &v1, &v2);
-		submodel_get_two_random_points(Lab_model_num, -1, &v3, &v4);
+
+		if ( Cmdline_old_collision_sys ) {
+			submodel_get_two_random_points(Lab_model_num, -1, &v1, &v2);
+			submodel_get_two_random_points(Lab_model_num, -1, &v3, &v4);
+		} else {
+			submodel_get_two_random_points_better(Lab_model_num, -1, &v1, &v2);
+			submodel_get_two_random_points_better(Lab_model_num, -1, &v3, &v4);
+		}
 
 		// For large ships, cap the length to be 25% of max radius
 		if (mradius > 200.0f)	{
@@ -402,7 +408,11 @@ void labviewer_add_model_arcs()
 
 				if ( mr < (RAND_MAX / 5) ) {
 					vec3d v1, v2;
-					submodel_get_two_random_points(Lab_model_num, -1, &v1, &v2);
+					if ( Cmdline_old_collision_sys ) {
+						submodel_get_two_random_points(Lab_model_num, -1, &v1, &v2);
+					} else {
+						submodel_get_two_random_points_better(Lab_model_num, -1, &v1, &v2);
+					}
 
 					vec3d static_one;
 
@@ -646,6 +656,11 @@ void labviewer_render_model(float frametime)
 		} else if (sip->flags & SIF_HUGE_SHIP) {
 			rev_rate *= 3.0f;
 		}
+
+		if (sip->uses_team_colors && !Teamcolor_override) {
+			gr_enable_team_color();
+			gr_set_team_color(sip->default_team_name);
+		}
 	}
 
 	// rotate/pan/zoom the model as much as required for this frame
@@ -809,6 +824,7 @@ void labviewer_render_model(float frametime)
 		gr_end_proj_matrix();
 	}
 
+	gr_disable_team_color();
 	g3_end_frame();
 }
 
@@ -1674,6 +1690,7 @@ void labviewer_make_render_options_window(Button *caller)
 	if (Cmdline_height) {
 		ADD_RENDER_BOOL("No Height Map", Heightmap_override);
 	}
+	ADD_RENDER_BOOL("No Team Colors", Teamcolor_override);
 	ADD_RENDER_BOOL("No Glow Points", Glowpoint_override);
 	// model flags
 	ADD_RENDER_FLAG("Wireframe", Lab_model_flags, ((Cmdline_nohtl) ? MR_SHOW_OUTLINE : MR_SHOW_OUTLINE_HTL) | MR_NO_POLYS);

@@ -908,6 +908,7 @@ void game_level_close()
 		ship_clear_cockpit_displays();
 		hud_level_close();
 		model_instance_free_all();
+		batch_render_close();
 
 		// be sure to not only reset the time but the lock as well
 		set_time_compression(1.0f, 0.0f);
@@ -1679,29 +1680,6 @@ DCF(gamma,"Sets Gamma factor")
 	}
 }
 
-void run_launcher()
-{
-#ifdef _WIN32
-	const char *launcher_link = "explorer.exe \"http://www.randomtiger.pwp.blueyonder.co.uk/freespace/Launcher5.rar\"";
-
-	int download = MessageBox((HWND)os_get_window(), 
-		"Run the fs2_open launcher to fix your problem. "
-		"Would you like to download the latest version of the launcher? "
-		"You must have at least version 5.0 to run fs2_open versions above 3.6.", 
-		"Question", MB_YESNO | MB_ICONQUESTION);
-
-	if(download == IDYES)
-	{
-		// Someone should change this to the offical link
-		WinExec(launcher_link, SW_SHOW);
-		return;
-	}
-
-	// This now crashes the launcher since fs2_open is still open
-	return;
-#endif
-}
-
 #ifdef APPLE_APP
 char full_path[1024];
 #endif
@@ -1849,7 +1827,6 @@ void game_init()
 		ShowCursor(TRUE);
 		ShowWindow((HWND)os_get_window(),SW_MINIMIZE);
 		MessageBox( NULL, "Error intializing graphics!", "Error", MB_OK|MB_TASKMODAL|MB_SETFOREGROUND );
-		run_launcher();
 #elif defined(SCP_UNIX)
 		fprintf(stderr, "Error initializing graphics!");
 
@@ -1980,6 +1957,12 @@ void game_init()
 
 	event_music_init();
 
+	// initialize alpha colors
+	// CommanderDJ: try with colors.tbl first, then use the old way if that doesn't work
+	if (!new_alpha_colors_init()) {
+		old_alpha_colors_init();
+	}
+
 	obj_init();	
 	mflash_game_init();	
 	armor_init();
@@ -2014,12 +1997,6 @@ void game_init()
 	pilot_load_squad_pic_list();
 
 	load_animating_pointer(NOX("cursor"), 0, 0);	
-
-	// initialize alpha colors
-	// CommanderDJ: try with colors.tbl first, then use the old way if that doesn't work
-	if (!new_alpha_colors_init()) {
-		old_alpha_colors_init();
-	}
 
 	if(!Cmdline_reparse_mainhall)
 	{
@@ -7343,7 +7320,12 @@ void game_shutdown(void)
 	multi_lag_close();
 #endif
 	fs2netd_close();
-	obj_pairs_close();		// free memory from object collision pairs
+
+	if ( Cmdline_old_collision_sys ) {
+		obj_pairs_close();		// free memory from object collision pairs
+	} else {
+		obj_reset_colliders();
+	}
 	stars_close();			// clean out anything used by stars code
 
 	// the menu close functions will unload the bitmaps if they were displayed during the game

@@ -1851,6 +1851,12 @@ void opengl_setup_function_pointers()
 	gr_screen.gf_render_buffer		= gr_opengl_render_buffer;
 	gr_screen.gf_set_buffer			= gr_opengl_set_buffer;
 
+	gr_screen.gf_create_stream_buffer		= gr_opengl_create_stream_buffer;
+	gr_screen.gf_update_stream_buffer		= gr_opengl_update_stream_buffer;
+	gr_screen.gf_render_stream_buffer		= gr_opengl_render_stream_buffer;
+	gr_screen.gf_render_stream_buffer_start	= gr_opengl_render_stream_buffer_start;
+	gr_screen.gf_render_stream_buffer_end	= gr_opengl_render_stream_buffer_end;
+
 	gr_screen.gf_start_instance_matrix			= gr_opengl_start_instance_matrix;
 	gr_screen.gf_end_instance_matrix			= gr_opengl_end_instance_matrix;
 	gr_screen.gf_start_angles_instance_matrix	= gr_opengl_start_instance_angles;
@@ -1901,6 +1907,12 @@ void opengl_setup_function_pointers()
 	gr_screen.gf_sphere_htl			= gr_opengl_sphere_htl;
 
 	gr_screen.gf_maybe_create_shader = gr_opengl_maybe_create_shader;
+
+	gr_screen.gf_flush_data_states	= gr_opengl_flush_data_states;
+
+	gr_screen.gf_set_team_color		= gr_opengl_set_team_color;
+	gr_screen.gf_enable_team_color  = gr_opengl_enable_team_color;
+	gr_screen.gf_disable_team_color = gr_opengl_disable_team_color;
 	// NOTE: All function pointers here should have a Cmdline_nohtl check at the top
 	//       if they shouldn't be run in non-HTL mode, Don't keep separate entries.
 	// *****************************************************************************
@@ -1968,6 +1980,7 @@ bool gr_opengl_init()
 	}
 
 	GL_state.Texture.init(max_texture_units);
+	GL_state.Array.init(max_texture_units);
 
 	opengl_set_texture_target();
 	GL_state.Texture.SetActiveUnit(0);

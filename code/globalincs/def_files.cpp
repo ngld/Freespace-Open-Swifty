@@ -113,7 +113,10 @@ $Default Campaign File Name: FreeSpace2									\n\
 #HUD SETTINGS															\n\
 																		\n\
 ;; Sets the delay before a directive will appear on the screen (ms)		\n\
-$directive wait time: 3000												\n\
+$Directive Wait Time: 3000												\n\
+																		\n\
+;; Turns off the HUD when in-game cutscenes are playing					\n\
+$Cutscene camera disables HUD: YES										\n\
 																		\n\
 																		\n\
 #SEXP SETTINGS															\n\
@@ -128,7 +131,25 @@ $Loop SEXPs Then Arguments:	NO											\n\
 $Use Alternate Chaining Behavior: NO									\n\
 																		\n\
 																		\n\
+#GRAPHICS SETTINGS														\n\
+;; When set, this enables the loading of external shader files			\n\
+$Enable external shaders: NO											\n\
+																		\n\
+																		\n\
 #OTHER SETTINGS															\n\
+																		\n\
+;; DESCRIPTION NEEDED!													\n\
+$Fixed Turret Collisions: NO											\n\
+																		\n\
+;; If not set, will damage nearest subsystem first						\n\
+$Damage Impacted Subsystem First: NO									\n\
+																		\n\
+;; used when no ani is specified or ship_select_3d is active			\n\
+$Default ship select effect: FS2										\n\
+																		\n\
+;; used when no ani is specified or weapon_select_3d is active			\n\
+$Default weapon select effect: FS2										\n\
+																		\n\
 																		\n\
 #END																	\n\
 ";
@@ -1267,10 +1288,7 @@ char* Default_main_vertex_shader =
 " #ifdef FLAG_FOG\n"
 "	fogDist = clamp((gl_Position.z - gl_Fog.start) * 0.75 * gl_Fog.scale, 0.0, 1.0);\n"
 " #endif\n"
-" #ifdef __GLSL_CG_DATA_TYPES\n"
-" // Check necessary for ATI specific behavior\n"
 "	gl_ClipVertex = (gl_ModelViewMatrix * gl_Vertex);\n"
-" #endif\n"
 "}";
 
 char *Default_main_fragment_shader = 
@@ -1309,6 +1327,14 @@ char *Default_main_fragment_shader =
 "uniform float vpwidth;\n"
 "uniform float vpheight;\n"
 "#endif\n"
+"#ifdef FLAG_TEAMCOLOR\n"
+"uniform vec3 base_color;\n"
+"uniform vec3 stripe_color;\n"
+"vec2 teamMask = vec2(0.0, 0.0);\n"
+"#endif\n"
+"#ifdef FLAG_MISC_MAP\n"
+"uniform sampler2D sMiscmap;\n"
+"#endif\n"
 "varying vec4 position;\n"
 "varying vec3 lNormal;\n"
 "#if SHADER_MODEL == 2\n"
@@ -1334,6 +1360,12 @@ char *Default_main_fragment_shader =
 "	vec2 texCoord = gl_TexCoord[0].xy;\n"
 " #ifdef FLAG_SPEC_MAP\n"
 "	vec4 specColour = texture2D(sSpecmap, texCoord);\n"
+" #endif\n"
+" #ifdef FLAG_MISC_MAP\n"
+"   #ifdef FLAG_TEAMCOLOR\n"
+"    vec2 teamMask = vec2(0.0, 0.0);\n"
+"    teamMask = texture2D(sMiscmap, texCoord).rg;\n"
+"   #endif\n"
 " #endif\n"
 " #ifdef FLAG_LIGHT\n"
 "  #ifdef FLAG_NORMAL_MAP\n"
@@ -1431,6 +1463,11 @@ char *Default_main_fragment_shader =
 " #else\n"
 "	vec4 baseColor = gl_Color;\n"
 " #endif\n"
+"  #ifdef FLAG_TEAMCOLOR\n"
+"	vec3 base = base_color - vec3(0.5);\n"
+"	vec3 stripe = stripe_color - vec3(0.5);\n"
+"	baseColor.rgb += (base * teamMask.x) + (stripe * teamMask.y);\n"
+"  #endif\n"
 "	vec4 fragmentColor;\n"
 "	fragmentColor.rgb = baseColor.rgb * max(lightAmbientDiffuse.rgb * AMBIENT_LIGHT_BOOST, gl_LightModel.ambient.rgb - 0.425);\n"
 "	fragmentColor.a = baseColor.a;\n"

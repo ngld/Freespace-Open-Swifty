@@ -13,6 +13,7 @@
 #include <setjmp.h>
 
 #include "globalincs/def_files.h"
+#include "globalincs/alphacolors.h"
 #include "ship/ship.h"
 #include "object/object.h"
 #include "weapon/weapon.h"
@@ -77,6 +78,7 @@
 #include "parse/scripting.h"
 #include "graphics/gropenglshader.h"
 #include "model/model.h"
+#include "mod_table/mod_table.h"
 
 
 #define NUM_SHIP_SUBSYSTEM_SETS			20		// number of subobject sets to use (because of the fact that it's a linked list,
@@ -372,9 +374,6 @@ static int Thrust_anim_inited = 0;
 bool warning_too_many_ship_classes = false;
 
 int ship_get_subobj_model_num(ship_info* sip, char* subobj_name);
-
-// Used to set the default effect for real time ship select anis, defaults to the FS2 effect
-int Default_ship_select_effect = 2;
 
 SCP_vector<ship_effect> Ship_effects;
 
@@ -964,6 +963,9 @@ void init_ship_entry(ship_info *sip)
 	sip->pathMetadata.clear();
 
 	sip->selection_effect = Default_ship_select_effect;
+
+	// Team colors
+	sip->uses_team_colors = false;
 }
 
 /**
@@ -1448,9 +1450,9 @@ int parse_ship_values(ship_info* sip, bool isTemplate, bool first_time, bool rep
 		stuff_string(effect, F_NAME, NAME_LENGTH);
 		if (!stricmp(effect, "FS2"))
 			sip->selection_effect = 2;
-		if (!stricmp(effect, "FS1"))
+		else if (!stricmp(effect, "FS1"))
 			sip->selection_effect = 1;
-		if (!stricmp(effect, "off"))
+		else if (!stricmp(effect, "off"))
 			sip->selection_effect = 0;
 	}
 
@@ -1624,6 +1626,27 @@ int parse_ship_values(ship_info* sip, bool isTemplate, bool first_time, bool rep
 			sip->nondark_colors[sip->num_nondark_colors][0] = nr;
 			sip->nondark_colors[sip->num_nondark_colors][1] = ng;
 			sip->nondark_colors[sip->num_nondark_colors++][2] = nb;
+		}
+	}
+
+	if (optional_string("$Enable Team Colors:")) {
+		stuff_boolean(&sip->uses_team_colors);
+		sip->default_team_name = "None";
+	} 
+
+	if (optional_string("$Default Team:")) {
+		char temp[NAME_LENGTH];
+		stuff_string(temp, F_NAME, NAME_LENGTH);
+		SCP_string name = temp;
+		if (name == "None") {
+			sip->uses_team_colors = true;
+		} else {
+			if (Team_Colors.find(name) != Team_Colors.end()) {
+				sip->default_team_name = name;
+				sip->uses_team_colors = true;
+			} else {
+				Warning(LOCATION, "Team name %s is invalid. Teams must be defined in colors.tbl.\n", temp);
+			}
 		}
 	}
 
@@ -5073,6 +5096,9 @@ void ship_set(int ship_index, int objnum, int ship_type)
 
 	// Reset special explosion too.
 	shipp->use_special_explosion = false;
+
+	// Team colors
+	shipp->team_name.assign( sip->default_team_name);
 }
 
 /**
@@ -6076,6 +6102,11 @@ void ship_render(object * obj)
 				}
 			}
 
+			if (sip->uses_team_colors) {
+				gr_enable_team_color();
+				gr_set_team_color(shipp->team_name);
+			}
+
 			if(sip->flags2 & SIF2_NO_LIGHTING)
 				render_flags |= MR_NO_LIGHTING;
 
@@ -6233,6 +6264,8 @@ void ship_render(object * obj)
 		shipp->warpin_effect->warpShipRender();
 	else if(shipp->flags & SF_DEPART_WARP)
 		shipp->warpout_effect->warpShipRender();
+
+	gr_disable_team_color();
 }
 
 void ship_render_cockpit(object *objp)
@@ -7072,7 +7105,11 @@ void ship_dying_frame(object *objp, int ship_num)
 				polymodel *pm = model_get(sip->model_num);
 
 				// Gets two random points on the surface of a submodel
-				submodel_get_two_random_points(pm->id, pm->detail[0], &pnt1, &pnt2 );
+				if ( Cmdline_old_collision_sys ) {
+					submodel_get_two_random_points(pm->id, pm->detail[0], &pnt1, &pnt2 );
+				} else {
+					submodel_get_two_random_points_better(pm->id, pm->detail[0], &pnt1, &pnt2 );
+				}
 
 				model_find_world_point(&outpnt, &pnt1, sip->model_num, pm->detail[0], &objp->orient, &objp->pos );
 
@@ -7182,7 +7219,11 @@ void ship_dying_frame(object *objp, int ship_num)
 				vec3d tmp, outpnt, pnt1, pnt2;
 
 				// Gets two random points on the surface of a submodel [KNOSSOS]
-				submodel_get_two_random_points(pm->id, pm->detail[0], &pnt1, &pnt2 );
+				if ( Cmdline_old_collision_sys ) {
+					submodel_get_two_random_points(pm->id, pm->detail[0], &pnt1, &pnt2 );
+				} else {
+					submodel_get_two_random_points_better(pm->id, pm->detail[0], &pnt1, &pnt2 );
+				}
 
 				vm_vec_avg( &tmp, &pnt1, &pnt2 );
 				model_find_world_point(&outpnt, &tmp, pm->id, pm->detail[0], &objp->orient, &objp->pos );
@@ -9740,7 +9781,14 @@ int ship_fire_primary(object * obj, int stream_weapons, int force)
 		// Goober5000 (thanks to _argv[-1] for the original idea)
 		if (!(The_mission.ai_profile->flags & AIPF_DISABLE_LINKED_FIRE_PENALTY))
 		{
-			next_fire_delay *= 1.0f + (num_primary_banks - 1) * 0.5f;		//	50% time penalty if banks linked
+			int effective_primary_banks = 0;
+			for (int i = 0; i < num_primary_banks; i++)
+				if (Weapon_info[swp->primary_bank_weapons[i]].wi_flags3 & WIF3_NOLINK)
+					continue;
+				else
+					effective_primary_banks++;
+
+			next_fire_delay *= 1.0f + (effective_primary_banks - 1) * 0.5f;		//	50% time penalty if banks linked
 		}
 
 		if (winfo_p->fof_spread_rate > 0.0f)
@@ -10300,8 +10348,9 @@ int ship_fire_primary(object * obj, int stream_weapons, int force)
 			target = NULL;
 		if (objp == Player_obj && Player_ai->target_objnum != -1)
 			target = &Objects[Player_ai->target_objnum]; 
+
 		Script_system.SetHookObjects(2, "User", objp, "Target", target);
-		Script_system.RunCondition(CHA_ONWPFIRED, 0, NULL, objp);
+		Script_system.RunCondition(CHA_ONWPFIRED, 0, NULL, objp, 1);
 
 		Script_system.RunCondition(CHA_PRIMARYFIRE, 0, NULL, objp);
 	}

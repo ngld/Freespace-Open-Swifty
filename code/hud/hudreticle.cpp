@@ -783,32 +783,32 @@ void HudGaugeWeaponLinking::initBitmaps(char *fname_arc,
 {
 	arc.first_frame = bm_load_animation(fname_arc, &arc.num_frames);
 	if (arc.first_frame < 0) {
-		mprintf(("Cannot load hud ani: %s\n", fname_arc));
+		Warning(LOCATION, "Cannot load hud ani: %s\n", fname_arc);
 	}
 	
 	weapon_linking_modes[LINK_ONE_PRIMARY].first_frame = bm_load_animation(fname_primary_link_1, &weapon_linking_modes[LINK_ONE_PRIMARY].num_frames);
 	if (weapon_linking_modes[LINK_ONE_PRIMARY].first_frame < 0) {
-		mprintf(("Cannot load hud ani: %s\n", fname_primary_link_1));
+		Warning(LOCATION, "Cannot load hud ani: %s\n", fname_primary_link_1);
 	}
 
 	weapon_linking_modes[LINK_TWO_PRIMARY].first_frame = bm_load_animation(fname_primary_link_2, &weapon_linking_modes[LINK_TWO_PRIMARY].num_frames);
 	if (weapon_linking_modes[LINK_TWO_PRIMARY].first_frame < 0) {
-		mprintf(("Cannot load hud ani: %s\n", fname_primary_link_2));
+		Warning(LOCATION, "Cannot load hud ani: %s\n", fname_primary_link_2);
 	}
 
 	weapon_linking_modes[LINK_ONE_SECONDARY].first_frame = bm_load_animation(fname_secondary_link_1, &weapon_linking_modes[LINK_ONE_SECONDARY].num_frames);
 	if (weapon_linking_modes[LINK_ONE_SECONDARY].first_frame < 0) {
-		mprintf(("Cannot load hud ani: %s\n", fname_secondary_link_1));
+		Warning(LOCATION, "Cannot load hud ani: %s\n", fname_secondary_link_1);
 	}
 
 	weapon_linking_modes[LINK_TWO_SECONDARY].first_frame = bm_load_animation(fname_secondary_link_2, &weapon_linking_modes[LINK_TWO_SECONDARY].num_frames);
 	if (weapon_linking_modes[LINK_TWO_SECONDARY].first_frame < 0) {
-		mprintf(("Cannot load hud ani: %s\n", fname_secondary_link_2));
+		Warning(LOCATION, "Cannot load hud ani: %s\n", fname_secondary_link_2);
 	}
 
 	weapon_linking_modes[LINK_THREE_SECONDARY].first_frame = bm_load_animation(fname_secondary_link_3, &weapon_linking_modes[LINK_THREE_SECONDARY].num_frames);
 	if (weapon_linking_modes[LINK_THREE_SECONDARY].first_frame < 0) {
-		mprintf(("Cannot load hud ani: %s\n", fname_secondary_link_3));
+		Warning(LOCATION, "Cannot load hud ani: %s\n", fname_secondary_link_3);
 	}
 }
 
@@ -829,7 +829,9 @@ void HudGaugeWeaponLinking::render(float frametime)
 
 	setGaugeColor();
 
-	renderBitmap(arc.first_frame+1, position[0], position[1]);
+	if (arc.first_frame >= 0) {
+		renderBitmap(arc.first_frame+1, position[0], position[1]);
+	}
 
 	swp = &Player_ship->weapons;
 
@@ -871,7 +873,9 @@ void HudGaugeWeaponLinking::render(float frametime)
 	}
 	
 	if ( gauge_index != -1 ) {
-		renderBitmap(weapon_linking_modes[gauge_index].first_frame+frame_offset, position[0] + Weapon_link_offsets[gauge_index][0], position[1] + Weapon_link_offsets[gauge_index][1]);
+		if (weapon_linking_modes[gauge_index].first_frame >= 0) {
+			renderBitmap(weapon_linking_modes[gauge_index].first_frame+frame_offset, position[0] + Weapon_link_offsets[gauge_index][0], position[1] + Weapon_link_offsets[gauge_index][1]);
+		}
 	}
 
 	int num_banks = swp->num_secondary_banks;
@@ -909,8 +913,9 @@ void HudGaugeWeaponLinking::render(float frametime)
 		} else {
 			frame_offset = swp->current_secondary_bank+1;
 		}
-
-		renderBitmap(weapon_linking_modes[gauge_index].first_frame+frame_offset, position[0] + Weapon_link_offsets[gauge_index][0],  position[1] + Weapon_link_offsets[gauge_index][1]);
+		if (weapon_linking_modes[gauge_index].first_frame >= 0) {
+			renderBitmap(weapon_linking_modes[gauge_index].first_frame+frame_offset, position[0] + Weapon_link_offsets[gauge_index][0],  position[1] + Weapon_link_offsets[gauge_index][1]);
+		}
 	}
 }
 

@@ -46,6 +46,7 @@
 #include "network/multiutil.h"
 #include "parse/scripting.h"
 #include "stats/scoring.h"
+#include "mod_table/mod_table.h"
 
 
 #ifndef NDEBUG
@@ -96,8 +97,6 @@ int missile_model = -1;
 int     First_secondary_index = -1;
 int		Default_cmeasure_index = -1;
 
-int Default_weapon_select_effect = 2;
-
 static int *used_weapons = NULL;
 
 int	Num_spawn_types = 0;
@@ -123,7 +122,7 @@ int		Weapon_impact_timer;			// timer, initialized at start of each mission
 #define FLAK_DAMAGE_SCALE				0.05f
 
 //default time of a homing weapon to not home
-#define HOMING_DEFAULT_FREE_FLIGHT_TIME	0.25f
+#define HOMING_DEFAULT_FREE_FLIGHT_TIME	0.5f
 
 // time delay between each swarm missile that is fired
 #define SWARM_MISSILE_DELAY				150
@@ -467,7 +466,7 @@ int weapon_info_lookup(const char *name)
 #define DEFAULT_WEAPON_SPAWN_COUNT	10
 
 //	Parse the weapon flags.
-void parse_wi_flags(weapon_info *weaponp, int wi_flags, int wi_flags2)
+void parse_wi_flags(weapon_info *weaponp, int wi_flags, int wi_flags2, int wi_flags3)
 {
 	const char *spawn_str = NOX("Spawn");
 	const size_t spawn_str_len = strlen(spawn_str);
@@ -485,6 +484,7 @@ void parse_wi_flags(weapon_info *weaponp, int wi_flags, int wi_flags2)
 		// reseting the flag values if set to override the existing flags
 		weaponp->wi_flags = wi_flags;
 		weaponp->wi_flags2 = wi_flags2;
+		weaponp->wi_flags3 = wi_flags3;
 	}
 
 	bool set_pierce = false;
@@ -642,6 +642,10 @@ void parse_wi_flags(weapon_info *weaponp, int wi_flags, int wi_flags2)
 			weaponp->wi_flags2 |= WIF2_RENDER_FLAK;
 		else if (!stricmp(NOX("ciws"), weapon_strings[i]))
 			weaponp->wi_flags2 |= WIF2_CIWS;
+		else if (!stricmp(NOX("anti-subsystem beam"), weapon_strings[i]))
+			weaponp->wi_flags2 |= WIF2_ANTISUBSYSBEAM;
+		else if (!stricmp(NOX("no primary linking"), weapon_strings[i]))
+			weaponp->wi_flags3 |= WIF3_NOLINK;
 		else
 			Warning(LOCATION, "Bogus string in weapon flags: %s\n", weapon_strings[i]);
 	}
@@ -1066,6 +1070,7 @@ int parse_weapon(int subtype, bool replace)
 	bool create_if_not_found  = true;
 	int wi_flags = WIF_DEFAULT_VALUE;
 	int wi_flags2 = WIF2_DEFAULT_VALUE;
+	int wi_flags3 = WIF3_DEFAULT_VALUE;
 
 	required_string("$Name:");
 	stuff_string(fname, F_NAME, NAME_LENGTH);
@@ -1212,9 +1217,9 @@ int parse_weapon(int subtype, bool replace)
 		stuff_string(effect, F_NAME, NAME_LENGTH);
 		if (!stricmp(effect, "FS2"))
 			wip->selection_effect = 2;
-		if (!stricmp(effect, "FS1"))
+		else if (!stricmp(effect, "FS1"))
 			wip->selection_effect = 1;
-		if (!stricmp(effect, "off"))
+		else if (!stricmp(effect, "off"))
 			wip->selection_effect = 0;
 	}	
 
@@ -1726,7 +1731,7 @@ int parse_weapon(int subtype, bool replace)
 
 	}
 
-	parse_wi_flags(wip, wi_flags, wi_flags2);
+	parse_wi_flags(wip, wi_flags, wi_flags2, wi_flags3);
 
 	// be friendly; make sure ballistic flags are synchronized - Goober5000
 	// primary
@@ -4028,13 +4033,20 @@ void weapon_home(object *obj, int num, float frame_time)
 			send_homing_weapon_info(num);
 		}
 
-		if (obj->phys_info.speed > max_speed) {
-			obj->phys_info.speed -= frame_time * (2 / wip->free_flight_time);
-			vm_vec_copy_scale( &obj->phys_info.desired_vel, &obj->orient.vec.fvec, obj->phys_info.speed);
-		} else if ((obj->phys_info.speed < max_speed / (2 / wip->free_flight_time)) && (wip->wi_flags & WIF_HOMING_HEAT)) {
-			obj->phys_info.speed = max_speed / (2 / wip->free_flight_time);
-			vm_vec_copy_scale( &obj->phys_info.desired_vel, &obj->orient.vec.fvec, obj->phys_info.speed);
+		// since free_flight_time can now be 0, guard against that
+		if (wip->free_flight_time > 0.0f) {
+			if (obj->phys_info.speed > max_speed) {
+				obj->phys_info.speed -= frame_time * (2 / wip->free_flight_time);
+			} else if ((obj->phys_info.speed < max_speed / (2 / wip->free_flight_time)) && (wip->wi_flags & WIF_HOMING_HEAT)) {
+				obj->phys_info.speed = max_speed / (2 / wip->free_flight_time);
+			}
 		}
+		// no free_flight_time, so immediately set desired speed
+		else {
+			obj->phys_info.speed = max_speed;
+		}
+		// set velocity using whatever speed we have
+		vm_vec_copy_scale( &obj->phys_info.desired_vel, &obj->orient.vec.fvec, obj->phys_info.speed);
 
 		return;
 	}
@@ -4870,7 +4882,17 @@ int weapon_create( vec3d * pos, matrix * porient, int weapon_type, int parent_ob
 
 	num_deleted = 0;
 	if (Num_weapons >= MAX_WEAPONS-5) {
-		num_deleted = collide_remove_weapons();
+
+		//No, do remove for AI ships -- MK, 3/12/98  // don't need to try and delete weapons for ai ships
+		//if ( !(Objects[parent_objnum].flags & OF_PLAYER_SHIP) )
+		//	return -1;
+
+		if ( Cmdline_old_collision_sys ) {
+			num_deleted = collide_remove_weapons();
+		} else {
+			num_deleted = 0;
+		}
+
 		nprintf(("WARNING", "Deleted %d weapons because of lack of slots\n", num_deleted));
 		if (num_deleted == 0){
 			return -1;
