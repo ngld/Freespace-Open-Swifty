@@ -187,22 +187,24 @@ char *drop_white_space(char *str)
 // ditto for SCP_string
 void drop_white_space(SCP_string &str)
 {
-	int len, newlen, first, i;
+	int len, newlen, first, last, i;
 
 	len = str.length();
 	first = 0;
-	newlen = 0;
+	last = len - 1;
 
 	// find first non-whitespace
 	while ((first < len) && is_white_space(str[first]))
 		first++;
 
-	// find first whitespace after string starts
-	while ((first + newlen < len) && !is_white_space(str[first + newlen]))
-		newlen++;
+	// find last non-whitespace
+	while ((last > first) && is_white_space(str[last]))
+		last--;
+
+	newlen = last - first + 1;
 
 	// quick out
-	if (newlen == 0)
+	if (newlen <= 0)
 	{
 		str = "";
 		return;
@@ -310,30 +312,28 @@ int get_line_num()
 extern int Cmdline_noparseerrors;
 void error_display(int error_level, char *format, ...)
 {
-	char	buffer[1024];
-	char	error_text[128];
+	char type[8];
+	SCP_string error_text;
 	va_list args;
 
 	if (error_level == 0) {
-		strcpy_s(error_text, "Warning");
+		strcpy_s(type, "Warning");
 		Warning_count++;
 	} else {
-		strcpy_s(error_text, "Error");
+		strcpy_s(type, "Error");
 		Error_count++;
 	}
 
-	nprintf((error_text, "%s(line %i:%s: ", Current_filename, get_line_num(), error_text));
-
 	va_start(args, format);
-	vsprintf(buffer, format, args);
+	vsprintf(error_text, format, args);
 	va_end(args);
-	Assert(strlen(buffer) < 1024);
 
-	nprintf((error_text, "%s", buffer));
+	nprintf((type, "%s(line %i): %s: %s\n", Current_filename, get_line_num(), type, error_text.c_str()));
+
 	if(error_level == 0 || Cmdline_noparseerrors)
-		Warning(LOCATION, "%s(line %i:\n%s: %s", Current_filename, get_line_num(), error_text, buffer);
+		Warning(LOCATION, "%s(line %i):\n%s: %s", Current_filename, get_line_num(), type, error_text.c_str());
 	else
-		Error(LOCATION, "%s(line %i:\n%s: %s", Current_filename, get_line_num(), error_text, buffer);
+		Error(LOCATION, "%s(line %i):\n%s: %s", Current_filename, get_line_num(), type, error_text.c_str());
 }
 
 //	Advance Mp to the next eoln character.
@@ -345,7 +345,7 @@ void advance_to_eoln(char *more_terminators)
 
 	terminators[0] = EOLN;
 	terminators[1] = (char)EOF_CHAR;
-	terminators[2] = NULL;
+	terminators[2] = 0;
 	if (more_terminators != NULL)
 		strcat_s(terminators, more_terminators);
 	else
@@ -519,7 +519,7 @@ int check_for_eoln()
 
 // similar to optional_string, but just checks if next token is a match.
 // It doesn't advance Mp except to skip past white space.
-int check_for_string(char *pstr)
+int check_for_string(const char *pstr)
 {
 	ignore_white_space();
 
@@ -530,11 +530,10 @@ int check_for_string(char *pstr)
 }
 
 // like check for string, but doesn't skip past any whitespace
-int check_for_string_raw(char *pstr)
+int check_for_string_raw(const char *pstr)
 {
-	if (!strnicmp(pstr, Mp, strlen(pstr))){
+	if (!strnicmp(pstr, Mp, strlen(pstr)))
 		return 1;
-	}
 
 	return 0;
 }
@@ -542,7 +541,7 @@ int check_for_string_raw(char *pstr)
 // Find an optional string.
 //	If found, return 1, else return 0.
 //	If found, point past string, else don't update pointer.
-int optional_string(char *pstr)
+int optional_string(const char *pstr)
 {
 	ignore_white_space();
 //	mprintf(("lookint for optional string %s",pstr));
@@ -786,7 +785,7 @@ void copy_to_eoln(char *outstr, char *more_terminators, char *instr, int max)
 
 	terminators[0] = EOLN;
 	terminators[1] = (char)EOF_CHAR;
-	terminators[2] = NULL;
+	terminators[2] = 0;
 	if (more_terminators != NULL)
 		strcat_s(terminators, more_terminators);
 	else
@@ -813,7 +812,7 @@ void copy_to_eoln(SCP_string &outstr, char *more_terminators, char *instr)
 
 	terminators[0] = EOLN;
 	terminators[1] = (char)EOF_CHAR;
-	terminators[2] = NULL;
+	terminators[2] = 0;
 	if (more_terminators != NULL)
 		strcat_s(terminators, more_terminators);
 	else
@@ -1129,7 +1128,7 @@ int get_string_or_variable (SCP_string &str)
 	else
 	{
 		get_string(str);
-		Error(LOCATION, "Invalid entry \"%s\"  found in get_string_or_variable. Must be a quoted string or a string variable name.", str); 
+		Error(LOCATION, "Invalid entry \"%s\"  found in get_string_or_variable. Must be a quoted string or a string variable name.", str.c_str()); 
 	}
 
 	return result;
@@ -1383,7 +1382,7 @@ void stuff_string(SCP_string &outstr, int type, char *terminators)
 		outstr = read_str;
 	}
 
-	diag_printf("Stuffed string = [%.30s]\n", outstr);
+	diag_printf("Stuffed string = [%.30s]\n", outstr.c_str());
 }
 
 // stuff a string, but only until the end of a line. don't ignore leading whitespace. close analog of fgets()/cfgets()
@@ -1433,38 +1432,30 @@ void stuff_string_line(SCP_string &outstr)
 		fhash_add_str(outstr.c_str(), tag_id);
 	}
 
-	diag_printf("Stuffed string = [%.30s]\n", outstr);
+	diag_printf("Stuffed string = [%.30s]\n", outstr.c_str());
 }
 
 // Exactly the same as stuff string only Malloc's the buffer. 
 //	Supports various FreeSpace primitive types.  If 'len' is supplied, it will override
 // the default string length if using the F_NAME case.
-char *stuff_and_malloc_string( int type, char *terminators, int len)
+char *stuff_and_malloc_string(int type, char *terminators)
 {
-	int l;
+	SCP_string tmp_result;
 
-	char tmp_result[MAX_TMP_STRING_LENGTH];
-	int final_len = len;
-
-	if ( !len || (len > MAX_TMP_STRING_LENGTH) )
-		final_len = MAX_TMP_STRING_LENGTH;
-
-	stuff_string(tmp_result, type, final_len, terminators);
+	stuff_string(tmp_result, type, terminators);
 	drop_white_space(tmp_result);
 
-	l = strlen(tmp_result);
-	Assert(l < MAX_TMP_STRING_LENGTH);		// Get John!!
-	if (l < 1)
+	if (tmp_result.empty())
 		return NULL;
 
-	return vm_strdup(tmp_result);
+	return vm_strdup(tmp_result.c_str());
 }
 
-void stuff_malloc_string(char **dest, int type, char *terminators, int len)
+void stuff_malloc_string(char **dest, int type, char *terminators)
 {
 	Assert(dest != NULL); //wtf?
 	
-	char *new_val = stuff_and_malloc_string(type, terminators, len);
+	char *new_val = stuff_and_malloc_string(type, terminators);
 	
 	if(new_val != NULL)
 	{
@@ -2232,12 +2223,14 @@ void stuff_float(float *f)
 	diag_printf("Stuffed float: %f\n", *f);
 }
 
-int stuff_float_optional(float *f)
+int stuff_float_optional(float *f, bool raw)
 {
 	int skip_len;
 	bool comma = false;
 	
-	ignore_white_space();
+	if (!raw)
+		ignore_white_space();
+
 	skip_len = strspn(Mp, "+-0123456789.");
 	if(*(Mp+skip_len) == ',') {
 		comma = true;
@@ -2274,9 +2267,35 @@ void stuff_int(int *i)
 	diag_printf("Stuffed int: %i\n", *i);
 }
 
+int stuff_int_optional(int *i, bool raw)
+{
+	int skip_len;
+	bool comma = false;
+	
+	if (!raw)
+		ignore_white_space();
+
+	skip_len = strspn(Mp, "+-0123456789");
+	if(*(Mp+skip_len) == ',') {
+		comma = true;
+	}
+	
+	if(skip_len == 0)
+	{
+		if(comma) {
+			Mp++;
+			return 1;
+		} else {
+			return 0;
+		}
+	}
+
+	stuff_int(i);
+	return 2;
+}
+
 int stuff_int_or_variable (int &i, bool positive_value = false);
 int stuff_int_or_variable (int *ilp, int count, bool positive_value = false);
-
 
 // Stuffs an int value or the value of a number variable. Returns the index of the variable or NOT_SET_BY_SEXP_VARIABLE.
 int stuff_int_or_variable (int &i, bool positive_value)
@@ -2566,7 +2585,7 @@ int stuff_string_list(SCP_vector<SCP_string>& slp)
 
 	ignore_white_space();
 
-	char buf[NAME_LENGTH];
+	SCP_string buf;
 
 	while (*Mp != ')') {
 		if(*Mp != '\"') {
@@ -2574,8 +2593,9 @@ int stuff_string_list(SCP_vector<SCP_string>& slp)
 		}
 		//Assert ( *Mp == '\"' );					// should always be enclosed in quotes
 
+		buf = "";
 		get_string( buf );
-		slp.push_back(SCP_string(buf));
+		slp.push_back( buf );
 		ignore_white_space();
 	}
 
@@ -3376,7 +3396,7 @@ int split_str(const char *src, int max_pixel_w, int *n_chars, const char **p_str
 	return line_num;
 }
 
-int split_str(const char *src, int max_pixel_w, SCP_vector<int> *n_chars, SCP_vector<const char*> *p_str, char ignore_char)
+int split_str(const char *src, int max_pixel_w, SCP_vector<int> &n_chars, SCP_vector<const char*> &p_str, char ignore_char)
 {
 	char buffer[SPLIT_STR_BUFFER_SIZE];
 	const char *breakpoint = NULL;
@@ -3385,8 +3405,6 @@ int split_str(const char *src, int max_pixel_w, SCP_vector<int> *n_chars, SCP_ve
 	
 	// check our assumptions..
 	Assert(src != NULL);
-	Assert(n_chars != NULL);
-	Assert(p_str != NULL);
 	Assert(max_pixel_w > 0);
 	
 	memset(buffer, 0, SPLIT_STR_BUFFER_SIZE);
@@ -3395,7 +3413,7 @@ int split_str(const char *src, int max_pixel_w, SCP_vector<int> *n_chars, SCP_ve
 	while (is_white_space(*src))
 		src++;
 
-	p_str->clear();
+	p_str.clear();
 
 	// iterate through chars in line, keeping track of most recent "white space" location that can be used
 	// as a line splitting point if necessary
@@ -3406,22 +3424,27 @@ int split_str(const char *src, int max_pixel_w, SCP_vector<int> *n_chars, SCP_ve
 			if (is_gray_space(*src))
 				continue;
 
-			p_str->push_back(src);
+			p_str.push_back(src);
 			breakpoint = NULL;
 			new_line = 0;
 		}
 
 		// maybe skip leading whitespace
 		if (ignore_until_whitespace) {
-			if ( is_white_space(*src) )
+			if ( is_white_space(*src) ) {
 				ignore_until_whitespace = 0;
+
+				// don't eat the newline
+				if (*src == EOLN)
+					src--;
+			}
 
 			continue;
 		}
 
 		// if we have a newline, split the line here
 		if (*src == '\n') {
-			n_chars->push_back(src - p_str->at(line_num));  // track length of line
+			n_chars.push_back(src - p_str.at(line_num));  // track length of line
 			line_num++;
 			new_line = 1;
 
@@ -3463,8 +3486,8 @@ int split_str(const char *src, int max_pixel_w, SCP_vector<int> *n_chars, SCP_ve
 				src--;  // reuse this character in next line
 			}
 
-			n_chars->push_back(end - p_str->at(line_num));  // track length of line
-			Assert(n_chars->at(line_num));
+			n_chars.push_back(end - p_str.at(line_num));  // track length of line
+			Assert(n_chars.at(line_num));
 			line_num++;
 			new_line = 1;
 
@@ -3474,9 +3497,9 @@ int split_str(const char *src, int max_pixel_w, SCP_vector<int> *n_chars, SCP_ve
 		}
 	}	// end for
 
-	if (!new_line && p_str->at(line_num)) {
-		n_chars->push_back(src - p_str->at(line_num));  // track length of line
-		Assert(n_chars->at(line_num));
+	if (!new_line && p_str.at(line_num)) {
+		n_chars.push_back(src - p_str.at(line_num));  // track length of line
+		Assert(n_chars.at(line_num));
 		line_num++;
 	}
 
@@ -3530,16 +3553,16 @@ char *stristr(const char *str, const char *substr)
 	char substr_ch_upper = (char)toupper(*substr);
 
 	// find the maximum distance to search
-	char *upper_bound = (char *)str + strlen(str) - strlen(substr);
+	const char *upper_bound = str + strlen(str) - strlen(substr);
 
 	// loop through every character of str
-	for (char *start = (char *)str; start <= upper_bound; start++)
+	for (const char *start = str; start <= upper_bound; start++)
 	{
 		// check first character of substr
 		if ((*start == substr_ch_upper) || (*start == substr_ch_lower))
 		{
 			// first character matched, so check the rest
-			for (char *str_ch = start+1, *substr_ch = (char *)substr+1; *substr_ch != '\0'; str_ch++, substr_ch++)
+			for (const char *str_ch = start+1, *substr_ch = substr+1; *substr_ch != '\0'; str_ch++, substr_ch++)
 			{
 				// character match?
 				if (*str_ch == *substr_ch)
@@ -3554,7 +3577,7 @@ char *stristr(const char *str, const char *substr)
 			}
 
 			// finished inner loop with success!
-			return start;
+			return const_cast<char*>(start);
 		}
 
 stristr_continue_outer_loop:
@@ -3577,8 +3600,7 @@ bool can_construe_as_integer(const char *text)
 		return false;
 
 	// check digits for rest
-	// (why on earth do we need a const cast here?  text isn't the pointer being modified!)
-	for (char *p = const_cast<char*>(text) + 1; *p != '\0'; p++)
+	for (const char *p = text + 1; *p != '\0'; p++)
 	{
 		if (!isdigit(*p))
 			return false;
@@ -3589,12 +3611,17 @@ bool can_construe_as_integer(const char *text)
 
 // Goober5000
 // yoinked gratefully from dbugfile.cpp
-void sprintf(SCP_string &dest, const char *format, ...)
+void vsprintf(SCP_string &dest, const char *format, va_list ap)
 {
-	char buf[32];
+	const int MAX_BUF = 64;
+	const char *handled_types = "diouxXcfsn%";
 
-	va_list ap;
-	char *p;
+	int buf_src_len;
+	char buf_src[MAX_BUF];
+	char buf_dest[MAX_BUF];
+
+	const char *p;
+	int *pint;
 	long ival;
 	double dval;
 
@@ -3602,9 +3629,7 @@ void sprintf(SCP_string &dest, const char *format, ...)
 	dest = "";
 
 	// Add each extra parameter to string
-	va_start(ap, format);
-
-	for (p = const_cast<char *>(format); *p; p++)
+	for (p = format; *p; ++p)
 	{
 		if (*p != '%')
 		{
@@ -3612,17 +3637,38 @@ void sprintf(SCP_string &dest, const char *format, ...)
 			continue;
 		}
 
-		p++;
-		if (!*p)
-			break;	// stupid edge case
+		// find the specifier that comes next
+		buf_src[0] = '%';
+		buf_src_len = 1;
+		do {
+			++p;
+			if (!*p || (buf_src_len >= MAX_BUF))
+			{
+				Warning(LOCATION, "Could not find a sprintf specifier within %d characters for format '%s', pos %d!", MAX_BUF, format, (p - format));
 
+				// unsafe to continue handling this va_list
+				dest += buf_src;
+				return;
+			}
+
+			buf_src[buf_src_len] = *p;
+			buf_src_len++;
+		} while (strchr(handled_types, *p) == NULL);
+		buf_src[buf_src_len] = 0;
+
+		// handle it
 		switch (*p)
 		{
 			case 'd':
+			case 'i':
+			case 'o':
+			case 'u':
+			case 'x':
+			case 'X':
 			{
 				ival = va_arg(ap, int);
-				sprintf(buf, "%d", ival);
-				dest += buf;
+				sprintf(buf_dest, buf_src, ival);
+				dest += buf_dest;
 				break;
 			}
 			case 'c':
@@ -3630,24 +3676,23 @@ void sprintf(SCP_string &dest, const char *format, ...)
 				dest += (char) va_arg(ap, char);
 				break;
 			}
-			case 'x':
-			{
-				ival = va_arg(ap, int);
-				sprintf(buf, "%x", ival);
-				dest += buf;
-				break;
-			}
 			case 'f':
 			{
 				dval = va_arg(ap, double);
-				sprintf(buf, "%f", dval);
-				dest += buf;
+				sprintf(buf_dest, buf_src, dval);
+				dest += buf_dest;
 				break;
 			}
 			case 's':
 			{
 				dest += va_arg(ap, char *);
 				break;
+			}
+			case 'n':
+			{
+				pint = va_arg(ap, int *);
+				Assert(pint != NULL);
+				*pint = dest.length();
 			}
 			case '%':
 			{
@@ -3656,14 +3701,20 @@ void sprintf(SCP_string &dest, const char *format, ...)
 			}
 			default:
 			{
-				sprintf(buf, "N/A: %%%c", *p);
-				dest += buf;
+				sprintf(buf_dest, "N/A: %%%c", *p);
+				dest += buf_dest;
 				break;
 			}
 		}
 	}
+}
 
-	va_end(ap);
+void sprintf(SCP_string &dest, const char *format, ...)
+{
+	va_list args;
+	va_start(args, format);
+	vsprintf(dest, format, args);
+	va_end(args);
 }
 
 // Goober5000
@@ -3790,7 +3841,17 @@ SCP_string& replace_one(SCP_string& context, const SCP_string& from, const SCP_s
 	size_t foundHere;
 	if ((foundHere = context.find(from, 0)) != SCP_string::npos)
 	{
-		context.replace(foundHere, from.size(), to);
+		context.replace(foundHere, from.length(), to);
+	}
+	return context;
+}
+
+SCP_string& replace_one(SCP_string& context, const char* from, const char* to)
+{
+	size_t foundHere;
+	if ((foundHere = context.find(from, 0)) != SCP_string::npos)
+	{
+		context.replace(foundHere, strlen(from), to);
 	}
 	return context;
 }
@@ -3798,12 +3859,31 @@ SCP_string& replace_one(SCP_string& context, const SCP_string& from, const SCP_s
 // http://www.cppreference.com/wiki/string/replace
 SCP_string& replace_all(SCP_string& context, const SCP_string& from, const SCP_string& to)
 {
+	size_t from_len = from.length();
+	size_t to_len = to.length();
+
 	size_t lookHere = 0;
 	size_t foundHere;
 	while ((foundHere = context.find(from, lookHere)) != SCP_string::npos)
 	{
-		context.replace(foundHere, from.size(), to);
-		lookHere = foundHere + to.size();
+		context.replace(foundHere, from_len, to);
+		lookHere = foundHere + to_len;
+	}
+	return context;
+}
+
+// http://www.cppreference.com/wiki/string/replace
+SCP_string& replace_all(SCP_string& context, const char* from, const char* to)
+{
+	size_t from_len = strlen(from);
+	size_t to_len = strlen(to);
+
+	size_t lookHere = 0;
+	size_t foundHere;
+	while ((foundHere = context.find(from, lookHere)) != SCP_string::npos)
+	{
+		context.replace(foundHere, from_len, to);
+		lookHere = foundHere + to_len;
 	}
 	return context;
 }
@@ -3923,6 +4003,30 @@ int scan_fso_version_string(const char *text, int *major, int *minor, int *build
 
 	*major = *minor = *build = *revis = 0;
 	return 0;
+}
+
+// Goober5000 - used for long Warnings, Errors, and FRED error messages with SEXPs
+void truncate_message_lines(SCP_string &text, int num_allowed_lines)
+{
+	Assert(num_allowed_lines > 0);
+	size_t find_from = 0;
+
+	while (find_from < text.size())
+	{
+		if (num_allowed_lines <= 0)
+		{
+			text.resize(find_from);
+			text.append("[...]");
+			break;
+		}
+
+		size_t pos = text.find('\n', find_from);
+		if (pos == SCP_string::npos)
+			break;
+
+		num_allowed_lines--;
+		find_from = pos + 1;
+	}
 }
 
 // Goober5000 - ugh, I can't see why they didn't just use stuff_*_list for these;

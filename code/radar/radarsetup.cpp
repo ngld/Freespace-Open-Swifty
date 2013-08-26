@@ -154,7 +154,7 @@ void radar_plot_object( object *objp )
 	vec3d pos, tempv;
 	float awacs_level, dist, max_radar_dist;
 	vec3d world_pos = objp->pos;
-	SCP_list<jump_node>::iterator jnp;
+	SCP_list<CJumpNode>::iterator jnp;
 
 	// don't process anything here.  Somehow, a jumpnode object caused this function
 	// to get entered on server side.
@@ -198,12 +198,12 @@ void radar_plot_object( object *objp )
 		case OBJ_JUMP_NODE:
 		{
 			for (jnp = Jump_nodes.begin(); jnp != Jump_nodes.end(); ++jnp) {
-				if(jnp->get_obj() == objp)
+				if(jnp->GetSCPObject() == objp)
 					break;
 			}
 			
 			// don't plot hidden jump nodes
-			if ( jnp->is_hidden() )
+			if ( jnp->IsHidden() )
 				return;
 
 			// filter jump nodes here if required
@@ -295,6 +295,7 @@ void radar_plot_object( object *objp )
 	b->dist = dist;
 	b->objp = objp;
 	b->radar_image_2d = -1;
+	b->radar_color_image_2d = -1;
 	b->radar_image_size = -1;
 	b->radar_projection_size = 1.0f;
 
@@ -312,9 +313,10 @@ void radar_plot_object( object *objp )
 
 		ship_info Iff_ship_info = Ship_info[Ships[objp->instance].ship_info_index];
 
-		if (Iff_ship_info.radar_image_2d_idx >= 0)
+		if (Iff_ship_info.radar_image_2d_idx >= 0 || Iff_ship_info.radar_color_image_2d_idx >= 0)
 		{
 			b->radar_image_2d = Iff_ship_info.radar_image_2d_idx;
+			b->radar_color_image_2d = Iff_ship_info.radar_color_image_2d_idx;
 			b->radar_image_size = Iff_ship_info.radar_image_size;
 			b->radar_projection_size = Iff_ship_info.radar_projection_size_mult;
 		}
@@ -490,7 +492,7 @@ RadarVisibility radar_is_visible( object *objp )
 	vec3d pos, tempv;
 	float awacs_level, dist, max_radar_dist;
 	vec3d world_pos = objp->pos;
-	SCP_list<jump_node>::iterator jnp;
+	SCP_list<CJumpNode>::iterator jnp;
 
 	// get team-wide awacs level for the object if not ship
 	int ship_is_visible = 0;
@@ -529,12 +531,12 @@ RadarVisibility radar_is_visible( object *objp )
 		case OBJ_JUMP_NODE:
 		{
 			for (jnp = Jump_nodes.begin(); jnp != Jump_nodes.end(); ++jnp) {
-				if(jnp->get_obj() == objp)
+				if(jnp->GetSCPObject() == objp)
 					break;
 			}
 			
 			// don't plot hidden jump nodes
-			if ( jnp->is_hidden() )
+			if ( jnp->IsHidden() )
 				return NOT_VISIBLE;
 
 			// filter jump nodes here if required

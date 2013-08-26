@@ -67,7 +67,14 @@ typedef struct comm_order {
 	int item;
 } comm_order;
 
+typedef struct sexp_com_order{ 
+	char *name; 
+	int xstring; 
+	int item; 
+}sexp_com_order;
+
 extern comm_order Comm_orders[];
+extern sexp_com_order Sexp_comm_orders[];
 
 // following defines are the set of possible commands that can be given to a ship.  A mission designer
 // might not allow some messages
@@ -170,6 +177,7 @@ protected:
 	int Header_offsets[2];
 	int Item_start_offsets[2];
 	int Middle_frame_start_offset_y;
+	int bottom_bg_offset;
 	int Item_h;
 	int Item_offset_x;
 
@@ -184,6 +192,7 @@ public:
 	void initHeaderOffsets(int x, int y);
 	void initItemStartOffsets(int x, int y);
 	void initMiddleFrameStartOffsetY(int y);
+	void initBottomBgOffset(int offset);
 	void initItemHeight(int h);
 	void initItemOffsetX(int x);
 	void initPgUpOffsets(int x, int y);

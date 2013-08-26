@@ -9,24 +9,24 @@
 
 
 
+#include "anim/animplay.h"
+#include "anim/packunpack.h"
+#include "gamehelp/contexthelp.h"
+#include "gamesequence/gamesequence.h"
+#include "gamesnd/eventmusic.h"
+#include "gamesnd/gamesnd.h"
+#include "globalincs/alphacolors.h"
+#include "graphics/font.h"
+#include "io/key.h"
+#include "io/timer.h"
+#include "mission/missionbriefcommon.h"
 #include "missionui/missioncmdbrief.h"
 #include "missionui/missionscreencommon.h"
-#include "ui/uidefs.h"
-#include "gamesnd/gamesnd.h"
-#include "gamesequence/gamesequence.h"
-#include "io/key.h"
-#include "graphics/font.h"
-#include "mission/missionbriefcommon.h"
 #include "missionui/redalert.h"
-#include "sound/audiostr.h"
-#include "io/timer.h"
-#include "gamesnd/eventmusic.h"
 #include "playerman/player.h"
-#include "gamehelp/contexthelp.h"
-#include "globalincs/alphacolors.h"
-#include "anim/packunpack.h"
-#include "anim/animplay.h"
+#include "sound/audiostr.h"
 #include "sound/fsspeech.h"
+#include "ui/uidefs.h"
 
 
 
@@ -91,18 +91,6 @@ int Cmd_stage_y[GR_NUM_RESOLUTIONS] =
 	90,		// GR_640
 	145		// GR_1024
 };
-
-/*
-int Cmd_image_wnd_coords[GR_NUM_RESOLUTIONS][4] =
-{
-	{
-		26, 258, 441, 204		// GR_640
-	},
-	{
-		155, 475, 706, 327		// GR_1024
-	}
-};
-*/
 
 // Goober5000 - center coordinates only
 int Cmd_image_center_coords[GR_NUM_RESOLUTIONS][2] =
@@ -183,18 +171,15 @@ static UI_WINDOW Ui_window;
 static int Cmd_brief_background_bitmap;					// bitmap for the background of the cmd_briefing
 static int Cur_stage;
 static int Cmd_brief_inited = 0;
-// static int Cmd_brief_ask_for_cd;
 static int Voice_good_to_go = 0;
 static int Voice_started_time = 0;
 static int Voice_ended_time;
-//static int Anim_playing_id = -1;
-//static anim_instance *Cur_anim_instance = NULL;
 static generic_anim Cur_Anim;
 static char *Cur_anim_filename = "~~~~";
 
 static int Cmd_brief_last_voice;
+static int Cmd_brief_last_stage;
 static int Cmd_brief_paused = 0;
-//static int Palette_bmp = -1;
 
 static int Uses_scroll_buttons = 0;
 
@@ -214,6 +199,7 @@ void cmd_brief_init_voice()
 	}
 
 	Cmd_brief_last_voice = -1;
+	Cmd_brief_last_stage = -1;
 }
 
 int cmd_brief_check_stage_done()
@@ -227,12 +213,26 @@ int cmd_brief_check_stage_done()
 	if (Voice_ended_time && (timer_get_milliseconds() - Voice_ended_time >= 1000))
 		return 1;
 
+	// check normal speech
 	if (Briefing_voice_enabled && (Cmd_brief_last_voice >= 0)) {
-		if (audiostream_is_playing(Cmd_brief_last_voice)){
+		if (audiostream_is_playing(Cmd_brief_last_voice)) {
 			return 0;
 		}
 
-		if (!Voice_ended_time){
+		if (!Voice_ended_time) {
+			Voice_ended_time = timer_get_milliseconds();
+		}
+
+		return 0;
+	}
+
+	// check simulated speech
+	if (Briefing_voice_enabled && (Cmd_brief_last_stage >= 0)) {
+		if (fsspeech_playing()) {
+			return 0;
+		}
+
+		if (!Voice_ended_time) {
 			Voice_ended_time = timer_get_milliseconds();
 		}
 
@@ -246,10 +246,14 @@ int cmd_brief_check_stage_done()
 	return 0;
 }
 
-// start playback of the voice for a particular briefing stage
+/**
+ * Start playback of the voice for a particular briefing stage
+ * @param stage_num Particular briefing stage
+ */
 void cmd_brief_voice_play(int stage_num)
 {
 	int voice = -1;
+	int stage = -1;
 
 	if (!Voice_good_to_go) {
 		Voice_started_time = 0;
@@ -267,27 +271,50 @@ void cmd_brief_voice_play(int stage_num)
 
 	if (Cur_stage >= 0 && Cur_stage < Cur_cmd_brief->num_stages){
 		voice = Cur_cmd_brief->stage[stage_num].wave;
+		stage = stage_num;
 	}
 
-	// are we still on same voice that is currently playing/played?
-	if (Cmd_brief_last_voice == voice){
-		return;  // no changes, nothing to do.
-	}
+	// do we need to play simulated speech?
+	if (voice < 0 && fsspeech_play_from(FSSPEECH_FROM_BRIEFING)) {
+		// are we still on the same stage?
+		if (Cmd_brief_last_stage == stage) {
+			return;  // no changes, nothing to do.
+		}
 
-	// if previous wave is still playing, stop it first.
-	if (Cmd_brief_last_voice >= 0) {
-		audiostream_stop(Cmd_brief_last_voice, 1, 0);  // stream is automatically rewound
-		Cmd_brief_last_voice = -1;
-	}
+		// if previous stage is still playing, stop it first.
+		if (Cmd_brief_last_stage >= 0) {
+			fsspeech_stop();
+			Cmd_brief_last_stage = -1;
+		}
 
-	// ok, new wave needs playing, so we can start playing it now (and it becomes the current wave)
-	Cmd_brief_last_voice = voice;
-	if (voice >= 0){
-		audiostream_play(voice, Master_voice_volume, 0);
+		// ok, new text needs speaking
+		Cmd_brief_last_stage = stage;
+		if (stage >= 0) {
+			fsspeech_play(FSSPEECH_FROM_BRIEFING, Cur_cmd_brief->stage[stage_num].text.c_str());
+		}
+	} else {
+		// are we still on same voice that is currently playing/played?
+		if (Cmd_brief_last_voice == voice) {
+			return;  // no changes, nothing to do.
+		}
+
+		// if previous wave is still playing, stop it first.
+		if (Cmd_brief_last_voice >= 0) {
+			audiostream_stop(Cmd_brief_last_voice, 1, 0);  // stream is automatically rewound
+			Cmd_brief_last_voice = -1;
+		}
+
+		// ok, new wave needs playing, so we can start playing it now (and it becomes the current wave)
+		Cmd_brief_last_voice = voice;
+		if (voice >= 0) {
+			audiostream_play(voice, Master_voice_volume, 0);
+		}
 	}
 }
 
-// called to leave the command briefing screen
+/**
+ * called to leave the command briefing screen
+ */
 void cmd_brief_exit()
 {
 	// I know, going to red alert from cmd brief is stupid, but we have stupid fredders
@@ -298,37 +325,31 @@ void cmd_brief_exit()
 	}
 }
 
-//doesn't actually stop playing ANIs any more, just stops audio
-void cmd_brief_stop_anim(int id)
+/**
+ * Doesn't actually stop playing ANIs any more, just stops audio
+ */
+void cmd_brief_stop_anim()
 {
-	/*
-	if (Cur_anim_instance && (id != Anim_playing_id)) {
-		anim_stop_playing(Cur_anim_instance);
-		Cur_anim_instance = NULL;
-	}
-	*/
-
 	Voice_good_to_go = 0;
 	if (Cmd_brief_last_voice >= 0) {
 		audiostream_stop(Cmd_brief_last_voice, 1, 0);  // stream is automatically rewound
 		Cmd_brief_last_voice = -1;
+	}
+	if (Cmd_brief_last_stage >= 0) {
+		fsspeech_stop();
+		Cmd_brief_last_stage = -1;
 	}
 }
 
 void cmd_brief_new_stage(int stage)
 {
 	if (stage < 0) {
-		cmd_brief_stop_anim(-1);
+		cmd_brief_stop_anim();
 		Cur_stage = -1;
 	}
 
-	// If the briefing has no wave to play use simulated speach
-	if(Cur_cmd_brief->stage[stage].wave <= 0) {
-		fsspeech_play(FSSPEECH_FROM_BRIEFING, Cur_cmd_brief->stage[stage].text);
-	}
-
 	Cur_stage = stage;
-	brief_color_text_init(Cur_cmd_brief->stage[stage].text, Cmd_text_wnd_coords[Uses_scroll_buttons][gr_screen.res][CMD_W_COORD]);
+	brief_color_text_init(Cur_cmd_brief->stage[stage].text.c_str(), Cmd_text_wnd_coords[Uses_scroll_buttons][gr_screen.res][CMD_W_COORD]);
 
 	// load a new animation if it's different to what's already playing
 	if (strcmp(Cur_anim_filename, Cur_cmd_brief->stage[stage].ani_filename) != 0) {
@@ -354,15 +375,14 @@ void cmd_brief_new_stage(int stage)
 	}
 
 	//resetting the audio here
-	cmd_brief_stop_anim(-1);
+	cmd_brief_stop_anim();
 
 	Top_cmd_brief_text_line = 0;
 }
 
 void cmd_brief_hold()
 {
-	cmd_brief_stop_anim(-1);
-	//Anim_playing_id = -1;
+	cmd_brief_stop_anim();
 }
 
 void cmd_brief_unhold()
@@ -382,12 +402,13 @@ void cmd_brief_pause()
 	if (Cmd_brief_last_voice >= 0) {
 		audiostream_pause(Cmd_brief_last_voice);
 	}
+	if (Cmd_brief_last_stage >= 0) {
+		fsspeech_pause(true);
+	}
 
 	if (Briefing_music_handle >= 0) {
 		audiostream_pause(Briefing_music_handle);
 	}
-
-	fsspeech_pause(true);
 }
 
 void cmd_brief_unpause()
@@ -400,12 +421,13 @@ void cmd_brief_unpause()
 	if (Cmd_brief_last_voice >= 0) {
 		audiostream_unpause(Cmd_brief_last_voice);
 	}
+	if (Cmd_brief_last_stage >= 0) {
+		fsspeech_pause(false);
+	}
 
 	if (Briefing_music_handle >= 0) {
 		audiostream_unpause(Briefing_music_handle);
 	}
-
-	fsspeech_pause(false);
 }
 
 void cmd_brief_button_pressed(int n)
@@ -517,10 +539,7 @@ void cmd_brief_init(int team)
 
 	// Goober5000 - replace any variables (probably persistent variables) with their values
 	for (i = 0; i < Cur_cmd_brief->num_stages; i++)
-	{
-		if (Cur_cmd_brief->stage[i].text)
-			sexp_replace_variable_names_with_values(Cur_cmd_brief->stage[i].text, CMD_BRIEF_TEXT_MAX);
-	}
+		sexp_replace_variable_names_with_values(Cur_cmd_brief->stage[i].text);
 
 	if (Cur_cmd_brief->num_stages <= 0)
 		return;
@@ -530,13 +549,6 @@ void cmd_brief_init(int team)
 	Mouse_hidden++;
 	gr_flip();
 	Mouse_hidden--;
-
-	/*
-	Palette_bmp = bm_load("BarracksPalette");	//CommandBriefPalette");
-	Assert(Palette_bmp);
-	bm_get_palette(Palette_bmp, Palette, Palette_name);  // get the palette for this bitmap
-	gr_set_palette(Palette_name, Palette, 1);
-	*/
 
 	// first determine which layout to use
 	Uses_scroll_buttons = 1;	// assume true
@@ -549,8 +561,6 @@ void cmd_brief_init(int team)
 
 	Ui_window.create(0, 0, gr_screen.max_w_unscaled, gr_screen.max_h_unscaled, 0);
 	Ui_window.set_mask_bmap(Cmd_brief_mask[Uses_scroll_buttons][gr_screen.res]);
-
-	// Cmd_brief_ask_for_cd = 1;
 
 	for (i=0; i<NUM_CMD_BRIEF_BUTTONS; i++) {
 		b = &Cmd_brief_buttons[gr_screen.res][i];
@@ -591,7 +601,6 @@ void cmd_brief_init(int team)
 		cmd_brief_ani_wave_init(i);
 
 	cmd_brief_init_voice();
-	//Cur_anim_instance = NULL;
 	cmd_brief_new_stage(0);
 	Cmd_brief_paused = 0;
 	Cmd_brief_inited = 1;
@@ -602,7 +611,7 @@ void cmd_brief_close()
 	int i;
 
 	if (Cmd_brief_inited) {
-		cmd_brief_stop_anim(-1);
+		cmd_brief_stop_anim();
 		generic_anim_unload(&Cur_Anim);
 		for (i=0; i<Cur_cmd_brief->num_stages; i++) {
 			if (Cur_cmd_brief->stage[i].wave >= 0)
@@ -620,11 +629,6 @@ void cmd_brief_close()
 		help_overlay_unload(CMD_BRIEF_OVERLAY);
 
 		Ui_window.destroy();
-		/*
-		if (Palette_bmp){
-			bm_unload(Palette_bmp);
-		}
-		*/
 
 		game_flush();
 		Cmd_brief_inited = 0;

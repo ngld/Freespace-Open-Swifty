@@ -20,7 +20,7 @@
 #include "mission/missioncampaign.h"
 #include "gamesequence/gamesequence.h"
 #include "gamesnd/gamesnd.h"
-
+#include "cmdline/cmdline.h"
 
 // --------------------------------------------------------------------------------------------------------------------------
 // SUPERNOVA DEFINES/VARS
@@ -85,6 +85,36 @@ void supernova_start(int seconds)
 	Supernova_status = SUPERNOVA_STARTED;
 }
 
+void supernova_stop()
+{
+	// There's no currently active supernova
+	if(Supernova_status != SUPERNOVA_STARTED)
+	{
+		return;
+	}
+	
+	// We're too late.
+	if(supernova_time_left() < SUPERNOVA_CUT_TIME)
+	{
+		return;
+	}
+
+	// A supernova? In MY multiplayer?
+	if(Game_mode & GM_MULTIPLAYER) {
+		return;
+	}
+
+	Supernova_time_total = -1.0f;
+	Supernova_time = -1.0f;
+	Supernova_finished = 0;
+	Supernova_popup = 0;
+	Supernova_fade_to_white = 0.0f;
+	Supernova_particle_stamp = -1;
+
+	Supernova_status = SUPERNOVA_NONE;
+}
+
+
 int sn_particles = 100;
 DCF(sn_part, "")
 {
@@ -125,7 +155,11 @@ void supernova_do_particles()
 
 		// emit
 		for(idx=0; idx<10; idx++) {
-			submodel_get_two_random_points(Ship_info[Player_ship->ship_info_index].model_num, 0, &ta, &tb);
+			if ( Cmdline_old_collision_sys ) {
+				submodel_get_two_random_points(Ship_info[Player_ship->ship_info_index].model_num, 0, &ta, &tb);
+			} else {
+				submodel_get_two_random_points_better(Ship_info[Player_ship->ship_info_index].model_num, 0, &ta, &tb);
+			}
 
 			// rotate into world space
 			vm_vec_unrotate(&a, &ta, &Player_obj->orient);
@@ -195,7 +229,7 @@ void supernova_process()
 					//
 					// don't actually check for a specific campaign here since others may want to end this way but we
 					// should test positive here if in campaign mode and sexp_end_campaign() got called - taylor
-					if (Campaign_ended_in_mission && (Game_mode & GM_CAMPAIGN_MODE) /*&& !stricmp(Campaign.filename, "freespace2")*/) {
+					if (Campaign_ending_via_supernova && (Game_mode & GM_CAMPAIGN_MODE) /*&& !stricmp(Campaign.filename, "freespace2")*/) {
 						gameseq_post_event(GS_EVENT_END_CAMPAIGN);
 					} else {
 						popupdead_start();

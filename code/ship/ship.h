@@ -125,6 +125,12 @@ typedef struct ship_weapon {
 	int primary_bank_rearm_time[MAX_SHIP_PRIMARY_BANKS];	// timestamp which indicates when bank can get new projectile
 	// end ballistic primary support
 
+	float primary_bank_fof_cooldown[MAX_SHIP_PRIMARY_BANKS];      // SUSHI: Current FOF cooldown level for the primary weapon
+
+	// dynamic weapon linking - by RSAXVC
+	int primary_bank_slot_count[MAX_SHIP_PRIMARY_BANKS];	// Fire this many slots at a time
+	// end dynamic weapon linking
+
 	int secondary_bank_ammo[MAX_SHIP_SECONDARY_BANKS];			// Number of missiles left in secondary bank
 	int secondary_bank_start_ammo[MAX_SHIP_SECONDARY_BANKS];	// Number of missiles starting in secondary bank
 	int secondary_bank_capacity[MAX_SHIP_SECONDARY_BANKS];		// Max number of missiles in bank
@@ -142,8 +148,8 @@ typedef struct ship_weapon {
 	int ai_class;
 
 	int flags;								// see SW_FLAG_* defines above
-	ubyte primary_animation_position[MAX_SHIP_PRIMARY_BANKS];
-	ubyte secondary_animation_position[MAX_SHIP_SECONDARY_BANKS];
+	EModelAnimationPosition primary_animation_position[MAX_SHIP_PRIMARY_BANKS];
+	EModelAnimationPosition secondary_animation_position[MAX_SHIP_SECONDARY_BANKS];
 	int primary_animation_done_time[MAX_SHIP_PRIMARY_BANKS];
 	int  secondary_animation_done_time[MAX_SHIP_SECONDARY_BANKS];
 
@@ -162,6 +168,22 @@ int damage_type_add(char *name);
 //**************************************************************
 //WMC - Armor stuff
 
+// Nuke: some defines for difficulty scaling type
+#define ADT_DIFF_SCALE_BAD_VAL	-1 // error mode 
+#define ADT_DIFF_SCALE_FIRST	0
+#define ADT_DIFF_SCALE_LAST		1
+#define ADT_DIFF_SCALE_MANUAL	2 // this is the user defined mode where the modder has to handle difficulty scaling in their calculations
+
+// Nuke: +value: replacing constants
+// these are stored as altArguments, positive values mean storage idxes and -1 means not used, anything below that is fair game
+#define AT_CONSTANT_NOT_USED	-1	// will probibly never get used
+#define AT_CONSTANT_BAD_VAL		-2	// this conveys table error to the user 
+#define AT_CONSTANT_BASE_DMG	-3	// what the damage was at start of calculations
+#define AT_CONSTANT_CURRENT_DMG	-4	// what the damage currently is
+#define AT_CONSTANT_DIFF_FACTOR	-5	// difficulty factor (by default 0.2 (easy) to 1.0 (insane))
+#define AT_CONSTANT_RANDOM		-6	// number between 0 and 1 (redundant but saves a calculation)
+#define AT_CONSTANT_PI			-7	// because everyone likes pi
+
 struct ArmorDamageType
 {
 	friend class ArmorType;
@@ -171,11 +193,14 @@ private:
 	int					DamageTypeIndex;
 	SCP_vector<int>	Calculations;
 	SCP_vector<float>	Arguments;
+	SCP_vector<int>		altArguments;		// Nuke: to facilitate optional importation of data in place of +value: tag -nuke 
 	float				shieldpierce_pct;
 
 	// piercing effect data
 	float				piercing_start_pct;
 	int					piercing_type;
+	// Nuke: difficulty scale type
+	int					difficulty_scale_type;
 
 public:
 	void clear();
@@ -194,7 +219,7 @@ public:
 	//Get
 	char *GetNamePtr(){return Name;}
 	bool IsName(char *in_name){return (stricmp(in_name,Name)==0);}
-	float GetDamage(float damage_applied, int in_damage_type_idx);
+	float GetDamage(float damage_applied, int in_damage_type_idx, float diff_dmg_scale);
 	float GetShieldPiercePCT(int damage_type_idx);
 	int GetPiercingType(int damage_type_idx);
 	float GetPiercingLimit(int damage_type_idx);
@@ -319,7 +344,7 @@ typedef	struct ship_subsys {
 	int		turret_pick_big_attack_point_timestamp;	//	Next time to pick an attack point for this turret
 	vec3d	turret_big_attack_point;			//	local coordinate of point for this turret to attack on enemy
 
-	ubyte	turret_animation_position;
+	EModelAnimationPosition	turret_animation_position;
 	int		turret_animation_done_time;
 
 	// swarm (rapid fire) info
@@ -384,6 +409,15 @@ typedef struct ship_subsys_info {
 	float aggregate_current_hits;	// current count of hits for all subsystems of this type.	
 } ship_subsys_info;
 
+// Karajorma - Used by the alter-ship-flag SEXP as an alternative to having lots of ship flag SEXPs
+typedef struct ship_flag_name {
+	int flag;							// the actual ship flag constant as given by the define below
+	char flag_name[TOKEN_LENGTH];		// the name written to the mission file for its corresponding parse_object flag
+	int flag_list;						// is this flag in the 1st or 2nd ship flags list?
+} ship_flag_name;
+
+#define MAX_SHIP_FLAG_NAMES					9
+extern ship_flag_name Ship_flag_names[];
 
 // states for the flags variable within the ship structure
 // low bits are for mission file savable flags..
@@ -398,7 +432,7 @@ typedef struct ship_subsys_info {
 //#define	SF_LOCKED					(1 << 6)		// can't manipulate ship in loadout screens
 
 // high bits are for internal flags not saved to mission files
-// Go from bit 31 down to bit 3
+// Go from bit 31 down to bit 6
 #define	SF_KILL_BEFORE_MISSION	(1 << 31)
 #define	SF_DYING						(1 << 30)
 #define	SF_DISABLED					(1 << 29)
@@ -424,8 +458,9 @@ typedef struct ship_subsys_info {
 #define	SF_SHIP_HAS_SCREAMED		(1 << 10)	// ship has let out a death scream
 #define	SF_RED_ALERT_STORE_STATUS (1 << 9)	// ship status should be stored/restored if red alert mission
 #define	SF_VAPORIZE					(1<<8)		// ship is vaporized by beam - alternative death sequence
+#define SF_DEPARTURE_ORDERED		(1<<7)		// departure of this ship was ordered by player - Goober5000, similar to WF_DEPARTURE_ORDERED
 
-// MWA -- don't go below whatever bitfield is used for Fred above (currently 7)!!!!
+// MWA -- don't go below whatever bitfield is used for Fred above (currently 6)!!!!
 
 #define	SF_DEPARTING				(SF_DEPART_WARP | SF_DEPART_DOCKBAY)				// ship is departing
 #define	SF_CANNOT_WARP				(SF_WARP_BROKEN | SF_WARP_NEVER | SF_DISABLED)	// ship cannot warp out
@@ -460,8 +495,9 @@ typedef struct ship_subsys_info {
 #define SF2_NO_THRUSTERS					(1<<23)		// The E - Thrusters on this ship are not rendered.
 #define SF2_SHIP_LOCKED						(1<<24)		// Karajorma - Prevents the player from changing the ship class on loadout screen
 #define SF2_WEAPONS_LOCKED					(1<<25)		// Karajorma - Prevents the player from changing the weapons on the ship on the loadout screen
+#define SF2_SHIP_SELECTIVE_LINKING			(1<<26)		// RSAXVC - Allow pilot to pick firing configuration
 
-// If any of these bits in the ship->flags are set, ignore this ship when targetting
+// If any of these bits in the ship->flags are set, ignore this ship when targeting
 extern int TARGET_SHIP_IGNORE_FLAGS;
 
 #define MAX_DAMAGE_SLOTS	32
@@ -508,6 +544,7 @@ typedef struct ship {
 	char targeting_laser_bank;						// -1 if not firing, index into polymodel gun points if it _is_ firing
 	// corkscrew missile stuff
 	ubyte num_corkscrew_to_fire;						// # of corkscrew missiles lef to fire
+	int corkscrew_missile_bank;
 	// END PACK
 
 	// targeting laser info
@@ -614,6 +651,7 @@ typedef struct ship {
 	int	next_swarm_fire;					// timestamp of next swarm missile to fire
 	int	next_swarm_path;					// next path number for swarm missile to take
 	int	num_turret_swarm_info;			// number of turrets in process of launching swarm
+	int swarm_missile_bank;				// The missilebank the swarm was originally launched from
 
 	int	group;								// group ship is in, or -1 if none.  Fred thing
 	int	death_roll_snd;					// id of death roll sound, may need to be stopped early	
@@ -704,7 +742,7 @@ typedef struct ship {
 	int ab_count;
 
 	// glow points
-	SCP_vector<bool> glow_point_bank_active;
+	std::deque<bool> glow_point_bank_active;
 
 	//Animated Shader effects
 	int shader_effect_num;
@@ -717,7 +755,7 @@ typedef struct ship {
 
 	// fighter bay door stuff, parent side
 	int bay_doors_anim_done_time;		// ammount of time to transition from one animation state to another
-	ubyte bay_doors_status;			// anim status of the bay doors (closed/not-animating, opening, open/not-animating)
+	EModelAnimationPosition bay_doors_status;			// anim status of the bay doors (closed/not-animating, opening, open/not-animating)
 	int bay_doors_wanting_open;		// how many ships want/need the bay door open
 
 	// figther bay door stuff, client side
@@ -751,6 +789,12 @@ typedef struct ship {
 
 	RadarVisibility radar_last_status; // Last radar status
 	RadarVisibility radar_current_status; // Current radar status
+
+	SCP_string team_name;
+	SCP_string secondary_team_name;	//If the change-team-color sexp is used, these fields control the fading behaviour
+	fix team_change_timestamp;
+	int team_change_time;
+
 } ship;
 
 struct ai_target_priority {
@@ -873,8 +917,9 @@ extern int ship_find_exited_ship_by_signature( int signature);
 #define SIF2_ALLOW_LANDINGS					(1 << 12)	// SUSHI: Automatically set if any subsystems allow landings (as a shortcut)
 #define SIF2_NO_ETS							(1 << 13)	// The E - No ETS on this ship class
 #define SIF2_NO_LIGHTING					(1 << 14)	// Valathil - No lighting for this ship
+#define SIF2_DYN_PRIMARY_LINKING			(1 << 15)	// RSAXVC - Dynamically generate weapon linking options
 // !!! IF YOU ADD A FLAG HERE BUMP MAX_SHIP_FLAGS !!!
-#define	MAX_SHIP_FLAGS	15		//	Number of distinct flags for flags field in ship_info struct
+#define	MAX_SHIP_FLAGS	16		//	Number of distinct flags for flags field in ship_info struct
 #define	SIF_DEFAULT_VALUE		0
 #define SIF2_DEFAULT_VALUE		0
 
@@ -886,6 +931,9 @@ extern int ship_find_exited_ship_by_signature( int signature);
 #define	SIF_HARMLESS				(SIF_CARGO | SIF_NAVBUOY | SIF_ESCAPEPOD)		// AL 12-3-97: ships that are not a threat
 // for ships of this type, we make beam weapons miss a little bit otherwise they'd be way too powerful
 #define	SIF_BEAM_JITTER			(SIF_CARGO | SIF_FIGHTER | SIF_BOMBER | SIF_FREIGHTER | SIF_TRANSPORT | SIF_SENTRYGUN | SIF_NAVBUOY | SIF_ESCAPEPOD)
+// these ships avoid shockwaves
+// (the weird thing is that freighters and transports used to be explicitly allowed in one part of the code but then explicitly disallowed in another)
+#define SIF_AVOID_SHOCKWAVE		SIF_SMALL_SHIP
 
 // masks for preventing only non flag entry SIF flags from being cleared
 #define SIF_MASK				SIF_AFTERBURNER
@@ -1281,6 +1329,10 @@ typedef struct ship_info {
 	// rgb shield color
 	ubyte shield_color[3];
 
+	// HW2-style team coloring
+	bool uses_team_colors;
+	SCP_string default_team_name;
+
 	// optional afterburner trail values
 	generic_bitmap afterburner_trail;
 	float afterburner_trail_width_factor;
@@ -1341,6 +1393,7 @@ typedef struct ship_info {
 	man_thruster maneuvering[MAX_MAN_THRUSTERS];
 
 	int radar_image_2d_idx;
+	int radar_color_image_2d_idx;
 	int radar_image_size;
 	float radar_projection_size_mult;
 
@@ -1369,6 +1422,7 @@ typedef struct ship_info {
 extern int Num_wings;
 extern ship Ships[MAX_SHIPS];
 extern ship	*Player_ship;
+extern int	*Player_cockpit_textures;
 
 // Data structure to track the active missiles
 typedef struct ship_obj {
@@ -1508,6 +1562,7 @@ extern void ship_process_pre( object * objp, float frametime );
 extern void ship_process_post( object * objp, float frametime );
 extern void ship_render( object * objp );
 extern void ship_render_cockpit( object * objp);
+extern void ship_render_show_ship_cockpit( object * objp);
 extern void ship_delete( object * objp );
 extern int ship_check_collision_fast( object * obj, object * other_obj, vec3d * hitpos );
 extern int ship_get_num_ships();
@@ -1519,6 +1574,7 @@ extern int ship_get_num_ships();
 #define SHIP_DEPARTED			( SHIP_DEPARTED_BAY | SHIP_DEPARTED_WARP )
 // Goober5000
 extern void ship_cleanup(int shipnum, int cleanup_mode);
+extern void ship_destroy_instantly(object *ship_obj, int shipnum);
 extern void ship_actually_depart(int shipnum, int method = SHIP_DEPARTED_WARP);
 
 extern int ship_fire_primary_debug(object *objp);	//	Fire the debug laser.
@@ -1614,7 +1670,7 @@ extern int ship_find_num_turrets(object *objp);
 extern void compute_slew_matrix(matrix *orient, angles *a);
 //extern camid ship_set_eye( object *obj, int eye_index);
 extern void ship_set_eye(object *obj, int eye_index);
-extern void ship_get_eye( vec3d *eye_pos, matrix *eye_orient, object *obj, bool do_slew = true );		// returns in eye the correct viewing position for the given object
+extern void ship_get_eye( vec3d *eye_pos, matrix *eye_orient, object *obj, bool do_slew = true, bool from_origin = false);		// returns in eye the correct viewing position for the given object
 //extern camid ship_get_followtarget_eye(object *obj);
 extern ship_subsys *ship_get_indexed_subsys( ship *sp, int index, vec3d *attacker_pos = NULL );	// returns index'th subsystem of this ship
 extern int ship_get_index_from_subsys(ship_subsys *ssp, int objnum, int error_bypass = 0);
@@ -1890,8 +1946,6 @@ int thruster_glow_anim_load(generic_anim *ga);
 // Sushi - Path metadata
 void init_path_metadata(path_metadata& metadata);
 
-// Ship select stuff
-extern int Default_ship_select_effect;
 
 typedef struct ship_effect {
 	char name[NAME_LENGTH];
@@ -1928,5 +1982,17 @@ bool ship_has_sound(object *objp, GameSoundsIndex id);
  * @return An index into Ship_info[], location of the default player ship.
  */
 int get_default_player_ship_index();
+
+/**
+ * Given a ship with bounding box and a point, find the closest point on the bbox
+ *
+ * @param ship_obj Object that has the bounding box (should be a ship)
+ * @param start World position of the point being compared
+ * @param box_pt OUTPUT PARAMETER: closest point on the bbox to start
+ *
+ * @return point is inside bbox, TRUE/1
+ * @return point is outside bbox, FALSE/0
+ */
+int get_nearest_bbox_point(object *ship_obj, vec3d *start, vec3d *box_pt);
 
 #endif

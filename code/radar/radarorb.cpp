@@ -303,9 +303,9 @@ void HudGaugeRadarOrb::drawBlips(int blip_type, int bright, int distort)
             {
                drawContact(&pos,b->rad);
             }
-            else if (b->radar_image_2d >= 0)
+            else if (b->radar_image_2d >= 0 || b->radar_color_image_2d >= 0)
 			{
-				drawContactImage(&pos, b->rad, b->radar_image_2d, b->radar_projection_size);
+				drawContactImage(&pos, b->rad, b->radar_image_2d, b->radar_color_image_2d, b->radar_projection_size);
 			}
             else
             {
@@ -352,7 +352,7 @@ void HudGaugeRadarOrb::doneDrawingHtl()
 	gr_end_view_matrix();
 	gr_end_proj_matrix();
 	resetClip();
-    gr_zbuffer_set(1);
+    gr_zbuffer_set(GR_ZBUFF_FULL);
 }
 
 void HudGaugeRadarOrb::drawOutlines()
@@ -410,7 +410,7 @@ int HudGaugeRadarOrb::calcAlpha(vec3d* pt)
     Assert(Player_obj);
 
     vec3d new_pt;
-    vec3d fvec = {0.0f, 0.0f, 1.0f};
+    vec3d fvec = { { { 0.0f, 0.0f, 1.0f } } };
 
     vm_vec_unrotate(&new_pt, pt, &Player_obj->orient);
     vm_vec_normalize(&new_pt);
@@ -569,7 +569,7 @@ void HudGaugeRadarOrb::pageIn()
 	bm_page_in_aabitmap( Radar_gauge.first_frame, Radar_gauge.num_frames );
 }
 
-void HudGaugeRadarOrb::drawContactImage(vec3d *pnt, int rad, int idx, float mult)
+void HudGaugeRadarOrb::drawContactImage(vec3d *pnt, int rad, int idx, int clr_idx, float mult)
 {
     int tmap_flags = 0;
     int h, w;
@@ -620,7 +620,13 @@ void HudGaugeRadarOrb::drawContactImage(vec3d *pnt, int rad, int idx, float mult
 
     tmap_flags = TMAP_FLAG_TEXTURED | TMAP_FLAG_BW_TEXTURE | TMAP_HTL_3D_UNLIT;
 
-    g3_draw_polygon(pnt, &vmd_identity_matrix, sizef/35.0f, aspect_mp*sizef/35.0f, tmap_flags);
+	if ( idx >= 0 ) {
+		g3_draw_polygon(pnt, &vmd_identity_matrix, sizef/35.0f, aspect_mp*sizef/35.0f, tmap_flags);
+	}
+
+	if ( clr_idx >= 0 ) {
+		g3_draw_polygon(pnt, &vmd_identity_matrix, sizef/35.0f, aspect_mp*sizef/35.0f, TMAP_FLAG_TEXTURED | TMAP_HTL_3D_UNLIT);
+	}
 }
 
 void HudGaugeRadarOrb::drawCrosshairs( vec3d pnt )
@@ -681,5 +687,5 @@ void HudGaugeRadarOrb::setupViewHtl()
     gr_set_proj_matrix( .625f * PI_2, float(w)/float(h), 0.001f, 5.0f);
 	gr_set_view_matrix( &Orb_eye_position, &vmd_identity_matrix );
 
-    gr_zbuffer_set(0);
+    gr_zbuffer_set(GR_ZBUFF_NONE);
 }

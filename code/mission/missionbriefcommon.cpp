@@ -238,10 +238,8 @@ color *Brief_text_colors[MAX_BRIEF_TEXT_COLORS] =
 float Brief_text_wipe_time_elapsed;
 static int Max_briefing_line_len;
 
-static int Brief_voice_ended;
-static int Brief_textdraw_finished;
-static int Brief_voice_started;
-static int Brief_stage_time;
+static int Voice_started_time;
+static int Voice_ended_time;
 
 const float		BRIEF_TEXT_WIPE_TIME	= 1.5f;		// time in seconds for wipe to occur
 static int		Brief_text_wipe_snd;					// sound handle of sound effect for text wipe
@@ -272,8 +270,7 @@ typedef struct icon_move_info
 	float				last_dist;
 } icon_move_info;
 
-#define MAX_MOVE_ICONS	10
-icon_move_info	Icon_movers[MAX_MOVE_ICONS];
+icon_move_info	Icon_movers[MAX_BRIEF_ICONS];
 icon_move_info	Icon_move_list;	// head of linked list
 
 // fading out icons
@@ -440,7 +437,7 @@ void brief_move_icon_reset()
 	int i;
 
 	list_init(&Icon_move_list);
-	for ( i = 0; i < MAX_MOVE_ICONS; i++ )
+	for ( i = 0; i < MAX_BRIEF_ICONS; i++ )
 		Icon_movers[i].used = 0;
 }
 
@@ -466,11 +463,7 @@ void mission_brief_common_init()
 		// If Fred is running malloc out max space
 		for (i = 0; i < MAX_TVT_TEAMS; i++) {
 			for (j = 0; j < MAX_BRIEF_STAGES; j++) {
-				if (Briefings[i].stages[j].new_text == NULL) {
-					Briefings[i].stages[j].new_text = (char *)vm_malloc(MAX_BRIEF_LEN);
-					Assert( Briefings[i].stages[j].new_text != NULL );
-					memset( Briefings[i].stages[j].new_text, 0, MAX_BRIEF_LEN );
-				}
+				Briefings[i].stages[j].text = "";
 
 				if (Briefings[i].stages[j].icons == NULL) {
 					Briefings[i].stages[j].icons = (brief_icon *)vm_malloc(sizeof(brief_icon) * MAX_STAGE_ICONS);
@@ -491,17 +484,8 @@ void mission_brief_common_init()
 
 		for (i = 0; i < MAX_TVT_TEAMS; i++) {
 			for (j = 0; j < MAX_DEBRIEF_STAGES; j++) {
-				if (Debriefings[i].stages[j].new_text == NULL) {
-					Debriefings[i].stages[j].new_text = (char *)vm_malloc(MAX_DEBRIEF_LEN);
-					Assert( Debriefings[i].stages[j].new_text != NULL );
-					memset( Debriefings[i].stages[j].new_text, 0, MAX_DEBRIEF_LEN );
-				}
-
-				if (Debriefings[i].stages[j].new_recommendation_text == NULL) {
-					Debriefings[i].stages[j].new_recommendation_text = (char *)vm_malloc(MAX_RECOMMENDATION_LEN);
-					Assert(Debriefings[i].stages[j].new_recommendation_text != NULL);
-					memset( Debriefings[i].stages[j].new_recommendation_text, 0, MAX_RECOMMENDATION_LEN );
-				}
+				Debriefings[i].stages[j].text = "";
+				Debriefings[i].stages[j].recommendation_text = "";
 			}
 		}
 
@@ -509,7 +493,7 @@ void mission_brief_common_init()
 		// If game is running don't malloc anything
 		for (i=0; i<MAX_TVT_TEAMS; i++ )	{
 			for (j=0; j<MAX_BRIEF_STAGES; j++ )	{
-				Briefings[i].stages[j].new_text = NULL;
+				Briefings[i].stages[j].text = "";
 				Briefings[i].stages[j].num_icons = 0;
 				Briefings[i].stages[j].icons = NULL;
 				Briefings[i].stages[j].num_lines = 0;
@@ -519,8 +503,8 @@ void mission_brief_common_init()
 
 		for (i=0; i<MAX_TVT_TEAMS; i++ )	{
 			for (j=0; j<MAX_DEBRIEF_STAGES; j++ )	{
-				Debriefings[i].stages[j].new_text = NULL;
-				Debriefings[i].stages[j].new_recommendation_text = NULL;
+				Debriefings[i].stages[j].text = "";
+				Debriefings[i].stages[j].recommendation_text = "";
 			}
 		}
 
@@ -540,11 +524,9 @@ void mission_brief_common_reset()
 		for (j = 0; j < MAX_BRIEF_STAGES; j++) {
 			Briefings[i].stages[j].num_icons = 0;
 			Briefings[i].stages[j].num_lines = 0;
+			Briefings[i].stages[j].text = "";
 
 			if (Fred_running) {
-				if ( Briefings[i].stages[j].new_text )
-					memset( Briefings[i].stages[j].new_text, 0, MAX_BRIEF_LEN );
-
 				if ( Briefings[i].stages[j].icons ) {
 					memset( Briefings[i].stages[j].icons, 0, sizeof(brief_icon) * MAX_STAGE_ICONS );
 					Briefings[i].stages[j].icons->ship_class = -1;
@@ -555,11 +537,6 @@ void mission_brief_common_reset()
 				if ( Briefings[i].stages[j].lines )
 					memset( Briefings[i].stages[j].lines, 0, sizeof(brief_line) * MAX_BRIEF_STAGE_LINES );
 			} else {
-				if ( Briefings[i].stages[j].new_text )	{
-					vm_free(Briefings[i].stages[j].new_text);
-					Briefings[i].stages[j].new_text = NULL;			
-				}
-	
 				if ( Briefings[i].stages[j].icons )	{
 					vm_free(Briefings[i].stages[j].icons);
 					Briefings[i].stages[j].icons = NULL;
@@ -586,23 +563,8 @@ void mission_debrief_common_reset()
 		Debriefings[i].num_stages = 0;
 
 		for (j = 0; j < MAX_DEBRIEF_STAGES; j++) {
-			if (Fred_running) {
-				if ( Debriefings[i].stages[j].new_text )
-					memset( Debriefings[i].stages[j].new_text, 0, MAX_DEBRIEF_LEN );
-
-				if ( Debriefings[i].stages[j].new_recommendation_text )
-					memset( Debriefings[i].stages[j].new_recommendation_text, 0, MAX_RECOMMENDATION_LEN );
-			} else {
-				if ( Debriefings[i].stages[j].new_text ) {
-					vm_free(Debriefings[i].stages[j].new_text);
-					Debriefings[i].stages[j].new_text = NULL;
-				}
-
-				if ( Debriefings[i].stages[j].new_recommendation_text ) {
-					vm_free(Debriefings[i].stages[j].new_recommendation_text);
-					Debriefings[i].stages[j].new_recommendation_text = NULL;
-				}
-			}
+			Debriefings[i].stages[j].text = "";
+			Debriefings[i].stages[j].recommendation_text = "";
 		}
 	}
 }
@@ -811,18 +773,19 @@ void brief_render_fade_outs(float frametime)
 			}
 
 			bm_get_info( fi->fade_anim.first_frame, &w, &h, NULL);
+			float screenX = tv.screen.xyw.x;
+			float screenY = tv.screen.xyw.y;
+			gr_unsize_screen_posf( &screenX, &screenY );
 
-			gr_resize_screen_pos( &w, &h );
-
-			bxf = tv.screen.xyw.x - w / 2.0f + 0.5f;
-			byf = tv.screen.xyw.y - h / 2.0f + 0.5f;
+			bxf = screenX - w / 2.0f + 0.5f;
+			byf = screenY - h / 2.0f + 0.5f;
 			bx = fl2i(bxf);
 			by = fl2i(byf);
 
 			if ( fi->fade_anim.first_frame >= 0 ) {
 				fi->fade_anim.sx = bx;
 				fi->fade_anim.sy = by;
-				hud_anim_render(&fi->fade_anim, frametime, 1, 0, 0, 0, false);
+				hud_anim_render(&fi->fade_anim, frametime, 1, 0, 0, 0, true);
 			}
 		}
 	}
@@ -1020,7 +983,7 @@ void brief_render_icon(int stage_num, int icon_num, float frametime, int selecte
 		by = fl2i(byf);
 		bc = fl2i(sx);
 
-		if ( (bx < 0) || (bx > gr_screen.max_w_unscaled) || (by < 0) || (by > gr_screen.max_h_unscaled) && !Fred_running ) {
+		if ( ( (bx < 0) || (bx > gr_screen.max_w_unscaled) || (by < 0) || (by > gr_screen.max_h_unscaled) ) && !Fred_running ) {
 			bi->x = bx;
 			bi->y = by;
 			return;
@@ -1189,12 +1152,6 @@ void brief_render_map(int stage_num, float frametime)
 	brief_render_icons(stage_num, frametime);
 
 	if ( Cam_target_reached && brief_text_wipe_finished() ) {
-
-		if ( Brief_textdraw_finished == 0 ) {
-			Brief_textdraw_finished = 1;
-			Brief_stage_time = 0;
-		}
-
 		if ( Play_highlight_flag ) {
 			brief_start_highlight_anims(stage_num);
 			Play_highlight_flag = 0;
@@ -1236,7 +1193,7 @@ void brief_blit_stage_num(int stage_num, int stage_max)
  */
 void brief_render_line(int line_num, int x, int y, int instance)
 {
-	Assert( 0<=instance && instance < (sizeof(Colored_stream)/sizeof(*Colored_stream)) );
+	Assert( 0<=instance && instance < (int)(sizeof(Colored_stream)/sizeof(*Colored_stream)) );
 
 	SCP_vector<colored_char> *src = &Colored_stream[instance].at(line_num);
 
@@ -1278,7 +1235,7 @@ void brief_render_line(int line_num, int x, int y, int instance)
 			//when the current color changes, the accumulated character sequence is drawn.
 			if (current_char.color != last_color){
 				//add a 0 terminal character to make line a valid C string
-				Assert(char_seq_pos<sizeof(char_seq));
+				Assert(char_seq_pos < (int)sizeof(char_seq));
 				char_seq[char_seq_pos] = 0;         
 				{	// Draw coloured text, and increment cariage position
 					int w=0,h=0;
@@ -1291,12 +1248,12 @@ void brief_render_line(int line_num, int x, int y, int instance)
 				char_seq_pos = 0;
 				last_color = current_char.color;
 			}
-			Assert(char_seq_pos<sizeof(char_seq));
+			Assert(char_seq_pos < (int)sizeof(char_seq));
 			char_seq[char_seq_pos++] = current_char.letter;		
 		}
 		// Draw the final chunk of acumulated characters
 		// Add a 0 terminal character to make line a valid C string
-		Assert(char_seq_pos<sizeof(char_seq));
+		Assert(char_seq_pos < (int)sizeof(char_seq));
 		char_seq[char_seq_pos] = 0;
         {	// Draw coloured text, and increment cariage position
 			int w=0,h=0;
@@ -1310,10 +1267,10 @@ void brief_render_line(int line_num, int x, int y, int instance)
 	{	// PART2: Draw leading bright white characters
 		char_seq_pos = 0;
 		for( int current_pos = truncate_len; current_pos<truncate_len + bright_len; current_pos++){		
-			Assert(char_seq_pos<sizeof(char_seq));
+			Assert(char_seq_pos < (int)sizeof(char_seq));
 			char_seq[char_seq_pos++] = src->at(current_pos).letter;
 		}
-		Assert(char_seq_pos<sizeof(char_seq));
+		Assert(char_seq_pos < (int)sizeof(char_seq));
 		char_seq[char_seq_pos] = 0;
 		gr_set_color_fast(&Color_bright_white);
 		gr_string(x + offset, y, char_seq);    
@@ -1383,7 +1340,6 @@ int brief_render_text(int line_offset, int x, int y, int h, float frametime, int
 void brief_render_elements(vec3d *pos, grid* gridp)
 {
 	vec3d	gpos;	//	Location of point on grid.
-	float		dxz;
 	plane		tplane;
 	vec3d	*gv;
 	
@@ -1396,8 +1352,6 @@ void brief_render_elements(vec3d *pos, grid* gridp)
 	tplane.D = gridp->planeD;
 
 	compute_point_on_plane(&gpos, &tplane, pos);
-
-	dxz = vm_vec_dist(pos, &gpos)/8.0f;
 
 	gv = &gridp->gmatrix.vec.uvec;
 	if (gv->xyz.x * pos->xyz.x + gv->xyz.y * pos->xyz.y + gv->xyz.z * pos->xyz.z < -gridp->planeD)
@@ -1572,14 +1526,9 @@ void brief_set_text_color(int color_index)
  * @param character the character to be analysed.
  * @return true when the given character is a word separator, and false when the character is part of a word.
  */
-bool is_a_word_separator(char character){
-	return character<=33					//  2 characters including (space) and !
-		|| (35<=character && character<=38)	//  4 characters #$%&
-		|| (42<=character && character<=44)	//  3 characters *+,
-		|| (character == 47)				//  1 character  /
-		|| (59<=character && character<=64)	//  6 characters ;<=>?@
-		|| (91<=character && character<=95)	//  5 characters [\]^_
-		|| (123<=character);				//  5 characters {|}~
+bool is_a_word_separator(char character)
+{
+	return character <= 32;					//  all control characters including space, newline, and tab
 }
 
 /**
@@ -1597,19 +1546,56 @@ bool is_a_word_separator(char character){
 int brief_text_colorize(char *src, int instance)
 {
 	Assert(src);
-	Assert( 0<=instance && instance < (sizeof(Colored_stream)/sizeof(*Colored_stream)) );
+	Assert((0 <= instance) && (instance < (int)(sizeof(Colored_stream) / sizeof(*Colored_stream))));
 
-	briefing_line dest_line; //the resulting vector of colored character
-	ubyte active_color_index = BRIEF_TEXT_WHITE; //the current drawing color
+	// manage different default colors (don't use a SCP_ stack because eh)
+	const int HIGHEST_COLOR_STACK_INDEX = 9;
+	ubyte default_color_stack[10];
+	int color_stack_index = 0;
+
+	briefing_line dest_line;	//the resulting vector of colored character
+	ubyte active_color_index;	//the current drawing color
+
+	// start off with white
+	default_color_stack[0] = active_color_index = BRIEF_TEXT_WHITE;
 
 	int src_len = strlen(src);
-	for (int i=0; i<src_len; i++) {
+	for (int i = 0; i < src_len; i++)
+	{
 		// Is the character a color markup?
 		// text markup consists of a '$' plus a character plus an optional space
-		if ( (i < src_len - 1)  && (src[i] == BRIEF_META_CHAR) ) {
+		if ( (i < src_len - 1)  && (src[i] == BRIEF_META_CHAR) )
+		{
 			i++;   // Consume the $ character
-			active_color_index = brief_return_color_index(src[i]);
-			i++; // Consume the color identifier and focus on the white character (if any)
+
+			// it's possible that there's a closing brace here
+			if (src[i] == '}')
+			{
+				if (color_stack_index > 0)
+				{
+					color_stack_index--;
+					active_color_index = default_color_stack[color_stack_index];
+				}
+				i++;	// consume the }
+			}
+			// normal $c or $c{
+			else
+			{
+				active_color_index = brief_return_color_index(src[i]);
+				i++; // Consume the color identifier and focus on the white character (if any)
+			}
+
+			// special case: color spans (different default color within braces)
+			// (there's a slim chance that src[i] could be the null-terminator, but that's okay here)
+			if (src[i] == '{')
+			{
+				if (color_stack_index < HIGHEST_COLOR_STACK_INDEX)
+				{
+					color_stack_index++;
+					default_color_stack[color_stack_index] = active_color_index;
+				}
+				i++;	// consume the {
+			}
  
 			// Skip every whitespace until the next word is reached
 			while ( (i < src_len) && is_white_space(src[i]) )
@@ -1621,10 +1607,9 @@ int brief_text_colorize(char *src, int instance)
 			continue;
  		}
 
-		// When the word is terminated reset color to white
-		if ( (is_white_space(src[i]) ) || ( is_a_word_separator(src[i]) )) {
-			active_color_index = BRIEF_TEXT_WHITE;
-		}
+		// When the word is terminated, reset color to default
+		if ( (is_white_space(src[i]) ) || ( is_a_word_separator(src[i]) ))
+			active_color_index = default_color_stack[color_stack_index];
 
 		// Append the character to the result structure
 		colored_char dest;
@@ -1632,6 +1617,7 @@ int brief_text_colorize(char *src, int instance)
 		dest.color = active_color_index;
 		dest_line.push_back(dest);
 	} 
+
 	Colored_stream[instance].push_back(dest_line); 	
 	return dest_line.size();
 }
@@ -1652,7 +1638,7 @@ int brief_color_text_init(const char* src, int w, int instance, int max_lines)
 	char brief_line[MAX_BRIEF_LINE_LEN];
 
 	Assert(src != NULL);
-	n_lines = split_str(src, w, &n_chars, &p_str, BRIEF_META_CHAR);
+	n_lines = split_str(src, w, n_chars, p_str, BRIEF_META_CHAR);
 	Assert(n_lines >= 0);
 
 	//for compatability reasons truncate text from everything except the fiction viewer
@@ -1688,12 +1674,12 @@ int brief_get_free_move_icon()
 {
 	int i;
 
-	for ( i = 0; i < MAX_MOVE_ICONS; i++ ) {
+	for ( i = 0; i < MAX_BRIEF_ICONS; i++ ) {
 		if ( Icon_movers[i].used == 0 )
 			break;
 	}
 	
-	if ( i == MAX_MOVE_ICONS ) 
+	if ( i == MAX_BRIEF_ICONS ) 
 		return -1;
 
 	Icon_movers[i].used = 1;
@@ -1730,7 +1716,7 @@ int brief_set_move_list(int new_stage, int current_stage, float time)
 
 					k = brief_get_free_move_icon();				
 					if ( k == -1 ) {
-						Int3();	// should never happen, get Alan
+						Warning(LOCATION, "Too many briefing icons are moving simultaneously!");
 						return 0;
 					}
 					imi = &Icon_movers[k];
@@ -1817,7 +1803,7 @@ void brief_clear_fade_out_icons()
  */
 void brief_set_new_stage(vec3d *pos, matrix *orient, int time, int stage_num)
 {
-	char msg[MAX_BRIEF_LEN];
+	const char *msg;
 	int num_movers, new_time, not_objv = 1;
 
 	Assert( Briefing != NULL );
@@ -1848,13 +1834,9 @@ void brief_set_new_stage(vec3d *pos, matrix *orient, int time, int stage_num)
 	}
 
 	if (not_objv) {
-		if(Briefing->stages[stage_num].new_text == NULL){
-			strcpy_s(msg, "");
-		} else {
-			strcpy_s(msg, Briefing->stages[stage_num].new_text);
-		}
+		msg = Briefing->stages[stage_num].text.c_str();
 	} else {
-		strcpy_s(msg, XSTR( "Please review your objectives for this mission.", 395));
+		msg = XSTR( "Please review your objectives for this mission.", 395);
 	}
 
 	if (gr_screen.res == GR_640) {
@@ -1863,10 +1845,6 @@ void brief_set_new_stage(vec3d *pos, matrix *orient, int time, int stage_num)
 	} else {
 		// GR_1024
 		Num_brief_text_lines[0] = brief_color_text_init(msg, MAX_BRIEF_LINE_W_1024);		
-	}
-
-	if ( Brief_voices[stage_num] == -1 ) {
-		fsspeech_play(FSSPEECH_FROM_BRIEFING, msg);
 	}
 
 	Top_brief_text_line = 0;
@@ -1879,10 +1857,8 @@ void brief_set_new_stage(vec3d *pos, matrix *orient, int time, int stage_num)
 		snd_stop(Brief_stage_highlight_sound_handle);
 	}
 
-	Brief_voice_ended = 0;
-	Brief_textdraw_finished = 0;
-	Brief_voice_started = 0;
-	Brief_stage_time = 0;
+	Voice_started_time = 0;
+	Voice_ended_time = 0;
 
 	Brief_stage_highlight_sound_handle = -1;
 	Last_new_stage = stage_num;
@@ -2273,9 +2249,8 @@ void brief_common_close()
 
 void brief_restart_text_wipe()
 {
-	Brief_stage_time = 0;
-	Brief_voice_ended = 0;
-	Brief_voice_started = 0;
+	Voice_started_time = 0;
+	Voice_ended_time = 0;
 	Brief_text_wipe_time_elapsed = 0.0f;
 }
 
@@ -2348,18 +2323,31 @@ void brief_voice_unload_all()
  */
 void brief_voice_play(int stage_num)
 {
-	if ( Brief_voices[stage_num] == -1 )
-		return;	// voice file doesn't exist
+	if (!Voice_started_time) {
+		Voice_started_time = timer_get_milliseconds();
+		Voice_ended_time = 0;
+	}
 
 	if ( !Briefing_voice_enabled ) {
 		return;
 	}
 
-	if ( audiostream_is_playing( Brief_voices[stage_num]) )
-		return;
+	if ( Brief_voices[stage_num] < 0 ) {
+		// play simulated speech?
+		if (fsspeech_play_from(FSSPEECH_FROM_BRIEFING)) {
+			if (fsspeech_playing()) {
+				return;
+			}
 
-	audiostream_play(Brief_voices[stage_num], Master_voice_volume, 0);
-	Brief_voice_started = 1;
+			fsspeech_play(FSSPEECH_FROM_BRIEFING, Briefing->stages[stage_num].text.c_str());
+		}
+	} else {
+		if ( audiostream_is_playing( Brief_voices[stage_num]) ) {
+			return;
+		}
+
+		audiostream_play(Brief_voices[stage_num], Master_voice_volume, 0);
+	}
 }
 
 /**
@@ -2367,10 +2355,11 @@ void brief_voice_play(int stage_num)
  */
 void brief_voice_stop(int stage_num)
 {
-	if ( Brief_voices[stage_num] == -1 )
-		return;
-
-	audiostream_stop(Brief_voices[stage_num], 1, 0);	// stream is automatically rewound
+	if (Brief_voices[stage_num] < 0) {
+		fsspeech_stop();
+	} else {
+		audiostream_stop(Brief_voices[stage_num], 1, 0);	// stream is automatically rewound
+	}
 }
 
 /**
@@ -2379,18 +2368,20 @@ void brief_voice_stop(int stage_num)
  */
 void brief_voice_pause(int stage_num)
 {
-	if ( Brief_voices[stage_num] == -1 )
-		return;
-
-	audiostream_pause(Brief_voices[stage_num]);
+	if (Brief_voices[stage_num] < 0) {
+		fsspeech_stop();
+	} else {
+		audiostream_pause(Brief_voices[stage_num]);
+	}
 }
 
 void brief_voice_unpause(int stage_num)
 {
-	if ( Brief_voices[stage_num] == -1 )
-		return;
-
-	audiostream_unpause(Brief_voices[stage_num]);
+	if (Brief_voices[stage_num] < 0) {
+		fsspeech_stop();
+	} else {
+		audiostream_unpause(Brief_voices[stage_num]);
+	}
 }
 
 void brief_reset_last_new_stage()
@@ -2430,8 +2421,7 @@ void cmd_brief_reset()
 	if (inited) {
 		for (i=0; i<MAX_TVT_TEAMS; i++) {
 			for (j=0; j<Cmd_briefs[i].num_stages; j++) {
-				if (Cmd_briefs[i].stage[j].text)
-					vm_free(Cmd_briefs[i].stage[j].text);
+				Cmd_briefs[i].stage[j].text = "";
 			}
 		}
 	}
@@ -2444,51 +2434,52 @@ void cmd_brief_reset()
 /**
  * Should briefing advance to the next stage?
  */
-int brief_time_to_advance(int stage_num, float frametime)
+int brief_time_to_advance(int stage_num)
 {
-	int voice_active, advance = 0;
-	brief_icon *closeup_icon;
-
-	closeup_icon = brief_get_closeup_icon();
-	if ( closeup_icon ) {
+	if (brief_get_closeup_icon() != NULL)
 		return 0;
-	}
 
-	if ( !Player->auto_advance ) {
-		return 0;
-	}
-
-	Brief_stage_time += fl2i(frametime*1000 + 0.5f);
-
-	// we do this after the stage time gets set so that we can continue the voice
-	// and current stage rather than jumping to the next
 	if (Briefing_paused)
 		return 0;
 
-	if ( (Brief_voices[stage_num] >= 0) && Briefing_voice_enabled ) {
-		voice_active = 1;
-	} else {
-		voice_active = 0;
+	if ( !Player->auto_advance )
+		return 0;
+
+	if (!brief_text_wipe_finished())
+		return 0;
+
+	if (Voice_ended_time && (timer_get_milliseconds() - Voice_ended_time >= STAGE_ADVANCE_DELAY))
+		return 1;
+
+	// check normal speech
+	if (Briefing_voice_enabled && (Brief_voices[stage_num] >= 0)) {
+		if (audiostream_is_playing(Brief_voices[stage_num])) {
+			return 0;
+		}
+
+		if (!Voice_ended_time) {
+			Voice_ended_time = timer_get_milliseconds();
+		}
+
+		return 0;
 	}
 
-	if ( voice_active && (Brief_voice_ended == 0) && Brief_voice_started) {
-		if ( !audiostream_is_playing( Brief_voices[stage_num]) ) {
-			Brief_voice_ended = 1;
-			Brief_stage_time = 0;
+	// check simulated speech
+	if (Briefing_voice_enabled && (Brief_voices[stage_num] < 0) && fsspeech_play_from(FSSPEECH_FROM_BRIEFING)) {
+		if (fsspeech_playing()) {
+			return 0;
 		}
-	}
-	
-	if ( Brief_voice_ended ) {
-		if ( Brief_stage_time > STAGE_ADVANCE_DELAY ) {
-			advance = 1;
+
+		if (!Voice_ended_time) {
+			Voice_ended_time = timer_get_milliseconds();
 		}
+
+		return 0;
 	}
 
-	if ( !voice_active && (Brief_textdraw_finished > 0) ) {
-		if ( Brief_stage_time > MAX(5000, Num_brief_text_lines[0] * 3500) ) {
-			advance = 1;
-		}
-	}
+	// if we get here, there is no voice, so we simulate the time it would take instead
+	if (!Voice_ended_time)
+		Voice_ended_time = Voice_started_time + MAX(5000, Num_brief_text_lines[0] * 3500);
 
-	return advance;
+	return 0;
 }

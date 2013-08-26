@@ -110,7 +110,7 @@ int get_char_width(ubyte c1,ubyte c2,int *width,int *spacing)
 }
 
 // NOTE: this returns an unscaled size for non-standard resolutions
-int get_centered_x(char *s)
+int get_centered_x(const char *s)
 {
 	int w,w2,s2;
 
@@ -140,15 +140,17 @@ void gr_char_centered(int x, int y, char chr)
 	gr_string(x - w / 2, y, str);
 }
 
-void gr_print_timestamp(int x, int y, int timestamp)
+void gr_print_timestamp(int x, int y, fix timestamp)
 {
 	char h[2], m[3], s[3];
 	int w, c;
 
+	int time = (int)f2fl(timestamp);  // convert to seconds
+
 	// format the time information into strings
-	sprintf(h, "%.1d", (timestamp / 3600000) % 10);
-	sprintf(m, "%.2d", (timestamp / 60000) % 60);
-	sprintf(s, "%.2d", (timestamp / 1000) % 60);
+	sprintf(h, "%.1d", (time / 3600));
+	sprintf(m, "%.2d", (time / 60) % 60);
+	sprintf(s, "%.2d", time % 60);
 
 	gr_get_string_size(&w, NULL, "0");
 	gr_get_string_size(&c, NULL, ":");
@@ -177,7 +179,7 @@ int gr_get_font_height()
 	}
 }
 
-void gr_get_string_size(int *w1, int *h1, char *text, int len)
+void gr_get_string_size(int *w1, int *h1, const char *text, int len)
 {
 	int longest_width;
 	int width,spacing;

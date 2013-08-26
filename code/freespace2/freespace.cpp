@@ -45,7 +45,6 @@
 #include "gamesnd/eventmusic.h"
 #include "gamesnd/gamesnd.h"
 #include "globalincs/alphacolors.h"
-#include "globalincs/linklist.h"
 #include "globalincs/version.h"
 #include "globalincs/mspdb_callstack.h"
 #include "graphics/font.h"
@@ -123,6 +122,7 @@
 #include "osapi/osapi.h"
 #include "osapi/osregistry.h"
 #include "parse/encrypt.h"
+#include "parse/generic_log.h"
 #include "parse/lua.h"
 #include "parse/parselo.h"
 #include "parse/scripting.h"
@@ -157,8 +157,11 @@
 #include "weapon/shockwave.h"
 #include "weapon/weapon.h"
 #include "fs2netd/fs2netd_client.h"
+#include "pilotfile/pilotfile.h"
 
 #include "globalincs/pstypes.h"
+
+#include <stdexcept>
 
 extern int Om_tracker_flag; // needed for FS2OpenPXO config
 
@@ -179,11 +182,6 @@ extern int Om_tracker_flag; // needed for FS2OpenPXO config
 //    1.00.01	5/25/98	MWA -- going final
 //		0.90		5/21/98	MWA -- getting ready for final.
 //		0.10		4/9/98.  Set by MK.
-//
-//	Demo version: (obsolete since DEMO codebase split from tree)
-//		0.03		4/10/98	AL.	Interplay rev
-//		0.02		4/8/98	MK.	Increased when this system was modified.
-//		0.01		4/7/98?	AL.	First release to Interplay QA.
 //
 //	OEM version:
 //		1.00		5/28/98	AL.	First release to Interplay QA.
@@ -465,8 +463,7 @@ void game_do_training_checks();
 void game_shutdown(void);
 void game_show_event_debug(float frametime);
 void game_event_debug_init();
-void game_frame(int paused = false);
-void demo_upsell_show_screens();
+void game_frame(bool paused = false);
 void game_start_subspace_ambient_sound();
 void game_stop_subspace_ambient_sound();
 void verify_ships_tbl();
@@ -842,7 +839,6 @@ void game_flash_diminish(float frametime)
 	
 	if ( Use_palette_flash )	{
 		int r,g,b;
-		static int o_r=0, o_g=0, o_b=0;
 
 		// Change the 200 to change the color range of colors.
 		r = fl2i( Game_flash_red*128.0f );  
@@ -867,10 +863,6 @@ void game_flash_diminish(float frametime)
 
 		if ( (r!=0) || (g!=0) || (b!=0) ) {
 			gr_flash( r, g, b );
-
-			o_r = r;
-			o_g = g;
-			o_b = b;
 		}
 	}
 	
@@ -914,6 +906,7 @@ void game_level_close()
 		ship_clear_cockpit_displays();
 		hud_level_close();
 		model_instance_free_all();
+		batch_render_close();
 
 		// be sure to not only reset the time but the lock as well
 		set_time_compression(1.0f, 0.0f);
@@ -947,7 +940,6 @@ uint load_post_level_init;
 /**
  * Intializes game stuff.  
  *
- * @param seed Only set by demo playback code.
  * @return 0 on failure, 1 on success
  */
 void game_level_init(int seed)
@@ -1062,7 +1054,7 @@ void game_level_init(int seed)
 	Game_no_clear = 0;
 
 	// campaign wasn't ended
-	Campaign_ended_in_mission = 0;
+	Campaign_ending_via_supernova = 0;
 
 	Env_cubemap_drawn = false;
 
@@ -1245,8 +1237,7 @@ void game_loading_callback_init()
 	if (Game_loading_background < 0)
 		Game_loading_background = bm_load(Game_loading_bground_fname[gr_screen.res]);
 
-	strcpy_s(Game_loading_ani.filename, Game_loading_ani_fname[gr_screen.res]);
-	generic_anim_init(&Game_loading_ani, Game_loading_ani.filename);
+	generic_anim_init(&Game_loading_ani, Game_loading_ani_fname[gr_screen.res]);
 	generic_anim_load(&Game_loading_ani);
 	Assertion( Game_loading_ani.num_frames > 0, "Load Screen animation %s not found, or corrupted. Needs to be an animation with at least 1 frame.", Game_loading_ani.filename );
 
@@ -1686,29 +1677,6 @@ DCF(gamma,"Sets Gamma factor")
 	}
 }
 
-void run_launcher()
-{
-#ifdef _WIN32
-	const char *launcher_link = "explorer.exe \"http://www.randomtiger.pwp.blueyonder.co.uk/freespace/Launcher5.rar\"";
-
-	int download = MessageBox((HWND)os_get_window(), 
-		"Run the fs2_open launcher to fix your problem. "
-		"Would you like to download the latest version of the launcher? "
-		"You must have at least version 5.0 to run fs2_open versions above 3.6.", 
-		"Question", MB_YESNO | MB_ICONQUESTION);
-
-	if(download == IDYES)
-	{
-		// Someone should change this to the offical link
-		WinExec(launcher_link, SW_SHOW);
-		return;
-	}
-
-	// This now crashes the launcher since fs2_open is still open
-	return;
-#endif
-}
-
 #ifdef APPLE_APP
 char full_path[1024];
 #endif
@@ -1857,7 +1825,6 @@ void game_init()
 		ShowCursor(TRUE);
 		ShowWindow((HWND)os_get_window(),SW_MINIMIZE);
 		MessageBox( NULL, "Error intializing graphics!", "Error", MB_OK|MB_TASKMODAL|MB_SETFOREGROUND );
-		run_launcher();
 #elif defined(SCP_UNIX)
 		fprintf(stderr, "Error initializing graphics!");
 
@@ -1978,6 +1945,10 @@ void game_init()
 
 	multi_init();	
 
+	// start up the mission logfile
+	logfile_init(LOGFILE_EVENT_LOG);
+	log_string(LOGFILE_EVENT_LOG,"FS2_Open Mission Log - Opened \n\n", 1);
+
 	// standalone's don't use the joystick and it seems to sometimes cause them to not get shutdown properly
 	if(!Is_standalone){
 		joy_init();
@@ -1987,6 +1958,12 @@ void game_init()
 	model_init();	
 
 	event_music_init();
+
+	// initialize alpha colors
+	// CommanderDJ: try with colors.tbl first, then use the old way if that doesn't work
+	if (!new_alpha_colors_init()) {
+		old_alpha_colors_init();
+	}
 
 	obj_init();	
 	mflash_game_init();	
@@ -2023,15 +2000,9 @@ void game_init()
 
 	load_animating_pointer(NOX("cursor"), 0, 0);	
 
-	// initialize alpha colors
-	// CommanderDJ: try with colors.tbl first, then use the old way if that doesn't work
-	if (!new_alpha_colors_init()) {
-		old_alpha_colors_init();
-	}
-
 	if(!Cmdline_reparse_mainhall)
 	{
-		main_hall_read_table();
+		main_hall_table_init();
 	}
 
 	if (Cmdline_env) {
@@ -2045,6 +2016,9 @@ void game_init()
 	Script_system.RunCondition(CHA_GAMEINIT);
 
 	game_title_screen_close();
+
+	// convert old pilot files (if they need it)
+	convert_pilot_files();
 
 #ifdef _WIN32
 	timeBeginPeriod(1);	
@@ -2538,7 +2512,7 @@ void game_set_view_clip(float frametime)
 		if (g3_in_frame() == 0) {
 			// Ensure that the bars are black
 			gr_set_color(0,0,0);
-			gr_set_bitmap(0); // Valathil - Dont ask me why this has to be here but otherwise the black bars dont draw
+			gr_set_bitmap(0); // Valathil - Don't ask me why this has to be here but otherwise the black bars don't draw
 			gr_rect(0, 0, gr_screen.max_w, yborder, false);
 			gr_rect(0, gr_screen.max_h-yborder, gr_screen.max_w, yborder, false);
 		} else {
@@ -3705,7 +3679,7 @@ void game_render_frame( camid cid )
 	if(draw_viewer_last && Viewer_obj)
 	{
 		gr_post_process_save_zbuffer();
-		ship_render(Viewer_obj);
+		ship_render_show_ship_cockpit(Viewer_obj);
 	}
 
 
@@ -4097,7 +4071,7 @@ void game_simulation_frame()
 		obj_snd_do_frame();						// update the object-linked persistant sounds
 
 		game_maybe_update_sound_environment();
-		snd_update_listener(&View_position, &Player_obj->phys_info.vel, &Player_obj->orient);
+		snd_update_listener(&Eye_position, &Player_obj->phys_info.vel, &Eye_matrix);
 
 // AL: debug code used for testing ambient subspace sound (ie when enabling subspace through debug console)
 #ifndef NDEBUG
@@ -4290,7 +4264,7 @@ void bars_do_frame(float frametime)
 		if (g3_in_frame() == 0) {
 			//Set rectangles
 			gr_set_color(0,0,0);
-			gr_set_bitmap(0); // Valathil - Dont ask me why this has to be here but otherwise the black bars dont draw
+			gr_set_bitmap(0); // Valathil - Don't ask me why this has to be here but otherwise the black bars don't draw
 			gr_rect(0, 0, gr_screen.max_w, yborder, false);
 			gr_rect(0, gr_screen.max_h-yborder, gr_screen.max_w, yborder, false);
 		} else {
@@ -4305,7 +4279,7 @@ void bars_do_frame(float frametime)
 
 		if (g3_in_frame() == 0) {
 			gr_set_color(0,0,0);
-			gr_set_bitmap(0); // Valathil - Dont ask me why this has to be here but otherwise the black bars dont draw
+			gr_set_bitmap(0); // Valathil - Don't ask me why this has to be here but otherwise the black bars don't draw
 			gr_rect(0, 0, gr_screen.max_w, yborder, false);
 			gr_rect(0, gr_screen.max_h-yborder, gr_screen.max_w, yborder, false);
 		} else {
@@ -4352,7 +4326,7 @@ void game_render_post_frame()
 #define DEBUG_GET_TIME(x)
 #endif
 
-void game_frame(int paused)
+void game_frame(bool paused)
 {
 #ifndef NDEBUG
 	fix total_time1, total_time2;
@@ -4363,9 +4337,6 @@ void game_frame(int paused)
 #endif
 	int actually_playing;
 
-	//vec3d eye_pos;
-	//matrix eye_orient;
-
 #ifndef NDEBUG
 	if (Framerate_delay) {
 		int	start_time = timer_get_milliseconds();
@@ -4374,19 +4345,11 @@ void game_frame(int paused)
 	}
 #endif
 
-#ifdef DEMO_SYSTEM
-	demo_do_frame_start();
-	if(Demo_error){
-		mprintf(("Error (%d) while processing demo!\n", Demo_error));
-		demo_close();
-	}
-#endif
+	// start timing frame
+	timing_frame_start();
+	profile_begin("Main Frame");
 	
-		// start timing frame
-		timing_frame_start();
-		profile_begin("Main Frame");
-	
-		DEBUG_GET_TIME( total_time1 )
+	DEBUG_GET_TIME( total_time1 )
 
 	if(paused)
 	{
@@ -4397,8 +4360,7 @@ void game_frame(int paused)
 	{
 		// var to hold which state we are in
 		actually_playing = game_actually_playing();
-	
-		
+
 		if ((!(Game_mode & GM_MULTIPLAYER)) || ((Game_mode & GM_MULTIPLAYER) && !(Net_player->flags & NETINFO_FLAG_OBSERVER))) {
 			if (!(Game_mode & GM_STANDALONE_SERVER)){
 				Assert( OBJ_INDEX(Player_obj) >= 0 );
@@ -4410,17 +4372,17 @@ void game_frame(int paused)
 		} else {
 			; //nprintf(("AI", "Framecount = %i, time = %7.3f\n", Framecount, f2fl(Missiontime)));
 		}
-	
+
 		//	Note: These are done even before the player enters, else buffers can overflow.
 		if (! (Game_mode & GM_STANDALONE_SERVER)){
 			radar_frame_init();
 		}
-	
+
 		shield_frame_init();
-	
-		if ( !Pre_player_entry && actually_playing ) {		   		
+
+		if ( !Pre_player_entry && actually_playing ) {
 			if (! (Game_mode & GM_STANDALONE_SERVER) ) {
-	
+
 				if( (!popup_running_state()) && (!popupdead_is_active()) ){
 					game_process_keys();
 					read_player_controls( Player_obj, flFrametime);
@@ -4530,6 +4492,10 @@ void game_frame(int paused)
 				}
 			}
 
+			// Goober5000 - check if we should red-alert
+			// (this is approximately where the red_alert_check_status() function tree began in the pre-HUD-overhaul code)
+			red_alert_maybe_move_to_next_mission();
+
 			DEBUG_GET_TIME( render3_time2 )
 			DEBUG_GET_TIME( render2_time1 )
 
@@ -4591,13 +4557,6 @@ void game_frame(int paused)
 	Timing_flip = f2fl( flip_time2 - flip_time1 ) * 1000.0f;
 #endif
 
-#ifdef DEMO_SYSTEM
-	demo_do_frame_end();
-	if(Demo_error){
-		mprintf(("Error (%d) while processing demo!\n", Demo_error));
-		demo_close();
-	}
-#endif
 }
 
 #define	MAX_FRAMETIME	(F1_0/4)		// Frametime gets saturated at this.  Changed by MK on 11/1/97.
@@ -4696,9 +4655,7 @@ void lock_time_compression(bool is_locked)
 
 void change_time_compression(float multiplier)
 {
-	fix modified = F1_0;
-
-	modified = fl2f( f2fl(Game_time_compression) * multiplier );
+	fix modified = fl2f( f2fl(Game_time_compression) * multiplier );
 
 	Desired_time_compression = Game_time_compression = modified;
 	Time_compression_change_rate = 0;
@@ -4817,7 +4774,6 @@ void game_set_frametime(int state)
 	//mprintf(("Frame %i, Last_time = %7.3f\n", Framecount, f2fl(Last_time)));
 
 	flFrametime = f2fl(Frametime);
-	//if(!(Game_mode & GM_PLAYING_DEMO)){
 	timestamp_inc(flFrametime);
 
 	// wrap overall frametime if needed
@@ -4843,7 +4799,7 @@ void game_update_missiontime()
 	// TODO JAS: Put in if and move this into game_set_frametime, 
 	// fix navmap to call game_stop/start_time
 	//if ( !timer_paused )	
-		Missiontime = fixTimeFromMs(timestamp());
+		Missiontime += Frametime;
 }
 
 void game_do_frame()
@@ -5138,12 +5094,6 @@ void os_close()
 	gameseq_post_event(GS_EVENT_QUIT_GAME);
 }
 
-void end_demo_campaign_do()
-{
-	// drop into main hall
-	gameseq_post_event( GS_EVENT_MAIN_MENU );
-}
-
 // All code to process events.   This is the only place
 // that you should change the state of the game.
 void game_process_event( int current_state, int event )
@@ -5196,11 +5146,18 @@ void game_process_event( int current_state, int event )
 			break;
 
 		case GS_EVENT_START_BRIEFING:
-			gameseq_set_state(GS_STATE_BRIEFING);		
+			gameseq_set_state(GS_STATE_BRIEFING);
 			break;
 
 		case GS_EVENT_DEBRIEF:
-			gameseq_set_state(GS_STATE_DEBRIEF);
+			// did we end the campaign in the main freespace 2 single player campaign?
+			// (specifically, did we successfully jump out when the supernova was in progress
+			// and the campaign was ending?)
+			if (Campaign_ending_via_supernova && (Game_mode & GM_CAMPAIGN_MODE)/* && !stricmp(Campaign.filename, "freespace2")*/) {
+				gameseq_post_event(GS_EVENT_END_CAMPAIGN);
+			} else {
+				gameseq_set_state(GS_STATE_DEBRIEF);
+			}
 			break;
 
 		case GS_EVENT_SHIP_SELECTION:
@@ -5211,14 +5168,7 @@ void game_process_event( int current_state, int event )
 			gameseq_set_state( GS_STATE_WEAPON_SELECT );
 			break;
 
-		case GS_EVENT_ENTER_GAME:		
-#ifdef DEMO_SYSTEM
-			// maybe start recording a demo
-			if(Demo_make){
-				demo_start_record("test.fsd");
-			}
-#endif
-
+		case GS_EVENT_ENTER_GAME:
 			if (Game_mode & GM_MULTIPLAYER) {
 				// if we're respawning, make sure we change the view mode so that the hud shows up
 				if (current_state == GS_STATE_DEATH_BLEW_UP) {
@@ -5230,7 +5180,7 @@ void game_process_event( int current_state, int event )
 				gameseq_set_state(GS_STATE_GAME_PLAY, 1);
 			}
 
-			// clear multiplayer button info			
+			// clear multiplayer button info
 			extern button_info Multi_ship_status_bi;
 			memset(&Multi_ship_status_bi, 0, sizeof(button_info));
 
@@ -5508,10 +5458,6 @@ void game_process_event( int current_state, int event )
 			gameseq_set_state(GS_STATE_END_OF_CAMPAIGN);
 			break;		
 
-		case GS_EVENT_END_DEMO:
-			gameseq_set_state(GS_STATE_END_DEMO);
-			break;
-
 		case GS_EVENT_LOOP_BRIEF:
 			gameseq_set_state(GS_STATE_LOOP_BRIEF);
 			break;
@@ -5709,11 +5655,6 @@ void game_leave_state( int old_state, int new_state )
 			}
 
 			if (end_mission) {
-			// shut down any recording or playing demos
-#ifdef DEMO_SYSTEM
-				demo_close();
-#endif
-
 				// when in multiplayer and going back to the main menu, send a leave game packet
 				// right away (before calling stop mission).  stop_mission was taking to long to
 				// close mission down and I want people to get notified ASAP.
@@ -5722,7 +5663,7 @@ void game_leave_state( int old_state, int new_state )
 				}
 				snd_aav_init();
 
-				freespace_stop_mission();			
+				freespace_stop_mission();
 			}
 			break;
 
@@ -5972,9 +5913,7 @@ void game_enter_state( int old_state, int new_state )
 
 			// remove any multiplayer flags from the game mode
 			Game_mode &= ~(GM_MULTIPLAYER);
-	
-			// determine which ship this guy is currently based on
-			main_hall_init(Player->main_hall);
+
 			// set the game_mode based on the type of player
 			Assert( Player != NULL );
 
@@ -5982,6 +5921,17 @@ void game_enter_state( int old_state, int new_state )
 				Game_mode = GM_MULTIPLAYER;
 			} else {
 				Game_mode = GM_NORMAL;
+			}
+
+			// determine which ship this guy is currently based on
+			mission_load_up_campaign(Player);
+
+			// if we're coming from the end of a campaign, we want to load the first mainhall of the campaign
+			// otherwise load the mainhall for the mission the player's up to
+			if (Campaign.next_mission == -1) {
+				main_hall_init(Campaign.missions[0].main_hall);
+			} else {
+				main_hall_init(Campaign.missions[Campaign.next_mission].main_hall);
 			}
 
 			//if ( (Cmdline_start_netgame || (Cmdline_connect_addr != NULL)) && !Main_hall_netgame_started ) {
@@ -6186,7 +6136,9 @@ void game_enter_state( int old_state, int new_state )
 			//Set the current hud
 			set_current_hud();
 
-			ship_init_cockpit_displays(Player_ship);
+			if ( !Is_standalone ) {
+				ship_init_cockpit_displays(Player_ship);
+			}
 
 			Game_mode |= GM_IN_MISSION;
 
@@ -6744,7 +6696,7 @@ void game_do_state(int state)
 		case GS_STATE_MULTI_MISSION_SYNC:
 			game_set_frametime(GS_STATE_MULTI_MISSION_SYNC);
 			multi_sync_do();
-			break;		
+			break;
 
 		case GS_STATE_MULTI_START_GAME:
 			game_set_frametime(GS_STATE_MULTI_START_GAME);
@@ -6754,16 +6706,11 @@ void game_do_state(int state)
 		case GS_STATE_MULTI_HOST_OPTIONS:
 			game_set_frametime(GS_STATE_MULTI_HOST_OPTIONS);
 			multi_host_options_do();
-			break;		
+			break;
 
 		case GS_STATE_END_OF_CAMPAIGN:
 			mission_campaign_end_do();
-			break;		
-
-		case GS_STATE_END_DEMO:
-			game_set_frametime(GS_STATE_END_DEMO);
-			end_demo_campaign_do();
-			break;
+			break;	
 
 		case GS_STATE_LOOP_BRIEF:
 			game_set_frametime(GS_STATE_LOOP_BRIEF);
@@ -7052,14 +6999,10 @@ int game_main(char *cmdline)
 	}
 
 
-#ifdef STANDALONE_ONLY_BUILD
-	Is_standalone = 1;
-	nprintf(("Network", "Standalone running"));
-#else
 	if (Is_standalone){
 		nprintf(("Network", "Standalone running"));
 	}
-#endif
+
 
 #ifdef _WIN32
 	if ( !Is_standalone )
@@ -7349,8 +7292,8 @@ void game_shutdown(void)
    // if the player has left the "player select" screen and quit the game without actually choosing
 	// a player, Player will be NULL, in which case we shouldn't write the player file out!
 	if (!(Game_mode & GM_STANDALONE_SERVER) && (Player!=NULL) && !Is_standalone){
-		write_pilot_file();
-		mission_campaign_savefile_save();
+		Pilot.save_player();
+		Pilot.save_savefile();
 	}
 
 	// load up common multiplayer icons
@@ -7362,16 +7305,22 @@ void game_shutdown(void)
 	ship_close();					// free any memory that was allocated for the ships
 	hud_free_scrollback_list();// free space allocated to store hud messages in hud scrollback
 	unload_animating_pointer();// frees the frames used for the animating mouse pointer
-	mission_campaign_close();	// close out the campaign stuff
+	mission_campaign_clear();	// clear out the campaign stuff
 	message_mission_close();	// clear loaded table data from message.tbl
 	mission_parse_close();		// clear out any extra memory that may be in use by mission parsing
 	multi_voice_close();			// close down multiplayer voice (including freeing buffers, etc)
 	multi_log_close();
+	logfile_close(LOGFILE_EVENT_LOG); // close down the mission log
 #ifdef MULTI_USE_LAG
 	multi_lag_close();
 #endif
 	fs2netd_close();
-	obj_pairs_close();		// free memory from object collision pairs
+
+	if ( Cmdline_old_collision_sys ) {
+		obj_pairs_close();		// free memory from object collision pairs
+	} else {
+		obj_reset_colliders();
+	}
 	stars_close();			// clean out anything used by stars code
 
 	// the menu close functions will unload the bitmaps if they were displayed during the game
@@ -7974,7 +7923,7 @@ void Do_model_timings_test()
 // Call this function when you want to inform the player that a feature is disabled in this build
 void game_feature_disabled_popup()
 {
-	popup(PF_USE_AFFIRMATIVE_ICON|PF_BODY_BIG, 1, POPUP_OK, XSTR( "Sorry, the requested feature is currently disabled in this build", -1));
+	popup(PF_USE_AFFIRMATIVE_ICON|PF_BODY_BIG, 1, POPUP_OK, XSTR( "Sorry, the requested feature is currently disabled in this build", 1621));
 }
 
 // format the specified time (fixed point) into a nice string
@@ -8032,10 +7981,6 @@ void get_version_string(char *str, int max_size)
 	#else
 		sprintf(str, "FreeSpace 2 Open v%i.%i.%i.%i", FS_VERSION_MAJOR, FS_VERSION_MINOR, FS_VERSION_BUILD, FS_VERSION_REVIS);
 	#endif
-
-#ifdef INF_BUILD
-	strcat_s( str, max_size, " Inferno" );
-#endif
 
 #ifndef NDEBUG
 	strcat_s( str, max_size, " Debug" );
@@ -8301,9 +8246,6 @@ int init_cdrom()
 	int i, rval;
 
 	//scan for CD, etc.
-
-	rval = 1;
-
 	i = find_freespace_cd();
 
 	rval = set_cdrom_path(i);
@@ -8335,11 +8277,10 @@ int game_cd_changed()
 		Last_cd_label_found = found;
 		if ( found )	{
 			mprintf(( "CD '%s' was inserted\n", label ));
-			changed = 1;
 		} else {
 			mprintf(( "CD '%s' was removed\n", Last_cd_label ));
-			changed = 1;
 		}
+        changed = 1;
 	} else {
 		if ( Last_cd_label_found )	{
 			if ( !stricmp( Last_cd_label, label ))	{

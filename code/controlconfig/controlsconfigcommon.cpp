@@ -163,10 +163,10 @@ config_item Control_config[CCFG_MAX + 1] = {
 	{             KEY_SHIFTED | KEY_B,				-1, TARGET_TAB,	true, "Target Previous Hostile Bomb or Bomber" },
 
 	// multiplayer messaging keys
-	{									 KEY_1,				-1, COMPUTER_TAB, true, "(Multiplayer) Message All", CC_TYPE_CONTINUOUS },
-	{									 KEY_2,				-1, COMPUTER_TAB, true, "(Multiplayer) Message Friendly", CC_TYPE_CONTINUOUS },
-	{									 KEY_3,				-1, COMPUTER_TAB, true, "(Multiplayer) Message Hostile", CC_TYPE_CONTINUOUS },
-	{									 KEY_4,				-1, COMPUTER_TAB, true, "(Multiplayer) Message Target", CC_TYPE_CONTINUOUS },
+	{									 KEY_1,				-1, COMPUTER_TAB, true, "(Multiplayer) Message All" },
+	{									 KEY_2,				-1, COMPUTER_TAB, true, "(Multiplayer) Message Friendly" },
+	{									 KEY_3,				-1, COMPUTER_TAB, true, "(Multiplayer) Message Hostile" },
+	{									 KEY_4,				-1, COMPUTER_TAB, true, "(Multiplayer) Message Target" },
 	{ KEY_ALTED	|					 KEY_X,				-1, COMPUTER_TAB, true, "(Multiplayer) Observer Zoom to Target"},	
 	{             KEY_SHIFTED | KEY_PERIOD,		-1, COMPUTER_TAB,	true, "Increase Time Compression" },
 	{             KEY_SHIFTED | KEY_COMMA,			-1, COMPUTER_TAB,	true, "Decrease Time Compression" },
@@ -187,7 +187,8 @@ config_item Control_config[CCFG_MAX + 1] = {
 	{ KEY_ALTED |					KEY_A,			-1, COMPUTER_TAB, false, "Toggle Auto Pilot"},
 	{ KEY_ALTED |					KEY_N,			-1, COMPUTER_TAB, false, "Cycle Nav Points"},
 	{ KEY_ALTED |					KEY_G,			-1, SHIP_TAB, false, "Toggle Gliding"},
-	{                           -1,					-1, -1,			 false,	"" }
+	{								KEY_O,				-1,	WEAPON_TAB, false, "Cycle Primary Weapon Firing Rate" },
+	{								-1,					-1, -1,			 false,	"" }
 };
 
 char *Scan_code_text_german[] = {
@@ -533,6 +534,9 @@ void control_config_common_load_overrides();
 // initialize common control config stuff - call at game startup after localization has been initialized
 void control_config_common_init()
 {
+	for (int i=0; i<CCFG_MAX; i++)
+		Control_config[i].disabled = false;
+
     control_config_common_load_overrides();
 	if(Lcl_gr){
 		Scan_code_text = Scan_code_text_german;
@@ -625,6 +629,9 @@ void control_config_common_load_overrides()
                 if (optional_string("$Type:"))
                 {stuff_string(szTempBuffer, F_NAME, iBufferLength);
                  r_ccConfig.type = (char)mEnumNameToVal[szTempBuffer];}
+                 
+                 if (optional_string("+Disable"))
+                    r_ccConfig.disabled = true;
                 
                 // Nerf the buffer now.
                 szTempBuffer[0] = '\0';

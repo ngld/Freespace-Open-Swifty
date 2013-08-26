@@ -103,7 +103,11 @@ typedef struct starfield_bitmap_instance {
 	int n_verts;
 	vertex *verts;
 
-	starfield_bitmap_instance() { memset(this, 0, sizeof(starfield_bitmap_instance)); star_bitmap_index = -1; };
+	starfield_bitmap_instance() : scale_x(1.0f), scale_y(1.0f), div_x(1), div_y(1), star_bitmap_index(0), n_verts(0), verts(NULL) {
+		ang.p = 0.0f;
+		ang.b = 0.0f;
+		ang.h = 0.0f;
+    }
 } starfield_bitmap_instance;
 
 // for drawing cool stuff on the background - comes from a table
@@ -159,6 +163,7 @@ int stars_debris_loaded = 0;	// 0 = not loaded, 1 = normal vclips, 2 = nebula vc
 // background data
 int Stars_background_inited = 0;			// if we're inited
 int Nmodel_num = -1;							// model num
+matrix Nmodel_orient = IDENTITY_MATRIX;			// model orientation
 int Nmodel_flags = DEFAULT_NMODEL_FLAGS;		// model flags
 int Nmodel_bitmap = -1;						// model texture
 
@@ -714,6 +719,7 @@ void stars_pre_level_init(bool clear_backgrounds)
 	stars_clear_instances();
 
 	stars_set_background_model(NULL, NULL);
+	stars_set_background_orientation();
 
 	// mark all starfield and sun bitmaps as unused for this mission and release any current bitmaps
 	// NOTE: that because of how we have to load the bitmaps it's important to release all of
@@ -771,6 +777,7 @@ void stars_post_level_init()
 
 
 	stars_set_background_model(The_mission.skybox_model, NULL, The_mission.skybox_flags);
+	stars_set_background_orientation(&The_mission.skybox_orientation);
 
 	stars_load_debris( ((The_mission.flags & MISSION_FLAG_FULLNEB) || Nebula_sexp_used) );
 
@@ -819,14 +826,8 @@ void stars_post_level_init()
 			mprintf(("Adding default sun.\n"));
 
 			starfield_bitmap_instance def_sun;
-		//	memset( &def_sun, 0, sizeof(starfield_bitmap_instance) );
 
 			// stuff some values
-			def_sun.star_bitmap_index = 0;
-			def_sun.scale_x = 1.0f;
-			def_sun.scale_y = 1.0f;
-			def_sun.div_x = 1;
-			def_sun.div_y = 1;
 			def_sun.ang.h = fl_radians(60.0f);
 
 			Suns.push_back(def_sun);
@@ -2118,7 +2119,7 @@ void stars_draw_background()
 	// draw the model at the player's eye with no z-buffering
 	model_set_alpha(1.0f);
 
-	model_render(Nmodel_num, &vmd_identity_matrix, &Eye_position, Nmodel_flags);
+	model_render(Nmodel_num, &Nmodel_orient, &Eye_position, Nmodel_flags);
 
 	if (Nmodel_bitmap >= 0) {
 		model_set_forced_texture(-1);
@@ -2144,11 +2145,21 @@ void stars_set_background_model(char *model_name, char *texture_name, int flags)
 	if ( (model_name == NULL) || (*model_name == '\0') )
 		return;
 
-	Nmodel_num = model_load(model_name, 0, NULL, 0);
+	Nmodel_num = model_load(model_name, 0, NULL, -1);
 	Nmodel_bitmap = bm_load(texture_name);
 
 	if (Nmodel_num >= 0)
 		model_page_in_textures(Nmodel_num);
+}
+
+// call this to set a specific orientation for the background
+void stars_set_background_orientation(matrix *orient)
+{
+	if (orient == NULL) {
+		vm_set_identity(&Nmodel_orient);
+	} else {
+		Nmodel_orient = *orient;
+	}
 }
 
 // lookup a starfield bitmap, return index or -1 on fail
@@ -2199,7 +2210,6 @@ int stars_add_sun_entry(starfield_list_entry *sun_ptr)
 	Assert(sun_ptr != NULL);
 
 	// copy information
-	memset(&sbi, 0, sizeof(starfield_bitmap_instance));
 	sbi.ang.p = sun_ptr->ang.p;
 	sbi.ang.b = sun_ptr->ang.b;
 	sbi.ang.h = sun_ptr->ang.h;
@@ -2248,13 +2258,14 @@ int stars_add_sun_entry(starfield_list_entry *sun_ptr)
 
 		if (Sun_bitmaps[idx].flare) {
 			for (i = 0; i < MAX_FLARE_BMP; i++) {
-				if ( !strlen(Sun_bitmaps[idx].flare_bitmaps[i].filename) )
+				flare_bitmap* fbp = &Sun_bitmaps[idx].flare_bitmaps[i];
+				if ( !strlen(fbp->filename) )
 					continue;
 
-				if (Sun_bitmaps[idx].flare_bitmaps[i].bitmap_id < 0) {
-					Sun_bitmaps[idx].flare_bitmaps[i].bitmap_id = bm_load(Sun_bitmaps[idx].flare_bitmaps[i].filename);
+				if (fbp->bitmap_id < 0) {
+					fbp->bitmap_id = bm_load(fbp->filename);
 
-					if (Sun_bitmaps[idx].flare_bitmaps[i].bitmap_id < 0) {
+					if (fbp->bitmap_id < 0) {
 						Warning(LOCATION, "Unable to load sun flare bitmap: '%s'!\n", Sun_bitmaps[idx].flare_bitmaps[i].filename);
 						continue;
 					}
@@ -2287,10 +2298,9 @@ int stars_add_bitmap_entry(starfield_list_entry *sle)
 	int idx;
 	starfield_bitmap_instance sbi;
 
-	Assert( sle != NULL );
+	Assert(sle != NULL);
 
 	// copy information
-	memset(&sbi, 0, sizeof(starfield_bitmap_instance));
 	sbi.ang.p = sle->ang.p;
 	sbi.ang.b = sle->ang.b;
 	sbi.ang.h = sle->ang.h;
@@ -2460,6 +2470,7 @@ void stars_set_nebula(bool activate)
 		if(Cmdline_nohtl || Fred_running) {
 			Neb2_render_mode = NEB2_RENDER_POF;
 			stars_set_background_model(BACKGROUND_MODEL_FILENAME, Neb2_texture_name);
+			stars_set_background_orientation();
 		} else {
 			Neb2_render_mode = NEB2_RENDER_HTL;
 		}
@@ -2510,7 +2521,14 @@ void stars_modify_entry_FRED(int index, const char *name, starfield_list_entry *
 	Assert( index >= 0 );
 	Assert( sbi_new != NULL );
 
-	memcpy( &sbi, sbi_new, sizeof(starfield_bitmap_instance) );
+    // copy information
+    sbi.ang.p = sbi_new->ang.p;
+	sbi.ang.b = sbi_new->ang.b;
+	sbi.ang.h = sbi_new->ang.h;
+	sbi.scale_x = sbi_new->scale_x;
+	sbi.scale_y = sbi_new->scale_y;
+	sbi.div_x = sbi_new->div_x;
+	sbi.div_y = sbi_new->div_y;
 
 	if (is_a_sun) {
 		idx = stars_find_sun((char*)name);

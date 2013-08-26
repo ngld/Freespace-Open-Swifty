@@ -10,6 +10,7 @@
 #include "nebula/neb.h"
 #include "parse/parselo.h"
 #include "cmdline/cmdline.h"
+#include "mod_table/mod_table.h"
 #include "globalincs/def_files.h"
 #include "ship/ship.h"
 #include "freespace2/freespace.h"
@@ -45,6 +46,19 @@ int ls_samplenum = 50;
 
 static SCP_vector<opengl_shader_t> GL_post_shader;
 
+struct opengl_shader_file_t {
+char *vert;
+	char *frag;
+
+	int flags;
+
+	int num_uniforms;
+	char* uniforms[MAX_SHADER_UNIFORMS];
+
+	int num_attributes;
+	char* attributes[MAX_SDR_ATTRIBUTES];
+};
+
 // NOTE: The order of this list *must* be preserved!  Additional shaders can be
 //       added, but the first 7 are used with magic numbers so their position
 //       is assumed to never change.
@@ -52,25 +66,25 @@ static opengl_shader_file_t GL_post_shader_files[] = {
 	// NOTE: the main post-processing shader has any number of uniforms, but
 	//       these few should always be present
 	{ "post-v.sdr", "post-f.sdr", SDR_POST_FLAG_MAIN,
-		4, { "tex", "timer", "bloomed", "bloom_intensity" } },
+		4, { "tex", "timer", "bloomed", "bloom_intensity" }, 0, { NULL } },
 
 	{ "post-v.sdr", "blur-f.sdr", SDR_POST_FLAG_BLUR | SDR_POST_FLAG_PASS1,
-		2, { "tex", "bsize" } },
+		2, { "tex", "bsize" }, 0, { NULL } },
 
 	{ "post-v.sdr", "blur-f.sdr", SDR_POST_FLAG_BLUR | SDR_POST_FLAG_PASS2,
-		2, { "tex", "bsize" } },
+		2, { "tex", "bsize" }, 0, { NULL } },
 
 	{ "post-v.sdr", "brightpass-f.sdr", SDR_POST_FLAG_BRIGHT,
-		1, { "tex" } },
+		1, { "tex" }, 0, { NULL } },
 
-	{ "fxaa-v.sdr", "fxaa-f.sdr", NULL, 
-		3, { "tex0", "rt_w", "rt_h"} },
+	{ "fxaa-v.sdr", "fxaa-f.sdr", 0, 
+		3, { "tex0", "rt_w", "rt_h"}, 0, { NULL } },
 
-	{ "post-v.sdr", "fxaapre-f.sdr", NULL,
-		1, { "tex"} },
+	{ "post-v.sdr", "fxaapre-f.sdr", 0,
+		1, { "tex"}, 0, { NULL } },
 
 	{ "post-v.sdr", "ls-f.sdr", SDR_POST_FLAG_LIGHTSHAFT,
-		8, { "scene", "cockpit", "sun_pos", "weight", "intensity", "falloff", "density", "cp_intensity" } }
+		8, { "scene", "cockpit", "sun_pos", "weight", "intensity", "falloff", "density", "cp_intensity" }, 0, { NULL } }
 };
 
 static const unsigned int Num_post_shader_files = sizeof(GL_post_shader_files) / sizeof(opengl_shader_file_t);
@@ -142,19 +156,7 @@ static bool opengl_post_pass_bloom()
 	GL_state.Texture.SetTarget(GL_TEXTURE_2D);
 	GL_state.Texture.Enable(Scene_color_texture);
 
-	glBegin(GL_QUADS);
-		glTexCoord2f(0.0f, 0.0f);
-		glVertex2f(-1.0f, -1.0f);
-
-		glTexCoord2f(1.0f, 0.0f);
-		glVertex2f(1.0f, -1.0f);
-
-		glTexCoord2f(1.0f, 1.0f);
-		glVertex2f(1.0f, 1.0f);
-
-		glTexCoord2f(0.0f, 1.0f);
-		glVertex2f(-1.0f, 1.0f);
-	glEnd();
+	opengl_draw_textured_quad(-1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
 
 	GL_state.Texture.Disable();
 
@@ -187,19 +189,7 @@ static bool opengl_post_pass_bloom()
 
 		GL_state.Texture.Enable(Post_bloom_texture_id[pass]);
 
-		glBegin(GL_QUADS);
-			glTexCoord2f(0.0f, 0.0f);
-			glVertex2f(-1.0f, -1.0f);
-
-			glTexCoord2f(1.0f, 0.0f);
-			glVertex2f(1.0f, -1.0f);
-
-			glTexCoord2f(1.0f, 1.0f);
-			glVertex2f(1.0f, 1.0f);
-
-			glTexCoord2f(0.0f, 1.0f);
-			glVertex2f(-1.0f, 1.0f);
-		glEnd();
+		opengl_draw_textured_quad(-1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, 1.0f, 1.0f);
 	}
 
 	GL_state.Texture.Disable();
@@ -258,10 +248,10 @@ void recompile_fxaa_shader() {
 	mprintf(("Recompiling FXAA shader with preset %d\n", Cmdline_fxaa_preset));
 
 	// read vertex shader
-	vert = opengl_post_load_shader(vert_name, shader_file->flags, NULL);
+	vert = opengl_post_load_shader(vert_name, shader_file->flags, 0);
 
 	// read fragment shader
-	frag = opengl_post_load_shader(frag_name, shader_file->flags, NULL);
+	frag = opengl_post_load_shader(frag_name, shader_file->flags, 0);
 
 
 	Verify( vert != NULL );
@@ -274,7 +264,7 @@ void recompile_fxaa_shader() {
 
 
 	new_shader->flags = shader_file->flags;
-	new_shader->flags2 = NULL;
+	new_shader->flags2 = 0;
 
 	opengl_shader_set_current( new_shader );
 
@@ -310,19 +300,7 @@ void opengl_post_pass_fxaa() {
 	GL_state.Texture.SetTarget(GL_TEXTURE_2D);
 	GL_state.Texture.Enable(Scene_color_texture);
 
-	glBegin(GL_QUADS);
-		glTexCoord2f(0.0f, 0.0f);
-		glVertex2f(-1.0f, -1.0f);
-
-		glTexCoord2f(Scene_texture_u_scale, 0.0f);
-		glVertex2f(1.0f, -1.0f);
-
-		glTexCoord2f(Scene_texture_u_scale, Scene_texture_v_scale);
-		glVertex2f(1.0f, 1.0f);
-
-		glTexCoord2f(0.0f, Scene_texture_v_scale);
-		glVertex2f(-1.0f, 1.0f);
-	glEnd();
+	opengl_draw_textured_quad(-1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, Scene_texture_u_scale, Scene_texture_u_scale);
 
 	GL_state.Texture.Disable();
 
@@ -340,19 +318,7 @@ void opengl_post_pass_fxaa() {
 	GL_state.Texture.SetTarget(GL_TEXTURE_2D);
 	GL_state.Texture.Enable(Scene_luminance_texture);
 
-	glBegin(GL_QUADS);
-		glTexCoord2f(0.0f, 0.0f);
-		glVertex2f(-1.0f, -1.0f);
-
-		glTexCoord2f(Scene_texture_u_scale, 0.0f);
-		glVertex2f(1.0f, -1.0f);
-
-		glTexCoord2f(Scene_texture_u_scale, Scene_texture_v_scale);
-		glVertex2f(1.0f, 1.0f);
-
-		glTexCoord2f(0.0f, Scene_texture_v_scale);
-		glVertex2f(-1.0f, 1.0f);
-	glEnd();
+	opengl_draw_textured_quad(-1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, Scene_texture_u_scale, Scene_texture_u_scale);
 
 	GL_state.Texture.Disable();
 
@@ -416,22 +382,12 @@ void gr_opengl_post_process_end()
 				GL_state.Texture.SetActiveUnit(1);
 				GL_state.Texture.SetTarget(GL_TEXTURE_2D);
 				GL_state.Texture.Enable(Cockpit_depth_texture);
-				glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+				GL_state.Color(255, 255, 255, 255);
 				GL_state.Blend(GL_TRUE);
 				GL_state.SetAlphaBlendMode(ALPHA_BLEND_ADDITIVE);
-				glBegin(GL_QUADS);
-					glTexCoord2f(0.0f, 0.0f);
-					glVertex2f(-1.0f, -1.0f);
+				
+				opengl_draw_textured_quad(-1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, Scene_texture_u_scale, Scene_texture_u_scale);
 
-					glTexCoord2f(Scene_texture_u_scale, 0.0f);
-					glVertex2f(1.0f, -1.0f);
-
-					glTexCoord2f(Scene_texture_u_scale, Scene_texture_v_scale);
-					glVertex2f(1.0f, 1.0f);
-
-					glTexCoord2f(0.0f, Scene_texture_v_scale);
-					glVertex2f(-1.0f, 1.0f);
-				glEnd();
 				GL_state.Blend(GL_FALSE);
 				break;
 			}
@@ -455,7 +411,7 @@ void gr_opengl_post_process_end()
 	glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
 	glClear(GL_COLOR_BUFFER_BIT);
 
-	glColor4f(1.0f, 1.0f, 1.0f, 1.0f);
+	GL_state.Color(255, 255, 255, 255);
 
 	// set and configure post shader ...
 
@@ -498,24 +454,10 @@ void gr_opengl_post_process_end()
 	GL_state.Texture.SetTarget(GL_TEXTURE_2D);
 	GL_state.Texture.Enable(Scene_color_texture);
 
-	glBegin(GL_QUADS);
-		glTexCoord2f(0.0f, 0.0f);
-		glVertex2f(-1.0f, -1.0f);
-
-		glTexCoord2f(Scene_texture_u_scale, 0.0f);
-		glVertex2f(1.0f, -1.0f);
-
-		glTexCoord2f(Scene_texture_u_scale, Scene_texture_v_scale);
-		glVertex2f(1.0f, 1.0f);
-
-		glTexCoord2f(0.0f, Scene_texture_v_scale);
-		glVertex2f(-1.0f, 1.0f);
-	glEnd();
-
+	opengl_draw_textured_quad(-1.0f, -1.0f, 0.0f, 0.0f, 1.0f, 1.0f, Scene_texture_u_scale, Scene_texture_u_scale);
 	// Done!
 
-	GL_state.Texture.SetActiveUnit(1);
-	GL_state.Texture.Disable();
+	GL_state.Texture.SetActiveUnit(1);	GL_state.Texture.Disable();
 	GL_state.Texture.SetActiveUnit(0);
 	GL_state.Texture.Disable();
 
@@ -542,7 +484,7 @@ void get_post_process_effect_names(SCP_vector<SCP_string> &names)
 	}
 }
 
-static bool opengl_post_compile_main_shader(int flags)
+static bool opengl_post_compile_shader(int flags)
 {
 	char *vert = NULL, *frag = NULL;
 	bool in_error = false;
@@ -674,7 +616,7 @@ void gr_opengl_post_process_set_effect(const char *name, int value)
 
 	// if not then add a new shader to the list
 	if (need_change) {
-		if ( !opengl_post_compile_main_shader(sflags) ) {
+		if ( !opengl_post_compile_shader(sflags) ) {
 			// shader added, set it as active
 			Post_active_shader_index = (int)(GL_post_shader.size() - 1);
 		} else {
@@ -720,12 +662,18 @@ void gr_opengl_post_process_set_defaults()
 extern GLuint Cockpit_depth_texture;
 void gr_opengl_post_process_save_zbuffer()
 {
-	if ( !Post_initialized ) {
-		return;
+	if (Post_initialized)
+	{
+		vglFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, Cockpit_depth_texture, 0);
+		gr_zbuffer_clear(TRUE);
+		zbuffer_saved = true;
 	}
-	vglFramebufferTexture2DEXT(GL_FRAMEBUFFER_EXT, GL_DEPTH_ATTACHMENT_EXT, GL_TEXTURE_2D, Cockpit_depth_texture, 0);
-	gr_zbuffer_clear(TRUE);
-	zbuffer_saved = true;
+	else
+	{
+		// If we can't save the z-buffer then just clear it so cockpits are still rendered correctly when
+		// post-processing isn't available/enabled.
+		gr_zbuffer_clear(TRUE);
+	}
 }
 
 
@@ -941,30 +889,32 @@ static char *opengl_post_load_shader(char *filename, int flags, int flags2)
 	const char *shader_flags = sflags.c_str();
 	int flags_len = strlen(shader_flags);
 
-	CFILE *cf_shader = cfopen(filename, "rt", CFILE_NORMAL, CF_TYPE_EFFECTS);
+	if (Enable_external_shaders && stricmp(filename, "fxaapre-f.sdr") && stricmp(filename, "fxaa-f.sdr") && stricmp(filename, "fxaa-v.sdr")) {
+		CFILE *cf_shader = cfopen(filename, "rt", CFILE_NORMAL, CF_TYPE_EFFECTS);
 
-	if (cf_shader != NULL && stricmp(filename, "fxaa-f.sdr") && stricmp(filename, "fxaa-v.sdr") ) {
-		int len = cfilelength(cf_shader);
-		char *shader = (char*) vm_malloc(len + flags_len + 1);
+		if (cf_shader != NULL  ) {
+			int len = cfilelength(cf_shader);
+			char *shader = (char*) vm_malloc(len + flags_len + 1);
 
-		strcpy(shader, shader_flags);
-		memset(shader + flags_len, 0, len + 1);
-		cfread(shader + flags_len, len + 1, 1, cf_shader);
-		cfclose(cf_shader);
+			strcpy(shader, shader_flags);
+			memset(shader + flags_len, 0, len + 1);
+			cfread(shader + flags_len, len + 1, 1, cf_shader);
+			cfclose(cf_shader);
 
-		return shader;
-	} else {
-		mprintf(("   Loading built-in default shader for: %s\n", filename));
-		char* def_shader = defaults_get_file(filename);
-		size_t len = strlen(def_shader);
-		char *shader = (char*) vm_malloc(len + flags_len + 1);
-
-		strcpy(shader, shader_flags);
-		strcat(shader, def_shader);
-		//memset(shader + flags_len, 0, len + 1);
-
-		return shader;
+			return shader;
+		} 
 	}
+
+	mprintf(("   Loading built-in default shader for: %s\n", filename));
+	char* def_shader = defaults_get_file(filename);
+	size_t len = strlen(def_shader);
+	char *shader = (char*) vm_malloc(len + flags_len + 1);
+
+	strcpy(shader, shader_flags);
+	strcat(shader, def_shader);
+	//memset(shader + flags_len, 0, len + 1);
+
+	return shader;
 
 }
 

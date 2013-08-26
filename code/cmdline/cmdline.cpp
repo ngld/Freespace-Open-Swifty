@@ -113,20 +113,19 @@ typedef struct
 // Please group them by type, ie graphics, gameplay etc, maximum 20 different types
 Flag exe_params[] = 
 {
-	{ "-spec",				"Enable specular",							true,	EASY_MEM_ALL_ON,	EASY_DEFAULT_MEM,	"Graphics",		"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-spec", },
-	{ "-glow",				"Enable glow maps",							true,	EASY_MEM_ALL_ON,	EASY_DEFAULT_MEM,	"Graphics",		"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-glow", },
-	{ "-env",				"Enable environment maps",					true,	EASY_MEM_ALL_ON,	EASY_DEFAULT_MEM,	"Graphics",		"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-env", },
+	{ "-nospec",			"Disable specular",							true,	0,					EASY_DEFAULT_MEM,	"Graphics",		"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-spec", },
+	{ "-noglow",			"Disable glow maps",						true,	0,					EASY_DEFAULT_MEM,	"Graphics",		"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-glow", },
+	{ "-noenv",				"Disable environment maps",					true,	0,					EASY_DEFAULT_MEM,	"Graphics",		"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-env", },
 	{ "-nomotiondebris",	"Disable motion debris",					true,	EASY_ALL_ON,		EASY_DEFAULT,		"Graphics",		"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-nomotiondebris",},
 	{ "-noscalevid",		"Disable scale-to-window for movies",		true,	0,					EASY_DEFAULT,		"Graphics",		"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-noscalevid", },
 	{ "-missile_lighting",	"Apply lighting to missiles"	,			true,	EASY_ALL_ON,		EASY_DEFAULT,		"Graphics",		"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-missile_lighting", },
-	{ "-normal",			"Enable normal maps",						true,	EASY_MEM_ALL_ON,	EASY_DEFAULT_MEM,	"Graphics",		"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-normal" },
+	{ "-nonormal",			"Disable normal maps",						true,	0,					EASY_DEFAULT_MEM,	"Graphics",		"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-normal" },
 	{ "-3dshockwave",		"Enable 3D shockwaves",						true,	EASY_MEM_ALL_ON,	EASY_DEFAULT_MEM,	"Graphics",		"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-3dshockwave" },
 	{ "-post_process",		"Enable post processing",					true,	0,					EASY_DEFAULT,		"Graphics",		"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-post_process" },
 	{ "-soft_particles",	"Enable soft particles",					true,	0,					EASY_DEFAULT,		"Graphics",		"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-soft_particles" },
 	{ "-fxaa",				"Enable FXAA anti-aliasing",				true,	0,					EASY_DEFAULT,		"Graphics",		"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-fxaa" },
-	{ "-flightshaftsoff",	"Force Lightshafts off",					true,	0,					EASY_DEFAULT,		"Graphics",		"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-flightshaftsoff"},
+	{ "-nolightshafts",		"Disable lightshafts",						true,	0,					EASY_DEFAULT,		"Graphics",		"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-flightshaftsoff"},
 
-	{ "-img2dds",			"Compress non-compressed images",			true,	0,					EASY_DEFAULT,		"Game Speed",	"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-img2dds", },
 	{ "-no_vsync",			"Disable vertical sync",					true,	0,					EASY_DEFAULT,		"Game Speed",	"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-no_vsync", },
 	{ "-cache_bitmaps",		"Cache bitmaps between missions",			true,	0,					EASY_DEFAULT_MEM,	"Game Speed",	"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-cache_bitmaps", },
 
@@ -172,6 +171,7 @@ Flag exe_params[] =
 	{ "-disable_di_mouse",	"Don't use DirectInput for mouse control",	true,	0,					EASY_DEFAULT,		"Troubleshoot",	"", },
  #endif
 	{ "-use_gldrawelements","Don't use glDrawRangeElements",			true,	0,					EASY_DEFAULT,		"Troubleshoot",	"", },
+	{ "-old_collision",		"Use old collision detection system",		true,	0,					EASY_DEFAULT,		"Troubleshoot",	"", },
 
 	{ "-ingame_join",		"Allow in-game joining",					true,	0,					EASY_DEFAULT,		"Experimental",	"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-ingame_join", },
 	{ "-voicer",			"Enable voice recognition",					true,	0,					EASY_DEFAULT,		"Experimental",	"http://www.hard-light.net/wiki/index.php/Command-Line_Reference#-voicer", },
@@ -256,16 +256,16 @@ cmdline_parm ogl_spec_arg("-ogl_spec", NULL);		// Cmdline_ogl_spec
 cmdline_parm spec_static_arg("-spec_static", NULL);
 cmdline_parm spec_point_arg("-spec_point", NULL);
 cmdline_parm spec_tube_arg("-spec_tube", NULL);
-cmdline_parm ambient_factor_arg("-ambient_factor", NULL);	// Cmdline_ambient_factor
-cmdline_parm env("-env", NULL);						// Cmdline_env
+cmdline_parm ambient_factor_arg("-ambient_factor", NULL);		// Cmdline_ambient_factor
+cmdline_parm env("-noenv", NULL);								// Cmdline_env
 cmdline_parm missile_lighting_arg("-missile_lighting", NULL);	// Cmdline_missile_lighting
-cmdline_parm glow_arg("-glow", NULL); 				// Cmdline_glow  -- use Bobs glow code
-cmdline_parm nomotiondebris_arg("-nomotiondebris", NULL); // Cmdline_nomotiondebris  -- Removes those ugly floating rocks -C
-cmdline_parm noscalevid_arg("-noscalevid", NULL);	// Cmdline_noscalevid  -- disable video scaling that fits to window
-cmdline_parm spec_arg("-spec", NULL);				// Cmdline_spec  -- use specular highlighting -Sticks
+cmdline_parm glow_arg("-noglow", NULL); 						// Cmdline_glow  -- use Bobs glow code
+cmdline_parm nomotiondebris_arg("-nomotiondebris", NULL);		// Cmdline_nomotiondebris  -- Removes those ugly floating rocks -C
+cmdline_parm noscalevid_arg("-noscalevid", NULL);				// Cmdline_noscalevid  -- disable video scaling that fits to window
+cmdline_parm spec_arg("-nospec", NULL);							// Cmdline_spec  -- 
 cmdline_parm noemissive_arg("-no_emissive_light", NULL);		// Cmdline_no_emissive  -- don't use emissive light in OGL
-cmdline_parm normal_arg("-normal", NULL);				// Cmdline_normal  -- enable normal mapping
-cmdline_parm height_arg("-height", NULL);			// Cmdline_height  -- enable support for parallax mapping
+cmdline_parm normal_arg("-nonormal", NULL);						// Cmdline_normal  -- disable normal mapping
+cmdline_parm height_arg("-noheight", NULL);						// Cmdline_height  -- enable support for parallax mapping
 cmdline_parm enable_3d_shockwave_arg("-3dshockwave", NULL);
 cmdline_parm softparticles_arg("-soft_particles", NULL);
 cmdline_parm postprocess_arg("-post_process", NULL);
@@ -273,22 +273,22 @@ cmdline_parm bloom_intensity_arg("-bloom_intensity", NULL);
 cmdline_parm fxaa_arg("-fxaa", NULL);
 cmdline_parm fxaa_preset_arg("-fxaa_preset", NULL);
 cmdline_parm fb_explosions_arg("-fb_explosions", NULL);
-cmdline_parm flightshaftsoff_arg("-flightshaftsoff", NULL);
+cmdline_parm flightshaftsoff_arg("-nolightshafts", NULL);
 
 float Cmdline_clip_dist = Default_min_draw_distance;
 float Cmdline_fov = 0.75f;
 float Cmdline_ogl_spec = 80.0f;
 int Cmdline_ambient_factor = 128;
-int Cmdline_env = 0;
+int Cmdline_env = 1;
 int Cmdline_mipmap = 0;
 int Cmdline_missile_lighting = 0;
-int Cmdline_glow = 0;
+int Cmdline_glow = 1;
 int Cmdline_nomotiondebris = 0;
 int Cmdline_noscalevid = 0;
-int Cmdline_spec = 0;
+int Cmdline_spec = 1;
 int Cmdline_no_emissive = 0;
-int Cmdline_normal = 0;
-int Cmdline_height = 0;
+int Cmdline_normal = 1;
+int Cmdline_height = 1;
 int Cmdline_enable_3d_shockwave = 0;
 int Cmdline_softparticles = 0;
 int Cmdline_postprocess = 0;
@@ -301,18 +301,16 @@ extern bool ls_force_off;
 
 // Game Speed related
 cmdline_parm cache_bitmaps_arg("-cache_bitmaps", NULL);	// Cmdline_cache_bitmaps
-cmdline_parm img2dds_arg("-img2dds", NULL);			// Cmdline_img2dds
 cmdline_parm no_fpscap("-no_fps_capping", NULL);	// Cmdline_NoFPSCap
 cmdline_parm no_vsync_arg("-no_vsync", NULL);		// Cmdline_no_vsync
 
 int Cmdline_cache_bitmaps = 0;	// caching of bitmaps between missions (faster loads, can hit swap on reload with <512 Meg RAM though) - taylor
-int Cmdline_img2dds = 0;
 int Cmdline_NoFPSCap = 0; // Disable FPS capping - kazan
 int Cmdline_no_vsync = 0;
 
 // HUD related
 cmdline_parm ballistic_gauge("-ballistic_gauge", NULL);	// Cmdline_ballistic_gauge
-cmdline_parm dualscanlines_arg("-dualscanlines", NULL); // Cmdline_dualscanlines  -- Change to phreaks options including new targetting code
+cmdline_parm dualscanlines_arg("-dualscanlines", NULL); // Cmdline_dualscanlines  -- Change to phreaks options including new targeting code
 cmdline_parm orb_radar("-orbradar", NULL);			// Cmdline_orb_radar
 cmdline_parm rearm_timer_arg("-rearm_timer", NULL);	// Cmdline_rearm_timer
 cmdline_parm targetinfo_arg("-targetinfo", NULL);	// Cmdline_targetinfo  -- Adds ship name/class to right of target box -C
@@ -399,10 +397,13 @@ char* Cmdline_keyboard_layout = NULL;
 
 // Developer/Testing related
 cmdline_parm start_mission_arg("-start_mission", NULL);	// Cmdline_start_mission
+cmdline_parm old_collision_system("-old_collision", NULL); // Cmdline_new_collision
 cmdline_parm dis_collisions("-dis_collisions", NULL);	// Cmdline_dis_collisions
 cmdline_parm dis_weapons("-dis_weapons", NULL);		// Cmdline_dis_weapons
 cmdline_parm noparseerrors_arg("-noparseerrors", NULL);	// Cmdline_noparseerrors  -- turns off parsing errors -C
+#ifdef Allow_NoWarn
 cmdline_parm nowarn_arg("-no_warn", NULL);			// Cmdline_nowarn
+#endif
 cmdline_parm extra_warn_arg("-extra_warn", NULL);	// Cmdline_extra_warn
 cmdline_parm fps_arg("-fps", NULL);					// Cmdline_show_fps
 cmdline_parm show_mem_usage_arg("-show_mem_usage", NULL);	// Cmdline_show_mem_usage
@@ -421,10 +422,13 @@ cmdline_parm no_grab("-nograb", NULL);				// Cmdline_no_grab
 cmdline_parm reparse_mainhall_arg("-reparse_mainhall", NULL); //Cmdline_reparse_mainhall
 
 char *Cmdline_start_mission = NULL;
+int Cmdline_old_collision_sys = 0;
 int Cmdline_dis_collisions = 0;
 int Cmdline_dis_weapons = 0;
 int Cmdline_noparseerrors = 0;
+#ifdef Allow_NoWarn
 int Cmdline_nowarn = 0; // turn warnings off in FRED
+#endif
 int Cmdline_extra_warn = 0;
 int Cmdline_show_mem_usage = 0;
 int Cmdline_show_pos = 0;
@@ -445,7 +449,20 @@ cmdline_parm get_flags_arg("-get_flags", NULL);
 cmdline_parm output_sexp_arg("-output_sexps", NULL); //WMC - outputs all SEXPs to sexps.html
 cmdline_parm output_scripting_arg("-output_scripting", NULL);	//WMC
 
+// Deprecated flags - CommanderDJ
+cmdline_parm deprecated_spec_arg("-spec", NULL);
+cmdline_parm deprecated_glow_arg("-glow", NULL);
+cmdline_parm deprecated_normal_arg("-normal", NULL);
+cmdline_parm deprecated_env_arg("-env", NULL);
+cmdline_parm deprecated_tbp_arg("-tbp", NULL);
+cmdline_parm deprecated_jpgtga_arg("-jpgtga", NULL);
 
+int Cmdline_deprecated_spec = 0;
+int Cmdline_deprecated_glow = 0;
+int Cmdline_deprecated_normal = 0;
+int Cmdline_deprecated_env = 0;
+int Cmdline_deprecated_tbp = 0;
+int Cmdline_deprecated_jpgtga = 0;
 
 #ifndef NDEBUG
 // NOTE: this assumes that os_init() has already been called but isn't a fatal error if it hasn't
@@ -453,7 +470,6 @@ void cmdline_debug_print_cmdline()
 {
 	cmdline_parm *parmp;
 	int found = 0;
-
 	mprintf(("Passed cmdline options:"));
 
 	for (parmp = GET_FIRST(&Parm_list); parmp !=END_OF_LIST(&Parm_list); parmp = GET_NEXT(parmp) ) {
@@ -471,6 +487,37 @@ void cmdline_debug_print_cmdline()
 		mprintf(("\n  <none>"));
 
 	mprintf(("\n"));
+
+	//Print log messages about any deprecated flags we found - CommanderDJ
+	if(Cmdline_deprecated_spec == 1)
+	{
+		mprintf(("Deprecated flag '-spec' found. Please remove from your cmdline.\n"));
+	}
+
+	if(Cmdline_deprecated_glow == 1)
+	{
+		mprintf(("Deprecated flag '-glow' found. Please remove from your cmdline.\n"));
+	}
+
+	if(Cmdline_deprecated_normal == 1)
+	{
+		mprintf(("Deprecated flag '-normal' found. Please remove from your cmdline.\n"));
+	}
+
+	if(Cmdline_deprecated_env == 1)
+	{
+		mprintf(("Deprecated flag '-env' found. Please remove from your cmdline.\n"));
+	}
+
+	if(Cmdline_deprecated_tbp == 1)
+	{
+		mprintf(("Deprecated flag '-tbp' found. Please remove from your cmdline.\n"));
+	}
+
+	if(Cmdline_deprecated_jpgtga == 1)
+	{
+		mprintf(("Deprecated flag '-jpgtga' found. Please remove from your cmdline.\n"));
+	}
 }
 #endif
 
@@ -919,6 +966,53 @@ bool SetCmdlineParams()
 // Sets externed variables used for communication cmdline information
 {
 	//getcwd(FreeSpace_Directory, 256); // set the directory to our fs2 root
+
+	// DO THIS FIRST to avoid unrecognized flag warnings when just getting flag file
+	if ( get_flags_arg.found() ) {
+		FILE *fp = fopen("flags.lch","w");
+		
+		if (fp == NULL) {
+			MessageBox(NULL,"Error creating flag list for launcher", "Error", MB_OK);
+			return false; 
+		}
+		
+		int easy_flag_size	= sizeof(EasyFlag);
+		int flag_size		= sizeof(Flag);
+		
+		int num_easy_flags	= sizeof(easy_flags) / easy_flag_size;
+		int num_flags		= sizeof(exe_params) / flag_size;
+		
+		// Launcher will check its using structures of the same size
+		fwrite(&easy_flag_size, sizeof(int), 1, fp);
+		fwrite(&flag_size, sizeof(int), 1, fp);
+		
+		fwrite(&num_easy_flags, sizeof(int), 1, fp);
+		fwrite(&easy_flags, sizeof(easy_flags), 1, fp);
+		
+		fwrite(&num_flags, sizeof(int), 1, fp);
+		fwrite(&exe_params, sizeof(exe_params), 1, fp);
+		
+		{
+			// cheap and bastardly cap check for builds
+			// (needs to be compatible with older Launchers, which means having
+			//  this implies an OpenAL build for old Launchers)
+			ubyte build_caps = 0;
+			
+			/* portej05 defined this always */
+			build_caps |= BUILD_CAP_OPENAL;
+			build_caps |= BUILD_CAP_NO_D3D;
+			build_caps |= BUILD_CAP_NEW_SND;
+			
+			
+			fwrite(&build_caps, 1, 1, fp);
+		}
+		
+		fflush(fp);
+		fclose(fp);
+		
+		return false; 
+	}
+
 	if (no_fpscap.found())
 	{
 		Cmdline_NoFPSCap = 1;
@@ -934,10 +1028,12 @@ bool SetCmdlineParams()
 		Cmdline_voice_recognition = 1;
 	}
 
+#ifdef Allow_NoWarn
 	if (nowarn_arg.found())
 	{
 		Cmdline_nowarn = 1;
 	}
+#endif
 
 	if (extra_warn_arg.found())
 	{
@@ -1227,7 +1323,7 @@ bool SetCmdlineParams()
 
 	if ( spec_arg.found() )
 	{
-		Cmdline_spec = 1;
+		Cmdline_spec = 0;
 	}
 
 	if ( htl_arg.found() ) 
@@ -1253,12 +1349,11 @@ bool SetCmdlineParams()
 #endif
 
 	if ( normal_arg.found() ) {
-		Cmdline_normal = 1;
+		Cmdline_normal = 0;
+	}
 
-		// height maps are only used if normal maps are
-		if ( height_arg.found() ) {
-			Cmdline_height = 1;
-		}
+	if ( height_arg.found() ) {
+		Cmdline_height = 0;
 	}
 
 	if ( noglsl_arg.found() ) {
@@ -1283,11 +1378,8 @@ bool SetCmdlineParams()
 		Cmdline_no_di_mouse = 1;
 	}
 
-	if ( img2dds_arg.found() )
-		Cmdline_img2dds = 1;
-
 	if ( glow_arg.found() )
-		Cmdline_glow = 1;
+		Cmdline_glow = 0;
 
 	if ( query_speech_arg.found() )
 		Cmdline_query_speech = 1;
@@ -1310,51 +1402,6 @@ bool SetCmdlineParams()
 
 	if ( ambient_factor_arg.found() )
 		Cmdline_ambient_factor = ambient_factor_arg.get_int();
-
-	if ( get_flags_arg.found() ) {
-		FILE *fp = fopen("flags.lch","w");
-
-		if (fp == NULL) {
-			MessageBox(NULL,"Error creating flag list for launcher", "Error", MB_OK);
-			return false; 
-		}
-
-		int easy_flag_size	= sizeof(EasyFlag);
-		int flag_size		= sizeof(Flag);
-
-		int num_easy_flags	= sizeof(easy_flags) / easy_flag_size;
-		int num_flags		= sizeof(exe_params) / flag_size;
-
-		// Launcher will check its using structures of the same size
-		fwrite(&easy_flag_size, sizeof(int), 1, fp);
-		fwrite(&flag_size, sizeof(int), 1, fp);
-
-		fwrite(&num_easy_flags, sizeof(int), 1, fp);
-		fwrite(&easy_flags, sizeof(easy_flags), 1, fp);
-
-		fwrite(&num_flags, sizeof(int), 1, fp);
-		fwrite(&exe_params, sizeof(exe_params), 1, fp);
-
-		{
-			// cheap and bastardly cap check for builds
-			// (needs to be compatible with older Launchers, which means having
-			//  this implies an OpenAL build for old Launchers)
-			ubyte build_caps = 0;
-
-			/* portej05 defined this always */
-			build_caps |= BUILD_CAP_OPENAL;
-			build_caps |= BUILD_CAP_NO_D3D;
-			build_caps |= BUILD_CAP_NEW_SND;
-
-
-			fwrite(&build_caps, 1, 1, fp);
-		}
-
-		fflush(fp);
-		fclose(fp);
-
-		return false; 
-	}
 
 	if ( output_scripting_arg.found() )
 		Output_scripting_meta = true;
@@ -1384,7 +1431,7 @@ bool SetCmdlineParams()
 	}
 
 	if ( env.found() ) {
-		Cmdline_env = 1;
+		Cmdline_env = 0;
 	}
 
 	if ( ballistic_gauge.found() ) {
@@ -1394,6 +1441,9 @@ bool SetCmdlineParams()
 	if ( cache_bitmaps_arg.found() ) {
 		Cmdline_cache_bitmaps = 1;
 	}
+
+	if(old_collision_system.found())
+		Cmdline_old_collision_sys = 1;
 
 	if(dis_collisions.found())
 		Cmdline_dis_collisions = 1;
@@ -1416,11 +1466,7 @@ bool SetCmdlineParams()
 	if ( ogl_spec_arg.found() ) {
 		Cmdline_ogl_spec = ogl_spec_arg.get_float();
 
-		if ( Cmdline_ogl_spec < 0.0f )
-			Cmdline_ogl_spec = 0.0f;
-
-		if ( Cmdline_ogl_spec > 128.0f )
-			Cmdline_ogl_spec = 128.0f;
+		CLAMP(Cmdline_ogl_spec, 0.0f, 128.0f);
 	}
 
 	if ( rearm_timer_arg.found() )
@@ -1479,6 +1525,37 @@ bool SetCmdlineParams()
 	if( reparse_mainhall_arg.found() )
 	{
 		Cmdline_reparse_mainhall = 1;
+	}
+
+	//Deprecated flags - CommanderDJ
+	if( deprecated_spec_arg.found() )
+	{
+		Cmdline_deprecated_spec = 1;
+	}
+
+	if( deprecated_glow_arg.found() )
+	{
+		Cmdline_deprecated_glow = 1;
+	}
+
+	if( deprecated_normal_arg.found() )
+	{
+		Cmdline_deprecated_normal = 1;
+	}
+
+	if( deprecated_env_arg.found() )
+	{
+		Cmdline_deprecated_env = 1;
+	}
+
+	if( deprecated_tbp_arg.found() )
+	{
+		Cmdline_deprecated_tbp = 1;
+	}
+
+	if( deprecated_jpgtga_arg.found() )
+	{
+		Cmdline_deprecated_jpgtga = 1;
 	}
 
 	return true; 

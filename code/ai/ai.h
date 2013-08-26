@@ -26,6 +26,15 @@ struct ship_info;
 
 #define	AI_DEFAULT_CLASS 3  // default AI class for new ships (Fred)
 
+typedef struct ai_flag_name {
+	int flag;
+	char flag_name[TOKEN_LENGTH];
+	int flag_list;
+} ai_flag_name;
+
+#define MAX_AI_FLAG_NAMES			1
+extern ai_flag_name Ai_flag_names[];
+
 #define	AIF_FORMATION_WING					(1 << 0)	//	Fly in formation as part of wing.
 #define	AIF_AWAITING_REPAIR					(1 << 1)	//	Awaiting a repair ship.
 #define	AIF_BEING_REPAIRED					(1 << 2)	//	Currently docked with repair ship.
@@ -604,7 +613,7 @@ void ai_process( object * obj, int ai_index, float frametime );
 int get_wingnum(int objnum);
 
 void set_wingnum(int objnum, int wingnum);
-char *ai_get_goal_target_name(char *name, int *index);
+char *ai_get_goal_target_name(const char *name, int *index);
 
 extern void init_ai_system(void);
 extern void ai_attack_object(object *attacker, object *attacked, ship_subsys *ssp);

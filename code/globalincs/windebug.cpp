@@ -32,6 +32,7 @@
 #include "globalincs/systemvars.h"
 #include "cmdline/cmdline.h"
 #include "parse/lua.h"
+#include "parse/parselo.h"
 
 #if defined( SHOW_CALL_STACK ) && defined( PDB_DEBUGGING )
 #	include "globalincs/mspdb_callstack.h"
@@ -43,6 +44,8 @@ bool Messagebox_active = false;
 
 int Global_warning_count = 0;
 int Global_error_count = 0;
+
+const int Messagebox_lines = 30;
 
 #ifndef _ASSERT
   #ifndef _DEBUG
@@ -76,6 +79,11 @@ public :
 	void Printf( const char* format, ... ) ;
 	void SetWindowText( HWND hWnd ) const ;
 	char buffer[ BUFFER_SIZE ] ;
+
+	void Append(const char* text);
+	void Truncate(size_t size);
+	void TruncateLines(int num_allowed_lines);
+	size_t Size() const;
 private :
 	char* current ;
 } ;
@@ -91,6 +99,53 @@ DumpBuffer :: DumpBuffer()
 void DumpBuffer :: Clear()
 {
 	current = buffer ;
+}
+
+
+void DumpBuffer :: Append(const char* text)
+{
+	strcat_s(buffer, text);
+}
+
+
+void DumpBuffer :: Truncate(size_t size)
+{
+	if (size >= strlen(buffer))
+		return;
+
+	buffer[size] = 0;
+}
+
+
+// adapted from parselo
+void DumpBuffer :: TruncateLines(int num_allowed_lines)
+{
+	Assert(num_allowed_lines > 0);
+	char *find_from = buffer;
+	char *lastch = find_from + strlen(buffer) - 6;
+
+	while (find_from < lastch)
+	{
+		if (num_allowed_lines <= 0)
+		{
+			*find_from = 0;
+			strcat_s(buffer, "[...]");
+			break;
+		}
+
+		char *p = strchr(find_from, '\n');
+		if (p == NULL)
+			break;
+
+		num_allowed_lines--;
+		find_from = p + 1;
+	}
+}
+
+
+size_t DumpBuffer :: Size() const
+{
+	return strlen(buffer);
 }
 
 
@@ -854,8 +909,11 @@ void _cdecl WinAssert(char * text, char * filename, int linenum )
 	// this stuff migt be really useful for solving bug reports and user errors. We should output it! 
 	mprintf(("ASSERTION: \"%s\" at %s:%d\n", text, strrchr(filename, '\\')+1, linenum ));
 
-	if (Cmdline_nowarn)
+#ifdef Allow_NoWarn
+	if (Cmdline_nowarn) {
 		return;
+	}
+#endif
 
 	Messagebox_active = true;
 
@@ -877,6 +935,9 @@ void _cdecl WinAssert(char * text, char * filename, int linenum )
 	/* Copy to the clipboard */
 	dump_text_to_clipboard( assertString.c_str( ) );
 
+	// truncate text
+	truncate_message_lines(assertString, Messagebox_lines);
+
 	assertString += "\n[ This info is in the clipboard so you can paste it somewhere now ]\n";
 	assertString += "\n\nUse Ok to break into Debugger, Cancel to exit.\n";
 	val = MessageBox( NULL, assertString.c_str( ), "Assertion Failed!", MB_OKCANCEL | flags );
@@ -887,6 +948,9 @@ void _cdecl WinAssert(char * text, char * filename, int linenum )
 	dumpBuffer.Printf( "\r\n" );
 	DumpCallsStack( dumpBuffer ) ;  
 	dump_text_to_clipboard(dumpBuffer.buffer);
+
+	// truncate text
+	dumpBuffer.TruncateLines(Messagebox_lines);
 
 	dumpBuffer.Printf( "\r\n[ This info is in the clipboard so you can paste it somewhere now ]\r\n" );
 	dumpBuffer.Printf( "\r\n\r\nUse Ok to break into Debugger, Cancel to exit.\r\n");
@@ -919,8 +983,11 @@ void _cdecl WinAssert(char * text, char * filename, int linenum, const char * fo
 	// this stuff migt be really useful for solving bug reports and user errors. We should output it! 
 	mprintf(("ASSERTION: \"%s\" at %s:%d\n %s\n", text, strrchr(filename, '\\')+1, linenum, AssertText2 ));
 
-	if (Cmdline_nowarn)
+#ifdef Allow_NoWarn
+	if (Cmdline_nowarn) {
 		return;
+	}
+#endif
 
 	Messagebox_active = true;
 
@@ -942,6 +1009,9 @@ void _cdecl WinAssert(char * text, char * filename, int linenum, const char * fo
 	/* Copy to the clipboard */
 	dump_text_to_clipboard( assertString.c_str( ) );
 
+	// truncate text
+	truncate_message_lines(assertString, Messagebox_lines);
+
 	assertString += "\n[ This info is in the clipboard so you can paste it somewhere now ]\n";
 	assertString += "\n\nUse Ok to break into Debugger, Cancel to exit.\n";
 	val = MessageBox( NULL, assertString.c_str( ), "Assertion Failed!", MB_OKCANCEL | flags );
@@ -952,6 +1022,9 @@ void _cdecl WinAssert(char * text, char * filename, int linenum, const char * fo
 	dumpBuffer.Printf( "\r\n" );
 	DumpCallsStack( dumpBuffer ) ;  
 	dump_text_to_clipboard(dumpBuffer.buffer);
+
+	// truncate text
+	dumpBuffer.TruncateLines(Messagebox_lines);
 
 	dumpBuffer.Printf( "\r\n[ This info is in the clipboard so you can paste it somewhere now ]\r\n" );
 	dumpBuffer.Printf( "\r\n\r\nUse Ok to break into Debugger, Cancel to exit.\r\n");
@@ -1056,12 +1129,35 @@ void LuaError(struct lua_State *L, char *format, ...)
 
 	AssertText2[0] = '\0';
 	dumpBuffer.Printf(Separator);
-	dumpBuffer.Printf("LUA Stack:\r\n");
-	int i;
-	for (i = 0; i < 4; i++) {
-		if (debug_stack[i][0] != '\0')
-			dumpBuffer.Printf("\t%s\r\n", debug_stack[i]);
+	
+	// Get the stack via the debug.traceback() function
+	lua_getglobal(L, LUA_DBLIBNAME);
+
+	if (!lua_isnil(L, -1))
+	{
+		dumpBuffer.Printf( "\r\n" );
+		lua_getfield(L, -1, "traceback");
+		lua_remove(L, -2);
+
+		if (lua_pcall(L, 0, 1, 0) != 0)
+			dumpBuffer.Printf("Error while retrieving stack: %s", lua_tostring(L, -1));
+		else
+			dumpBuffer.Printf(lua_tostring(L, -1));
+
+		lua_pop(L, 1);
 	}
+	else
+	{
+		// If the debug library is nil then fall back to the default debug stack
+		dumpBuffer.Printf("LUA Stack:\r\n");
+		int i;
+		for (i = 0; i < 4; i++) {
+			if (debug_stack[i][0] != '\0')
+				dumpBuffer.Printf("\t%s\r\n", debug_stack[i]);
+		}
+	}
+	dumpBuffer.Printf( "\r\n" );
+
 	dumpBuffer.Printf(Separator);
 	ade_stackdump(L, AssertText2);
 	dumpBuffer.Printf( AssertText2 );
@@ -1069,6 +1165,9 @@ void LuaError(struct lua_State *L, char *format, ...)
 	dumpBuffer.Printf(Separator);
 
 	dump_text_to_clipboard(dumpBuffer.buffer);
+
+	// truncate text
+	dumpBuffer.TruncateLines(Messagebox_lines);
 
 	dumpBuffer.Printf( "\r\n[ This info is in the clipboard so you can paste it somewhere now ]\r\n" );
 	dumpBuffer.Printf( "\r\n\r\nUse Yes to break into Debugger, No to continue.\r\nand Cancel to Quit");
@@ -1118,6 +1217,9 @@ void _cdecl Error( const char * filename, int line, const char * format, ... )
 	/* Copy to the clipboard */
 	dump_text_to_clipboard( assertString.c_str( ) );
 
+	// truncate text
+	truncate_message_lines(assertString, Messagebox_lines);
+
 	assertString += "\n[ This info is in the clipboard so you can paste it somewhere now ]\n";
 	assertString += "\n\nUse Ok to break into Debugger, Cancel to exit.\n";
 	val = MessageBox( NULL, assertString.c_str( ), "Error!", flags | MB_DEFBUTTON2 | MB_OKCANCEL );
@@ -1128,6 +1230,9 @@ void _cdecl Error( const char * filename, int line, const char * format, ... )
 	dumpBuffer.Printf( "\r\n" );
 	DumpCallsStack( dumpBuffer ) ;  
 	dump_text_to_clipboard(dumpBuffer.buffer);
+
+	// truncate text
+	dumpBuffer.TruncateLines(Messagebox_lines);
 
 	dumpBuffer.Printf( "\r\n[ This info is in the clipboard so you can paste it somewhere now ]\r\n" );
 	dumpBuffer.Printf( "\r\n\r\nUse Ok to break into Debugger, Cancel exits.\r\n");
@@ -1209,10 +1314,11 @@ void _cdecl Warning( char *filename, int line, const char *format, ... )
 	mprintf(("WARNING: \"%s\" at %s:%d\n", AssertText2, strrchr(filename, '\\')+1, line));
 
 	// now go for the additional popup window, if we want it ...
-
+#ifdef Allow_NoWarn
 	if (Cmdline_nowarn) {
 		return;
 	}
+#endif
 
 	filename = strrchr(filename, '\\')+1;
 	sprintf(AssertText2, "Warning: %s\r\nFile: %s\r\nLine: %d\r\n", AssertText1, filename, line );
@@ -1234,6 +1340,9 @@ void _cdecl Warning( char *filename, int line, const char *format, ... )
 	/* Copy to the clipboard */
 	dump_text_to_clipboard( assertString.c_str( ) );
 
+	// truncate text
+	truncate_message_lines(assertString, Messagebox_lines);
+
 	assertString += "\n[ This info is in the clipboard so you can paste it somewhere now ]\n";
 	assertString += "\n\nUse Yes to break into Debugger, No to continue.\nand Cancel to Quit\n";
 	result = MessageBox( NULL, assertString.c_str( ), "Warning!", MB_YESNOCANCEL | MB_DEFBUTTON2 | MB_ICONWARNING | flags );
@@ -1247,6 +1356,9 @@ void _cdecl Warning( char *filename, int line, const char *format, ... )
 	dumpBuffer.Printf( "\r\n" );
 	DumpCallsStack( dumpBuffer ) ;  
 	dump_text_to_clipboard(dumpBuffer.buffer);
+
+	// truncate text
+	dumpBuffer.TruncateLines(Messagebox_lines);
 
 	dumpBuffer.Printf( "\r\n[ This info is in the clipboard so you can paste it somewhere now ]\r\n" );
 	dumpBuffer.Printf("\r\n\r\nUse Yes to break into Debugger, No to continue.\r\nand Cancel to Quit");

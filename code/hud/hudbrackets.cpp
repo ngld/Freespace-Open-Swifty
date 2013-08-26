@@ -14,7 +14,6 @@
 #include "playerman/player.h"
 #include "hud/hudtarget.h"
 #include "render/3d.h"
-#include "globalincs/linklist.h"
 #include "weapon/emp.h"
 #include "ship/ship.h"
 #include "object/object.h"
@@ -514,7 +513,7 @@ void draw_bounding_brackets(int x1, int y1, int x2, int y2, int w_correction, in
 		char* tinfo_class = NULL;
 		char temp_name[NAME_LENGTH*2+3];
 		char temp_class[NAME_LENGTH];
-		SCP_list<jump_node>::iterator jnp;
+		SCP_list<CJumpNode>::iterator jnp;
 
 		switch(t_objp->type)
 		{
@@ -562,11 +561,11 @@ void draw_bounding_brackets(int x1, int y1, int x2, int y2, int w_correction, in
 				break;
 			case OBJ_JUMP_NODE:
 				for (jnp = Jump_nodes.begin(); jnp != Jump_nodes.end(); ++jnp) {
-					if(jnp->get_obj() == t_objp)
+					if(jnp->GetSCPObject() == t_objp)
 						break;
 				}
 				
-				strcpy_s(temp_name, jnp->get_name_ptr());
+				strcpy_s(temp_name, jnp->GetName());
 				end_string_at_first_hash_symbol(temp_name);
 				tinfo_name = temp_name;
 				break;
@@ -587,6 +586,102 @@ void draw_bounding_brackets(int x1, int y1, int x2, int y2, int w_correction, in
 		}
  */
 	}
+}
+
+int draw_subsys_brackets(ship_subsys* subsys, int min_width, int min_height, bool draw, bool set_color, int* draw_coords)
+{
+	Assertion(subsys != NULL, "Invalid subsystem pointer passed to draw_subsys_brackets!");
+
+	int		target_objnum;
+	object* targetp;
+	vertex subobj_vertex;
+	vec3d	subobj_pos;
+	int x1,x2,y1,y2;
+
+	target_objnum = subsys->parent_objnum;
+	Assert(target_objnum != -1);
+	targetp = &Objects[target_objnum];
+	Assert( targetp->type == OBJ_SHIP );
+
+	get_subsystem_world_pos(targetp, subsys, &subobj_pos);
+
+	g3_rotate_vertex(&subobj_vertex,&subobj_pos);
+
+	g3_project_vertex(&subobj_vertex);
+	if (subobj_vertex.flags & PF_OVERFLOW)  // if overflow, no point in drawing brackets
+		return -1;
+
+	int subobj_x = fl2i(subobj_vertex.screen.xyw.x + 0.5f);
+	int subobj_y = fl2i(subobj_vertex.screen.xyw.y + 0.5f);
+	int hud_subtarget_w, hud_subtarget_h, bound_rc;
+
+	bound_rc = subobj_find_2d_bound(subsys->system_info->radius, &targetp->orient, &subobj_pos, &x1,&y1,&x2,&y2);
+	if ( bound_rc != 0 )
+		return -1;
+
+	hud_subtarget_w = x2-x1+1;
+	if ( hud_subtarget_w > gr_screen.clip_width ) {
+		hud_subtarget_w = gr_screen.clip_width;
+	}
+
+	hud_subtarget_h = y2-y1+1;
+	if ( hud_subtarget_h > gr_screen.clip_height ) {
+		hud_subtarget_h = gr_screen.clip_height;
+	}
+
+	if ( hud_subtarget_w > gr_screen.max_w ) {
+		x1 = subobj_x - (gr_screen.max_w>>1);
+		x2 = subobj_x + (gr_screen.max_w>>1);
+	}
+	if ( hud_subtarget_h > gr_screen.max_h ) {
+		y1 = subobj_y - (gr_screen.max_h>>1);
+		y2 = subobj_y + (gr_screen.max_h>>1);
+	}
+
+	// *** these unsize take care of everything below ***
+	gr_unsize_screen_pos( &hud_subtarget_w, &hud_subtarget_h );
+	gr_unsize_screen_pos( &subobj_x, &subobj_y );
+	gr_unsize_screen_pos( &x1, &y1 );
+	gr_unsize_screen_pos( &x2, &y2 );
+
+	if ( hud_subtarget_w < min_width ) {
+		x1 = subobj_x - (min_width>>1);
+		x2 = subobj_x + (min_width>>1);
+	}
+	if ( hud_subtarget_h < min_height ) {
+		y1 = subobj_y - (min_height>>1);
+		y2 = subobj_y + (min_height>>1);
+	}
+
+	// determine if subsystem is on far or near side of the ship
+	int in_sight = ship_subsystem_in_sight(targetp, subsys, &View_position, &subobj_pos, 0);
+	
+	if (draw)
+	{
+
+		if (set_color)
+		{
+			// AL 29-3-98: If subsystem is destroyed, draw gray brackets
+			// Goober5000: this will now execute for fighterbays if the bay has been given a
+			// percentage subsystem strength in ships.tbl
+			// Goober5000: this will now execute for any subsys that takes damage and will not
+			// execute for any subsys that doesn't take damage
+			if ( (subsys->current_hits <= 0) && ( ship_subsys_takes_damage(subsys) ) ) {
+				gr_set_color_fast(iff_get_color(IFF_COLOR_MESSAGE, 1));
+			} else {
+				hud_set_iff_color( targetp, 1 );
+			}
+		}
+
+		if ( in_sight ) {
+			draw_brackets_square_quick(x1, y1, x2, y2);
+		} else {
+			draw_brackets_diamond_quick(x1, y1, x2, y2);
+		}
+	}
+	// mprintf(("Drawing subobject brackets at %4i, %4i\n", sx, sy));
+	
+	return in_sight;
 }
 
 HudGaugeBrackets::HudGaugeBrackets():
@@ -646,9 +741,9 @@ void HudGaugeBrackets::render(float frametime)
 void HudGaugeBrackets::renderObjectBrackets(object *targetp, color *clr, int w_correction, int h_correction, int flags)
 {
 	int x1,x2,y1,y2;
-	int draw_box = true;
+	bool draw_box = true;
 	int bound_rc;
-	SCP_list<jump_node>::iterator jnp;
+	SCP_list<CJumpNode>::iterator jnp;
 
 	if ( Player->target_is_dying <= 0 ) {
 		int modelnum;
@@ -695,11 +790,11 @@ void HudGaugeBrackets::renderObjectBrackets(object *targetp, color *clr, int w_c
 
 		case OBJ_JUMP_NODE:
 			for (jnp = Jump_nodes.begin(); jnp != Jump_nodes.end(); ++jnp) {
-				if(jnp->get_obj() == targetp)
+				if(jnp->GetSCPObject() == targetp)
 					break;
 			}	
 				
-			modelnum = jnp->get_modelnum();
+			modelnum = jnp->GetModelNumber();
 			bound_rc = model_find_2d_bound_min( modelnum, &targetp->orient, &targetp->pos,&x1,&y1,&x2,&y2 );
 			break;
 
@@ -872,7 +967,7 @@ void HudGaugeBrackets::renderBoundingBrackets(int x1, int y1, int x2, int y2, in
 		char* tinfo_class = NULL;
 		char temp_name[NAME_LENGTH*2+3];
 		char temp_class[NAME_LENGTH];
-		SCP_list<jump_node>::iterator jnp;
+		SCP_list<CJumpNode>::iterator jnp;
 
 		switch(t_objp->type) {
 			case OBJ_SHIP:
@@ -914,11 +1009,11 @@ void HudGaugeBrackets::renderBoundingBrackets(int x1, int y1, int x2, int y2, in
 				break;
 			case OBJ_JUMP_NODE:
 				for (jnp = Jump_nodes.begin(); jnp != Jump_nodes.end(); ++jnp) {
-					if(jnp->get_obj() == t_objp)
+					if(jnp->GetSCPObject() == t_objp)
 						break;
 				}
 				
-				strcpy_s(temp_name, jnp->get_name_ptr());
+				strcpy_s(temp_name, jnp->GetName());
 				end_string_at_first_hash_symbol(temp_name);
 				tinfo_name = temp_name;
 				break;

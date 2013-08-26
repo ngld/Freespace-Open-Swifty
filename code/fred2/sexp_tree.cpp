@@ -45,6 +45,7 @@
 #include "graphics/gropenglshader.h"
 #include "graphics/gropenglpostprocessing.h"
 #include "sound/ds.h"
+#include "globalincs/alphacolors.h"
 
 #define TREE_NODE_INCREMENT	100
 
@@ -2116,7 +2117,7 @@ void sexp_list_item::add_data(char *str, int t)
 // add a node to end of list, allocating memory for the text
 // Defaults: t = SEXPT_STRING
 //
-void sexp_list_item::add_data_dup(char *str, int t)
+void sexp_list_item::add_data_dup(const char *str, int t)
 {
 	sexp_list_item *item, *ptr;
 
@@ -2641,6 +2642,8 @@ int sexp_tree::query_default_argument_available(int op, int i)
 		case OPF_HUD_GAUGE:
 		case OPF_SHIP_EFFECT:
 		case OPF_ANIMATION_TYPE:
+		case OPF_SHIP_FLAG:
+		case OPF_NEBULA_PATTERN:
 			return 1;
 
 		case OPF_SHIP:
@@ -2757,6 +2760,15 @@ int sexp_tree::query_default_argument_available(int op, int i)
 				return 1;
 			else
 				return 0;
+
+		case OPF_MISSION_MOOD:
+			if (Builtin_moods.empty()) 
+				return 0;
+			else
+				return 1;
+
+		case OPF_TEAM_COLOR:
+			return 1;
 
 		default:
 			Int3();
@@ -3877,7 +3889,11 @@ void sexp_tree::update_help(HTREEITEM h)
 		return;
 	}
 
-	if (SEXPT_TYPE(tree_nodes[i].type) != SEXPT_OPERATOR)
+	if (SEXPT_TYPE(tree_nodes[i].type) == SEXPT_OPERATOR)
+	{
+		mini_help_box->SetWindowText("");
+	}
+	else
 	{
 		z = tree_nodes[i].parent;
 		if (z < 0) {
@@ -3924,6 +3940,14 @@ void sexp_tree::update_help(HTREEITEM h)
 				{
 					sprintf(searchstr, "%d:", sibling_place);
 					loc = strstr(helpstr, searchstr);
+				}
+				if(loc == NULL)
+				{
+					loc = strstr(helpstr, "Rest:");
+				}
+				if(loc == NULL)
+				{
+					loc = strstr(helpstr, "All:");
 				}
 
 				if(loc != NULL)
@@ -4383,6 +4407,22 @@ sexp_list_item *sexp_tree::get_listing_opf(int opf, int parent_node, int arg_ind
 
 		case OPF_SHIP_EFFECT:
 			list = get_listing_opf_ship_effect();
+			break;
+
+		case OPF_MISSION_MOOD:
+			list = get_listing_opf_mission_moods();
+			break;
+			
+		case OPF_SHIP_FLAG:
+			list = get_listing_opf_ship_flags();
+			break;
+
+		case OPF_TEAM_COLOR:
+			list = get_listing_opf_team_colors();
+			break;
+
+		case OPF_NEBULA_PATTERN:
+			list = get_listing_opf_nebula_patterns();
 			break;
 
 		default:
@@ -5213,7 +5253,7 @@ sexp_list_item *sexp_tree::get_listing_opf_persona()
 
 	for (i = 0; i < Num_personas; i++) {
 		if (Personas[i].flags & PERSONA_FLAG_WINGMAN) {
-			head.add_data (Personas[i].name);
+			head.add_data(Personas[i].name);
 		}
 	}
 
@@ -5270,9 +5310,7 @@ sexp_list_item *sexp_tree::get_listing_opf_sound_environment()
 
 	head.add_data(SEXP_NONE_STRING);
 	for (int i = 0; i  < (int)EFX_presets.size(); i++) {
-		// ugh
-		char *text = const_cast<char*>(EFX_presets[i].name.c_str());
-		head.add_data_dup(text);
+		head.add_data_dup(EFX_presets[i].name.c_str());
 	}
 
 	return head.next;
@@ -5478,7 +5516,7 @@ sexp_list_item *sexp_tree::get_listing_opf_keypress()
 	sexp_list_item head;
 
 	for (i=0; i<CCFG_MAX; i++) {
-		if (Control_config[i].key_default > 0) {
+		if (Control_config[i].key_default > 0 && !Control_config[i].disabled) {
 			head.add_data_dup(textify_scancode(Control_config[i].key_default));
 		}
 	}
@@ -5687,9 +5725,9 @@ sexp_list_item *sexp_tree::get_listing_opf_jump_nodes()
 {
 	sexp_list_item head;
 
-	SCP_list<jump_node>::iterator jnp;
+	SCP_list<CJumpNode>::iterator jnp;
 	for (jnp = Jump_nodes.begin(); jnp != Jump_nodes.end(); ++jnp) {	
-		head.add_data( jnp->get_name_ptr());
+		head.add_data( jnp->GetName());
 	}
 
 	return head.next;
@@ -5791,7 +5829,7 @@ sexp_list_item *sexp_tree::get_listing_opf_post_effect()
 	SCP_vector<SCP_string> ppe_names;
 	get_post_process_effect_names(ppe_names);
 	for (i=0; i < ppe_names.size(); i++) {
-		head.add_data_dup(const_cast<char*>(ppe_names[i].c_str()));
+		head.add_data_dup(ppe_names[i].c_str());
 	}
 	head.add_data_dup("lightshafts");
 
@@ -5858,6 +5896,64 @@ sexp_list_item *sexp_tree::get_listing_opf_weapon_banks()
 
 	return head.next;
 }
+
+sexp_list_item *sexp_tree::get_listing_opf_mission_moods()
+{
+	sexp_list_item head;
+	for (SCP_vector<SCP_string>::iterator iter = Builtin_moods.begin(); iter != Builtin_moods.end(); ++iter) {
+		head.add_data_dup(iter->c_str());
+	}
+
+	return head.next;
+}
+
+sexp_list_item *sexp_tree::get_listing_opf_ship_flags()
+{
+	int i;
+	sexp_list_item head;
+	// object flags
+	for ( i = 0; i < MAX_OBJECT_FLAG_NAMES; i++) {
+		head.add_data_dup(Object_flag_names[i].flag_name);
+	}
+	// ship flags
+	for ( i = 0; i < MAX_SHIP_FLAG_NAMES; i++) {
+		head.add_data_dup(Ship_flag_names[i].flag_name);
+	}
+	// ai flags
+	for ( i = 0; i < MAX_AI_FLAG_NAMES; i++) {
+		head.add_data_dup(Ai_flag_names[i].flag_name);
+	}
+
+	return head.next;
+}
+
+sexp_list_item *sexp_tree::get_listing_opf_team_colors()
+{
+	sexp_list_item head;
+	head.add_data("None");
+	for (SCP_map<SCP_string, team_color>::iterator tcolor = Team_Colors.begin(); tcolor != Team_Colors.end(); ++tcolor) {
+		head.add_data_dup(tcolor->first.c_str());
+	}
+
+	return head.next;
+}
+
+sexp_list_item *sexp_tree::get_listing_opf_nebula_patterns()
+{
+	sexp_list_item head;
+
+	head.add_data(SEXP_NONE_STRING);
+
+	for (int i = 0; i < MAX_NEB2_BITMAPS; i++) {
+		if (strlen(Neb2_bitmap_filenames[i]) > 0) {
+			head.add_data(Neb2_bitmap_filenames[i]);
+		}
+	}
+
+	return head.next;
+}
+
+
 
 // Deletes sexp_variable from sexp_tree.
 // resets tree to not include given variable, and resets text and type

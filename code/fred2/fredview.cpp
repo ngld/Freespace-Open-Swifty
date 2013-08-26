@@ -89,7 +89,7 @@ int Show_sexp_help = 1;
 int Show_ships = 1;
 int Show_starts = 1;
 int Show_ship_info = 1;
-int Show_ship_models = 0;
+int Show_ship_models = 1;
 int Show_compass = 1;
 int Show_dock_points = 0;
 int Show_paths_fred = 0;
@@ -1394,7 +1394,7 @@ void CFREDView::OnContextMenu(CWnd* /*pWnd*/, CPoint point)
 	CMenu menu;
 	int	objnum;
 	CPoint local = point;
-	SCP_list<jump_node>::iterator jnp;
+	SCP_list<CJumpNode>::iterator jnp;
 
 	if (button_down) {
 		cancel_drag();
@@ -1422,10 +1422,10 @@ void CFREDView::OnContextMenu(CWnd* /*pWnd*/, CPoint point)
 				else if (Objects[objnum].type == OBJ_JUMP_NODE) {
 					id = ID_EDITORS_WAYPOINT;
 					for (jnp = Jump_nodes.begin(); jnp != Jump_nodes.end(); ++jnp) {
-						if(jnp->get_obj() == &Objects[objnum])
+						if(jnp->GetSCPObject() == &Objects[objnum])
 							break;
 					}
-					str.Format("Edit %s", jnp->get_name_ptr());
+					str.Format("Edit %s", jnp->GetName());
 
 				} else if (Objects[objnum].type == OBJ_WAYPOINT) {
 					int idx;
@@ -2195,6 +2195,35 @@ void CFREDView::OnUpdateZoomSelected(CCmdUI* pCmdUI)
 
 void CFREDView::OnFormWing() 
 {
+	object *ptr = GET_FIRST(&obj_used_list);
+	bool found = false;
+	while (ptr != END_OF_LIST(&obj_used_list)) {
+		if (( (ptr->type == OBJ_SHIP) || (ptr->type == OBJ_START) ) && (ptr->flags & OF_MARKED)) {
+			if(Ships[ptr->instance].flags & SF_REINFORCEMENT) {
+				found = true;
+				break;
+			}
+		}
+
+		ptr = GET_NEXT(ptr);
+	}
+
+	if(found) {
+		int ok = MessageBox("Some of the ships you selected to create a wing are marked as reinforcements. Press Ok to clear the flag on all selected ships. Press Cancel to not create the wing.", "Reinforcement conflict", MB_ICONEXCLAMATION | MB_OKCANCEL);
+		if(ok == IDOK) {
+			ptr = GET_FIRST(&obj_used_list);
+			while (ptr != END_OF_LIST(&obj_used_list)) {
+				if (( (ptr->type == OBJ_SHIP) || (ptr->type == OBJ_START) ) && (ptr->flags & OF_MARKED)) {
+					set_reinforcement(Ships[ptr->instance].ship_name, 0);
+				}
+
+			ptr = GET_NEXT(ptr);
+			}
+		} else {
+			return;
+		}
+	}
+
 	if (!create_wing())
 		FREDDoc_ptr->autosave("form wing");
 }
@@ -3232,7 +3261,7 @@ int CFREDView::global_error_check_player_wings(int multi)
 	return 0;
 }
 
-int CFREDView::error(char *msg, ...)
+int CFREDView::error(const char *msg, ...)
 {
 	char buf[2048];
 	va_list args;
@@ -3248,7 +3277,7 @@ int CFREDView::error(char *msg, ...)
 	return 1;
 }
 
-int CFREDView::internal_error(char *msg, ...)
+int CFREDView::internal_error(const char *msg, ...)
 {
 	char buf[2048];
 	va_list args;
@@ -3275,9 +3304,9 @@ int CFREDView::internal_error(char *msg, ...)
 	return -1;
 }
 
-int CFREDView::fred_check_sexp(int sexp, int type, char *msg, ...)
+int CFREDView::fred_check_sexp(int sexp, int type, const char *msg, ...)
 {
-	char buf[512], buf2[2048], buf3[MAX_EVENT_SIZE];
+	SCP_string buf, sexp_buf, error_buf;
 	int err = 0, z, faulty_node;
 	va_list args;
 
@@ -3292,17 +3321,17 @@ int CFREDView::fred_check_sexp(int sexp, int type, char *msg, ...)
 	if (!z)
 		return 0;
 
-	convert_sexp_to_string(sexp, buf2, SEXP_ERROR_CHECK_MODE, MAX_EVENT_SIZE);
-	sprintf(buf3, "Error in %s: %s\n\nIn sexpression: %s\n(Error appears to be: %s)",
-		buf, sexp_error_message(z), buf2, Sexp_nodes[faulty_node].text);
+	convert_sexp_to_string(sexp_buf, sexp, SEXP_ERROR_CHECK_MODE);
+	truncate_message_lines(sexp_buf, 30);
+	sprintf(error_buf, "Error in %s: %s\n\nIn sexpression: %s\n\n(Error appears to be: %s)", buf.c_str(), sexp_error_message(z), sexp_buf.c_str(), Sexp_nodes[faulty_node].text);
 
 	if (z < 0 && z > -100)
 		err = 1;
 
 	if (err)
-		return internal_error(buf3);
+		return internal_error(error_buf.c_str());
 
-	if (error(buf3))
+	if (error(error_buf.c_str()))
 		return 1;
 
 	return 0;

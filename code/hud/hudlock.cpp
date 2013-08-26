@@ -629,7 +629,15 @@ void hud_do_lock_indicator(float frametime)
 		if ( Missile_track_loop > -1 )	{
 			snd_stop(Missile_track_loop);
 			Missile_track_loop = -1;
-			Missile_lock_loop = snd_play(&Snds[ship_get_sound(Player_obj, SND_MISSILE_LOCK)]);
+
+			if (wip->hud_locked_snd >= 0)
+			{
+				Missile_lock_loop = snd_play(&Snds[wip->hud_locked_snd]);
+			}
+			else
+			{
+				Missile_lock_loop = snd_play(&Snds[ship_get_sound(Player_obj, SND_MISSILE_LOCK)]);
+			}
 		}
 	}
 	else {
@@ -848,8 +856,15 @@ void hud_calculate_lock_position(float frametime)
 			accumulated_y_pixels -= int_portion;
 		}
 
-		if ( Missile_track_loop == -1 ) {	
-			Missile_track_loop = snd_play_looping( &Snds[ship_get_sound(Player_obj, SND_MISSILE_TRACKING)], 0.0f , -1, -1);
+		if ( Missile_track_loop == -1 ) {
+			if (wip->hud_tracking_snd >= 0)
+			{
+				Missile_track_loop = snd_play_looping( &Snds[wip->hud_tracking_snd], 0.0f , -1, -1);
+			}
+			else
+			{
+				Missile_track_loop = snd_play_looping( &Snds[ship_get_sound(Player_obj, SND_MISSILE_TRACKING)], 0.0f , -1, -1);
+			}
 		}
 
 		if (!Players[Player_num].lock_time_to_target) {
@@ -1061,7 +1076,7 @@ void hud_lock_get_new_lock_pos(object *target_objp)
 			}
 			ss = GET_NEXT( ss );
 		}
-	} else if ((target_shipp) && wip->wi_flags & WIF_HOMING_JAVELIN) {
+	} else if ( (target_shipp) && (wip->wi_flags & WIF_HOMING_JAVELIN)) {
 		Player->locking_subsys = ship_get_closest_subsys_in_sight(target_shipp, SUBSYSTEM_ENGINE, &Player_obj->pos);
 		if (Player->locking_subsys != NULL) {
 			get_subsystem_world_pos(target_objp, Player->locking_subsys, &lock_world_pos);
@@ -1105,7 +1120,7 @@ void hud_lock_determine_lock_point(vec3d *lock_world_pos_out)
 		Player->locking_on_center=0;
 		Player->locking_subsys=Player_ai->targeted_subsys;
 		Player->locking_subsys_parent=Player_ai->target_objnum;
-	} else if ( wip->wi_flags & WIF_HOMING_JAVELIN && target_objp->type == OBJ_SHIP) {
+	} else if ( (wip->wi_flags & WIF_HOMING_JAVELIN) && (target_objp->type == OBJ_SHIP)) {
 		if (!Player->locking_subsys ||
 			Player->locking_subsys->system_info->type != SUBSYSTEM_ENGINE) {
 				Player->locking_subsys = ship_get_closest_subsys_in_sight(&Ships[target_objp->instance], SUBSYSTEM_ENGINE, &Player_obj->pos);

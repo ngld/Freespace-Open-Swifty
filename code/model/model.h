@@ -31,8 +31,9 @@ extern int model_render_flags_size;
 #define MOVEMENT_TYPE_NONE				-1
 #define MOVEMENT_TYPE_POS				0
 #define MOVEMENT_TYPE_ROT				1
-#define MOVEMENT_TYPE_ROT_SPECIAL	2		// for turrets only
+#define MOVEMENT_TYPE_ROT_SPECIAL		2	// for turrets only
 #define MOVEMENT_TYPE_TRIGGERED			3	//triggered rotation
+#define MOVEMENT_TYPE_LOOK_AT			4	// the subobject is always looking at a 'look at' subobject, as best it can - Bobboau
 
 
 // DA 11/13/98 Reordered to account for difference between max and game
@@ -135,9 +136,15 @@ typedef struct polymodel_instance {
 
 #define MSS_FLAG2_PLAYER_TURRET_SOUND			 (1 << 0)
 #define MSS_FLAG2_TURRET_ONLY_TARGET_IF_CAN_FIRE (1 << 1)	// Turrets only target things they're allowed to shoot at (e.g. if check-hull fails, won't keep targeting)
-#define MSS_FLAG2_NO_DISAPPEAR					 (1 << 2) // Submodel won't disappear when subsystem destroyed
+#define MSS_FLAG2_NO_DISAPPEAR					 (1 << 2)	// Submodel won't disappear when subsystem destroyed
+#define MSS_FLAG2_COLLIDE_SUBMODEL				 (1 << 3)	// subsystem takes damage only from hits which impact the associated submodel
+#define MSS_FLAG2_DESTROYED_ROTATION			 (1 << 4)   // allows subobjects to continue to rotate even if they have been destroyed
 
 #define NUM_SUBSYSTEM_FLAGS			33
+
+// all subsys flags set in model file, used to copy only these flags for different table entries using the same model
+#define MSS_MODEL_FLAG_MASK				(MSS_FLAG_CREWPOINT | MSS_FLAG_ROTATES | MSS_FLAG_TRIGGERED | MSS_FLAG_ARTILLERY | MSS_FLAG_STEPPED_ROTATE)
+#define MSS_MODEL_FLAG2_MASK			0
 
 // definition of stepped rotation struct
 typedef struct stepped_rotation {
@@ -252,7 +259,46 @@ typedef struct IBX {
 	char name[MAX_FILENAME_LEN];	// filename of the ibx, this is used in case a safety check fails and we delete the file
 } IBX;
 
+typedef struct model_tmap_vert {
+	ushort vertnum;
+	ushort normnum;
+	float u,v;
+} model_tmap_vert;
 
+struct bsp_collision_node {
+	vec3d min;
+	vec3d max;
+
+	int back;
+	int front;
+
+	int leaf;
+};
+
+struct bsp_collision_leaf {
+	vec3d plane_pnt;
+	vec3d plane_norm;
+	float face_rad;
+	int vert_start;
+	ubyte num_verts;
+	ubyte tmap_num;
+
+	int next;
+};
+
+struct bsp_collision_tree {
+	bsp_collision_node *node_list;
+	int n_nodes;
+
+	bsp_collision_leaf *leaf_list;
+	int n_leaves;
+
+	model_tmap_vert *vert_list;
+	vec3d *point_list;
+
+	int n_verts;
+	bool used;
+};
 
 typedef struct bsp_info {
 	char		name[MAX_NAME_LEN];	// name of the subsystem.  Probably displayed on HUD
@@ -265,6 +311,8 @@ typedef struct bsp_info {
 
 	int		bsp_data_size;
 	ubyte		*bsp_data;
+
+	int collision_tree_index;
 
 	vec3d	geometric_center;		// geometric center of this subobject.  In the same Frame Of 
 	                              //  Reference as all other vertices in this submodel. (Relative to pivot point)
@@ -309,6 +357,7 @@ typedef struct bsp_info {
 	vec3d	render_box_min;
 	vec3d	render_box_max;
 	float	render_sphere_radius;
+	vec3d	render_sphere_offset;
 	int		use_render_box;			// 0==do nothing, 1==only render this object if you are inside the box, -1==only if you're outside
 	int		use_render_sphere;		// 0==do nothing, 1==only render this object if you are inside the sphere, -1==only if you're outside
 	bool	gun_rotation;			// for animated weapon models
@@ -318,7 +367,10 @@ typedef struct bsp_info {
 	bool	force_turret_normal;	//Wanderer: Sets the turret uvec to override any input of for turret normal.
 	char	lod_name[MAX_NAME_LEN];	//FUBAR:  Name to be used for LOD naming comparison to preserve compatibility with older tables.  Only used on LOD0 
 	bool	attach_thrusters;		//zookeeper: If set and this submodel or any of its parents rotates, also rotates associated thrusters.
-	float		dumb_turn_rate;
+	float	dumb_turn_rate;			//Bobboau
+	//int	look_at;				//Bobboau
+	int		look_at_num;			//VA - number of the submodel to be looked at by this submodel (-1 if none)
+	char	look_at[MAX_NAME_LEN];	//VA - name of submodel to be looked at by this submodel
 
 	/* If you've got a better way to do this, please implement it! */
 	void Reset( )
@@ -355,6 +407,7 @@ typedef struct bsp_info {
 		bsp_data = NULL;
 		rad = 0.f;
 		lod_name[ 0 ] = '\0';
+		collision_tree_index = -1;
 		attach_thrusters = false;
 
 		/* Compound types */
@@ -371,6 +424,7 @@ typedef struct bsp_info {
 		memset( arc_type, 0, sizeof( arc_type ) );
 		memset( &render_box_min, 0, sizeof( render_box_min ) );
 		memset( &render_box_max, 0, sizeof( render_box_max ) );
+		memset( &render_sphere_offset, 0, sizeof( render_sphere_offset ) );
 
 		buffer.clear( );
 	}
@@ -400,12 +454,6 @@ typedef struct model_path {
 									// For MP_TYPE_UNUSED, this means nothing.
 									// For MP_TYPE_SUBSYS, this is the subsystem number this path takes you to.
 } model_path;
-
-typedef struct model_tmap_vert {
-	ushort vertnum;
-	ushort normnum;
-	float u,v;
-} model_tmap_vert;
 
 // info for gun and missile banks.  Also used for docking points.  There should always
 // only be two slots for each docking bay
@@ -596,7 +644,8 @@ public:
 #define TM_SPECULAR_TYPE	2		// optional specular map
 #define TM_NORMAL_TYPE		3		// optional normal map
 #define TM_HEIGHT_TYPE		4		// optional height map (for parallax mapping)
-#define TM_NUM_TYPES		5		//WMC - Number of texture_info objects in texture_map
+#define TM_MISC_TYPE		5		// optional utility map
+#define TM_NUM_TYPES		6		//WMC - Number of texture_info objects in texture_map
 									//Used by scripting - if you change this, do a search
 									//to update switch() statement in lua.cpp
 // taylor
@@ -618,6 +667,9 @@ public:
 };
 
 #define MAX_REPLACEMENT_TEXTURES MAX_MODEL_TEXTURES * TM_NUM_TYPES
+
+// Goober5000 - since we need something < 0
+#define REPLACE_WITH_INVISIBLE	-47
 
 //used to describe a polygon model
 typedef struct polymodel {
@@ -906,7 +958,7 @@ extern int submodel_get_points(int model_num, int submodel_num, int max_num, vec
 
 // Gets two random points on the surface of a submodel
 extern void submodel_get_two_random_points(int model_num, int submodel_num, vec3d *v1, vec3d *v2, vec3d *n1 = NULL, vec3d *n2 = NULL);
-
+extern void submodel_get_two_random_points_better(int model_num, int submodel_num, vec3d *v1, vec3d *v2);
 // gets the index into the docking_bays array of the specified type of docking point
 // Returns the index.  second functions returns the index of the docking bay with
 // the specified name
@@ -968,7 +1020,8 @@ typedef struct mc_info {
 	int		edge_hit;			// Set if an edge got hit.  Only valid if MC_CHECK_THICK is set.	
 	ubyte		*f_poly;				// pointer to flat poly where we intersected
 	ubyte		*t_poly;				// pointer to tmap poly where we intersected
-		
+	bsp_collision_leaf *bsp_leaf;
+
 										// flags can be changed for the case of sphere check finds an edge hit
 	mc_info()
 	{
@@ -994,6 +1047,8 @@ typedef struct mc_info {
 		this->hit_dist = other.hit_dist;
 		this->hit_point = other.hit_point;
 		this->hit_point_world = other.hit_point_world;
+        this->hit_submodel = other.hit_submodel;
+        this->hit_bitmap = other.hit_bitmap;
 		this->hit_u = other.hit_u;
 		this->hit_v = other.hit_v;
 		this->shield_hit_tri = other.shield_hit_tri;
@@ -1071,6 +1126,11 @@ typedef struct mc_info {
 */
 
 int model_collide(mc_info * mc_info);
+void model_collide_parse_bsp(bsp_collision_tree *tree, void *model_ptr, int version);
+
+bsp_collision_tree *model_get_bsp_collision_tree(int tree_index);
+void model_remove_bsp_collision_tree(int tree_index);
+int model_create_bsp_collision_tree();
 
 void model_collide_preprocess(matrix *orient, int model_instance_num);
 
@@ -1161,6 +1221,7 @@ typedef struct transparent_object {
 	int spec_map;
 	int norm_map;
 	int height_map;
+	int misc_map;
 	vertex_buffer *buffer;
 	unsigned int tmap_flags;
 	int i;
@@ -1171,6 +1232,7 @@ typedef struct transparent_submodel {
 	bsp_info *model;
 	matrix orient;
 	bool is_submodel;
+	bool pop_matrix;
 	SCP_vector<transparent_object> transparent_objects;
 } transparent_submodel;
 // scale the engines thrusters by this much
@@ -1224,6 +1286,8 @@ void model_set_replacement_textures(int *replacement_textures);
 
 void model_setup_cloak(vec3d *shift, int full_cloak, int alpha);
 void model_finish_cloak(int full_cloak);
+
+void model_do_look_at(int model_num); //Bobboau
 
 void model_do_dumb_rotation(int modelnum); //Bobboau
 #endif // _MODEL_H

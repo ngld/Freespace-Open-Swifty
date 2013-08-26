@@ -771,17 +771,13 @@ void brief_set_default_closeup()
 	}
 }
 
-//  funciton to evaluate the sexpressions of the briefing stages eliminating those stages
-// which shouldn't get shown
+/**
+ * Evaluate the sexpressions of the briefing stages eliminating those stages
+ * which shouldn't get shown
+ */
 void brief_compact_stages()
 {
 	int num, before, result, i;
-
-	/*
-	if((Game_mode & GM_MULTIPLAYER) && (Netgame.campaign_mode == MP_CAMPAIGN) && !(Net_player->flags & NETINFO_FLAG_AM_MASTER)){
-		Game_mode |= GM_CAMPAIGN_MODE;
-	}
-	*/
 
 	before = Briefing->num_stages;
 
@@ -789,16 +785,12 @@ void brief_compact_stages()
 	while ( num < Briefing->num_stages ) {
 		result = eval_sexp( Briefing->stages[num].formula );
 		if ( !result ) {
-			if ( Briefing->stages[num].new_text != NULL ) {
-				vm_free( Briefing->stages[num].new_text );
-				Briefing->stages[num].new_text = NULL;
-			}
+			Briefing->stages[num].text = "";
 
 			if ( Briefing->stages[num].icons != NULL ) {
 				vm_free( Briefing->stages[num].icons );
 				Briefing->stages[num].icons = NULL;
 			}
-
 
 			if ( Briefing->stages[num].lines != NULL ) {
 				vm_free( Briefing->stages[num].lines );
@@ -818,15 +810,9 @@ void brief_compact_stages()
 	// completely clear out the old entries (if any) so we don't access them by mistake - taylor
 	if ( before > Briefing->num_stages ) {
 		for ( i = Briefing->num_stages; i < before; i++ ) {
-			memset( &Briefing->stages[i], 0, sizeof(brief_stage) );
+			Briefing->stages[i] = brief_stage();
 		}
 	}
-
-	/*
-	if((Game_mode & GM_MULTIPLAYER) && (Netgame.campaign_mode == MP_CAMPAIGN) && !(Net_player->flags & NETINFO_FLAG_AM_MASTER)){
-		Game_mode &= ~(GM_CAMPAIGN_MODE);
-	}
-	*/
 }
 
 
@@ -861,10 +847,7 @@ void brief_init()
 
 	// Goober5000 - replace any variables (probably persistent variables) with their values
 	for (i = 0; i < Briefing->num_stages; i++)
-	{
-		if (Briefing->stages[i].new_text)
-			sexp_replace_variable_names_with_values(Briefing->stages[i].new_text, MAX_BRIEF_LEN);
-	}
+		sexp_replace_variable_names_with_values(Briefing->stages[i].text);
 
 	Brief_last_auto_advance = 0;
 
@@ -1250,10 +1233,10 @@ int brief_setup_closeup(brief_icon *bi)
 		*/
 		break;
 	case ICON_ASTEROID_FIELD:
-		strcpy_s(pof_filename, Asteroid_info[ASTEROID_TYPE_LARGE].pof_files[0]);
+		strcpy_s(pof_filename, Asteroid_icon_closeup_model);
 		strcpy_s(Closeup_icon->closeup_label, XSTR( "asteroid", 431));
-		vm_vec_make(&Closeup_cam_pos, 0.0f, 0.0f, -334.0f);
-		Closeup_zoom = 0.5f;
+		Closeup_cam_pos = Asteroid_icon_closeup_position;
+		Closeup_zoom = Asteroid_icon_closeup_zoom;
 		break;
 	case ICON_JUMP_NODE:
 		strcpy_s(pof_filename, NOX("subspacenode.pof"));
@@ -1636,7 +1619,7 @@ void brief_do_frame(float frametime)
 	common_render(frametime);
 
 	if ( Current_brief_stage < (Num_brief_stages-1) ) {
-		if ( !help_overlay_active(BR_OVERLAY) && brief_time_to_advance(Current_brief_stage, frametime) ) {
+		if ( !help_overlay_active(BR_OVERLAY) && brief_time_to_advance(Current_brief_stage) ) {
 			brief_do_next_pressed(0);
 			common_flash_button_init();
 			Brief_last_auto_advance = timer_get_milliseconds();

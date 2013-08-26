@@ -62,9 +62,13 @@ extern bool Show_iff[];
 
 extern CCriticalSection CS_cur_object_index;
 
-void	string_copy(char *dest, CString &src, int max_len, int modify = 0);
-CString convert_multiline_string(char *src);
-void	deconvert_multiline_string(char *buf, CString &str, int max_len);
+void	string_copy(char *dest, const CString &src, int max_len, int modify = 0);
+void	string_copy(SCP_string &dest, const CString &src, int modify = 0);
+void	convert_multiline_string(CString &dest, const SCP_string &src);
+void	convert_multiline_string(CString &dest, const char *src);
+void	deconvert_multiline_string(char *dest, const CString &str, int max_len);
+void	deconvert_multiline_string(SCP_string &dest, const CString &str);
+
 bool	fred_init();
 void	set_physics_controls();
 int	dup_object(object *objp);
@@ -94,7 +98,7 @@ void	unmark_all();
 void	clear_menu(CMenu *ptr);
 void	generate_wing_popup_menu(CMenu *mptr, int first_id, int state);
 void	generate_ship_popup_menu(CMenu *mptr, int first_id, int state, int filter = 0);
-int	string_lookup(CString str1, char *strlist[], int max);
+int	string_lookup(const CString &str1, char *strlist[], int max);
 int	update_dialog_boxes();
 void	set_cur_wing(int wing);
 int	gray_menu_tree(CMenu *base);
@@ -109,7 +113,7 @@ void	correct_marking();
 int	get_ship_from_obj(int obj);
 int	get_ship_from_obj(object *objp);
 void	set_valid_dock_points(int ship, int type, CComboBox *box);
-void	ai_update_goal_references(int type, char *old_name, char *new_name);
+void	ai_update_goal_references(int type, const char *old_name, const char *new_name);
 int	query_referenced_in_ai_goals(int type, char *name);
 int	advanced_stricmp(char *one, char *two);
 int	reference_handler(char *name, int type, int obj);
@@ -124,7 +128,7 @@ void	generate_weaponry_usage_list(int team, int *arr);
 void	generate_weaponry_usage_list(int *arr, int wing);
 void	generate_ship_usage_list(int *arr, int wing);
 
-jump_node *jumpnode_get_by_name(CString& name);
+CJumpNode *jumpnode_get_by_name(const CString& name);
 
 // function and defines to use when adding ships to combo boxes
 #define SHIPS_2_COMBO_SPECIAL					(1<<0)
@@ -138,6 +142,6 @@ extern int wing_is_player_wing(int wing);
 extern void update_custom_wing_indexes();
 extern void stuff_special_arrival_anchor_name(char *buf, int iff_index, int restrict_to_players, int retail_format);
 extern void stuff_special_arrival_anchor_name(char *buf, int anchor_num, int retail_format);
-extern void update_texture_replacements(char *old_name, char *new_name);
+extern void update_texture_replacements(const char *old_name, const char *new_name);
 
 #endif

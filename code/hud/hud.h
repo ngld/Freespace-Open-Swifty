@@ -13,6 +13,7 @@
 #include "hud/hudgauges.h"
 #include "graphics/2d.h"
 #include "hud/hudparse.h"
+#include "globalincs/vmallocator.h"
 
 struct object;
 struct cockpit_display;
@@ -30,7 +31,7 @@ typedef struct hud_anim {
 		: first_frame( 0 ), num_frames( 0 ), sx( 0 ), sy( 0 ),
 		  total_time( 0 ), time_elapsed( 0 )
 	{
-		filename[ 0 ] = NULL;
+		filename[ 0 ] = 0;
 	}
 } hud_anim;
 
@@ -235,14 +236,16 @@ protected:
 	int custom_frame_offset;
 	int textoffset_x, textoffset_y;
 	char custom_name[NAME_LENGTH];
-	char custom_text[NAME_LENGTH];
-	char default_text[NAME_LENGTH];
+	SCP_string custom_text;
+	
+	SCP_string default_text;
 
 	// Render to texture stuff
 	char texture_target_fname[MAX_FILENAME_LEN];
 	int texture_target;
 	int canvas_w, canvas_h;
 	int target_w, target_h;
+	int target_x, target_y;
 	int display_offset_x, display_offset_y;
 public:
 	// constructors
@@ -282,8 +285,9 @@ public:
 	char* getCustomGaugeName();
 	void updateCustomGaugeCoords(int _x, int _y);
 	void updateCustomGaugeFrame(int frame_offset);
-	void updateCustomGaugeText(char* txt);
-	char* getCustomGaugeText();
+	void updateCustomGaugeText(const char* txt);
+	void updateCustomGaugeText(SCP_string& txt);
+	const char* getCustomGaugeText();
 
 	void startPopUp(int time=4000);
 	int popUpActive();
@@ -305,6 +309,7 @@ public:
 	// rendering functions
 	void renderBitmap(int x, int y);
 	void renderBitmap(int frame, int x, int y);
+	void renderBitmapColor(int frame, int x, int y);
 	void renderBitmapUv(int frame, int x, int y, int w, int h, float u0, float v0, float u1, float v1);
 	void renderBitmapEx(int frame, int x, int y, int w, int h, int sx, int sy);
 	void renderString(int x, int y, char *str);
@@ -429,6 +434,7 @@ protected:
 	int middle_frame_start_offset_y;
 	int subsys_integ_start_offsets[2];
 	int subsys_integ_val_offset_x;
+	int bottom_bg_offset;
 	int line_h;
 
 	int Damage_flash_timer;
@@ -445,6 +451,7 @@ public:
 	void initMiddleFrameStartOffsetY(int y);
 	void initSubsysIntegStartOffsets(int x, int y);
 	void initSubsysIntegValueOffsetX(int x);
+	void initBottomBgOffset(int offset);
 	void initLineHeight(int h);
 	void render(float frametime);
 	void pageIn();
@@ -500,6 +507,18 @@ class HudGaugeSupernova: public HudGauge
 {
 public:
 	HudGaugeSupernova();
+	void render(float frametime);
+};
+
+class HudGaugeFlightPath: public HudGauge
+{
+	hud_frames Marker;
+
+	int Marker_half[2];
+public:
+	HudGaugeFlightPath();
+	void initBitmap(char *fname);
+	void initHalfSize(int w, int h);
 	void render(float frametime);
 };
 

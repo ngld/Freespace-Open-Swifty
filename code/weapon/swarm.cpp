@@ -96,21 +96,24 @@ void swarm_maybe_fire_missile(int shipnum)
 	Assert(shipnum >= 0 && shipnum < MAX_SHIPS );
 	sp = &Ships[shipnum];
 
-	if ( sp->num_swarm_missiles_to_fire <= 0 )
+	if ( sp->num_swarm_missiles_to_fire <= 0 ) {
+		sp->swarm_missile_bank = -1;
 		return;
+	}
 
 	swp = &sp->weapons;
-	if ( swp->current_secondary_bank == -1 ) {
+	if ( sp->swarm_missile_bank == -1 ) {
 		sp->num_swarm_missiles_to_fire = 0;
 		return;
 	}
 
-	weapon_info_index = swp->secondary_bank_weapons[swp->current_secondary_bank];
+	weapon_info_index = swp->secondary_bank_weapons[sp->swarm_missile_bank];
 	Assert( weapon_info_index >= 0 && weapon_info_index < MAX_WEAPON_TYPES );
 
-	// if current secondary bank is not a swarm missile, return
+	// if swarm secondary bank is not a swarm missile, return
 	if ( !(Weapon_info[weapon_info_index].wi_flags & WIF_SWARM) ) {
 		sp->num_swarm_missiles_to_fire = 0;
+		sp->swarm_missile_bank = -1;
 		return;
 	}
 
@@ -260,7 +263,10 @@ void swarm_update_direction(object *objp, float frametime)
 
 			missile_speed = pi->speed;
 			missile_dist = missile_speed * swarmp->change_time/1000.0f;
-			swarmp->angle_offset = (float)(asin(SWARM_DIST_OFFSET / missile_dist));
+			if (missile_dist == 0.0f) // Just in case of div by zero, which can happen with local SSMs
+				swarmp->angle_offset = (float)asin(SWARM_DIST_OFFSET);
+			else
+				swarmp->angle_offset = (float)(asin(SWARM_DIST_OFFSET / missile_dist));
 			Assert(!_isnan(swarmp->angle_offset) );
 		}
 
@@ -378,7 +384,6 @@ int turret_swarm_create()
 
 	if ( i >= MAX_TURRET_SWARM_INFO ) {
 		nprintf(("Warning","No more turret swarm info slots are available\n"));
-		Int3();
 		return -1;
 	}
 
@@ -513,7 +518,7 @@ void turret_swarm_maybe_fire_missile(int shipnum)
 	ship_subsys *subsys;
 	turret_swarm_info *tsi;
 	object *parent_obj, *target_obj;
-	int target_objnum, num_turret_swarm_turrets_left;
+	int num_turret_swarm_turrets_left;
 	int k, j;
 	weapon_info *wip;
 
@@ -555,13 +560,10 @@ void turret_swarm_maybe_fire_missile(int shipnum)
 						Assert(tsi->num_to_launch > 0);
 	
 						// check target still alive
-						target_objnum = -1;
 						if (tsi->target_objnum > -1) {
 							target_obj= &Objects[tsi->target_objnum];
 
-							if (target_obj->signature == tsi->target_sig) {
-								target_objnum = tsi->target_objnum;
-							} else {
+							if (target_obj->signature != tsi->target_sig) {
 								// poor target, it died
 								tsi->target_objnum = -1;
 							}
@@ -624,7 +626,7 @@ void turret_swarm_check_validity()
 {
 	int i;
 	turret_swarm_info *tswarmp;
-	object *ship_obj;
+	object *ship_objp;
 
 	if (timestamp_elapsed(Turret_swarm_validity_next_check_time)) {
 
@@ -636,9 +638,9 @@ void turret_swarm_check_validity()
 			tswarmp = &Turret_swarm_info[i];
 
 			if (tswarmp->flags & SWARM_USED) {
-				ship_obj = &Objects[tswarmp->parent_objnum];
-				if (ship_obj->type == OBJ_SHIP) {
-					if (ship_obj->signature == tswarmp->parent_sig) {
+				ship_objp = &Objects[tswarmp->parent_objnum];
+				if (ship_objp->type == OBJ_SHIP) {
+					if (ship_objp->signature == tswarmp->parent_sig) {
 						continue;
 					}
 				}

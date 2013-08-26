@@ -12,6 +12,9 @@
 #include "globalincs/def_files.h"
 #include "globalincs/alphacolors.h"
 
+SCP_map<SCP_string, team_color> Team_Colors;
+SCP_vector<SCP_string> Team_Names;
+
 // -----------------------------------------------------------------------------------
 // ALPHA DEFINES/VARS
 //
@@ -138,28 +141,28 @@ int new_alpha_colors_init()
 		};
 
 		int rgba_defaults[TOTAL_COLORS][4] = {
-			93, 93, 128, 255,
-			185, 185, 255, 255,
-			0, 120, 0, 255,
-			50, 190, 50, 255,
-			0, 0, 0, 255,
-			65, 65, 65, 255,
-			160, 160, 160, 255,
-			105, 105, 105, 255,
-			255, 255, 255 ,255,
-			160, 144, 160, 255,
-			192, 104, 192, 255,
-			80, 6, 6, 255,
-			126, 6, 6, 255,
-			200, 0, 0, 255,
-			185, 150, 150, 255,
-			230, 190, 190, 255,
-			255, 255, 122, 255,
-			255, 255, 0, 255,
-			161, 184, 161, 255,
-			190, 228, 190, 255,
-			184, 161, 161, 255,
-			228, 190, 190, 255
+			{93, 93, 128, 255},
+			{185, 185, 255, 255},
+			{0, 120, 0, 255},
+			{50, 190, 50, 255},
+			{0, 0, 0, 255},
+			{65, 65, 65, 255},
+			{160, 160, 160, 255},
+			{105, 105, 105, 255},
+			{255, 255, 255 ,255},
+			{160, 144, 160, 255},
+			{192, 104, 192, 255},
+			{80, 6, 6, 255},
+			{126, 6, 6, 255},
+			{200, 0, 0, 255},
+			{185, 150, 150, 255},
+			{230, 190, 190, 255},
+			{255, 255, 122, 255},
+			{255, 255, 0, 255},
+			{161, 184, 161, 255},
+			{190, 228, 190, 255},
+			{184, 161, 161, 255},
+            {228, 190, 190, 255}
 		};
 
 		// now for each color, check if it's corresponding string is there
@@ -190,11 +193,50 @@ int new_alpha_colors_init()
 				gr_init_alphacolor(colors[i], rgba_defaults[i][0], rgba_defaults[i][1], rgba_defaults[i][2], rgba_defaults[i][3]);
 		}
 		required_string("#End");
-
-		return 1;
 	}
-	// if we get here, then something's wrong with the table
-	return 0;
+
+	//Team coloring
+	if (optional_string("#Team Colors")) {
+
+		while (required_string_either("#End", "$Team Name:")) {
+			required_string("$Team Name:"); // required to move the parse pointer forward
+			char temp[NAME_LENGTH];
+			SCP_string temp2;
+			team_color temp_color;
+
+			stuff_string(temp, F_NAME, NAME_LENGTH);
+			temp2 = SCP_string(temp);
+
+			if (required_string("$Team Stripe Color:")) {
+				int rgb[3];
+				stuff_int_list(rgb, 3, RAW_INTEGER_TYPE);
+				for (int i = 0; i < 3; i++) {
+					CLAMP(rgb[i], 0, 255);
+				}
+				
+				temp_color.stripe.r = rgb[0] / 255.0f;
+				temp_color.stripe.g = rgb[1] / 255.0f;
+				temp_color.stripe.b = rgb[2] / 255.0f;
+			}
+
+			if (required_string("$Team Base Color:")) {
+				int rgb[3];
+				stuff_int_list(rgb, 3, RAW_INTEGER_TYPE);
+				for (int i = 0; i < 3; i++) {
+					CLAMP(rgb[i], 0, 255);
+				}
+
+				temp_color.base.r = rgb[0] / 255.0f;
+				temp_color.base.g = rgb[1] / 255.0f;
+				temp_color.base.b = rgb[2] / 255.0f;
+			}
+
+			Team_Colors[temp2] = temp_color;
+			Team_Names.push_back(temp2);
+		}
+	}
+
+	return 1;
 }
 
 // initialize all alpha colors (call at startup)

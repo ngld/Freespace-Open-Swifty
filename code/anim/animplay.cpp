@@ -472,7 +472,7 @@ int anim_show_next_frame(anim_instance *instance, float frametime)
 		if ( instance->last_bitmap != -1 ){
 			bm_release(instance->last_bitmap);
 		}
-		bitmap_id = bm_create(16, instance->parent->width, instance->parent->height, instance->frame, bitmap_flags);
+		bitmap_id = bm_create(bpp, instance->parent->width, instance->parent->height, instance->frame, bitmap_flags);
 	}
 	
 	if ( bitmap_id == -1 ) {
@@ -968,6 +968,9 @@ void anim_display_info(char *real_filename)
 	// read the keyframe frame nums and offsets
 	key_frame_nums = (int*)vm_malloc(sizeof(int)*A.num_keys);
 	Assert(key_frame_nums != NULL);
+	if (key_frame_nums == NULL)
+		return;
+
 	for ( i = 0; i < A.num_keys; i++ ) {
 		key_frame_nums[i] = 0;
 		cfread(&key_frame_nums[i], 2, 1, fp);
@@ -1000,7 +1003,7 @@ void anim_display_info(char *real_filename)
 	printf("FPS:                       %d\n", A.fps);
 
 #ifndef NDEBUG
-	printf("Transparent RGB:           (%d,%d,%d)\n", A.xparent_r, A.xparent_g, A.xparent_b); 
+	printf("Transparent RGB:           (%u,%u,%u)\n", A.xparent_r, A.xparent_g, A.xparent_b); 
 #endif
 
 	printf("ac version:                %d\n", A.version);

@@ -79,7 +79,6 @@ extern bool Cmdline_fb_explosions;
 
 // Game Speed related
 extern int Cmdline_cache_bitmaps;
-extern int Cmdline_img2dds;
 extern int Cmdline_NoFPSCap;
 extern int Cmdline_no_vsync;
 
@@ -131,10 +130,13 @@ extern char* Cmdline_keyboard_layout;
 
 // Developer/Testing related
 extern char *Cmdline_start_mission;
+extern int Cmdline_old_collision_sys;
 extern int Cmdline_dis_collisions;
 extern int Cmdline_dis_weapons;
 extern int Cmdline_noparseerrors;
+#ifdef Allow_NoWarn
 extern int Cmdline_nowarn;
+#endif
 extern int Cmdline_extra_warn;
 extern int Cmdline_show_mem_usage;
 extern int Cmdline_show_pos;

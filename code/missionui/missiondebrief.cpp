@@ -1012,8 +1012,8 @@ void debrief_award_init()
 		sprintf(buf, NOX("%s%.2d"), Debrief_award_filename[gr_screen.res][DB_AWARD_RANK], Promoted + 1);
 		Rank_bitmap = bm_load(buf);
 
-		Promotion_stage.new_text = Ranks[Promoted].promotion_text;
-		Promotion_stage.new_recommendation_text = NULL;
+		Promotion_stage.text = Ranks[Promoted].promotion_text;
+		Promotion_stage.recommendation_text = "";
 
 		// choose appropriate promotion voice for this mission
 		debrief_choose_voice(Promotion_stage.voice, Ranks[Promoted].promotion_voice_base);
@@ -1028,8 +1028,8 @@ void debrief_award_init()
 		sprintf(buf, NOX("%s%.2d"), Debrief_award_filename[gr_screen.res][DB_AWARD_BADGE], Medals[i].badge_num + 1);
 		Badge_bitmap = bm_load(buf);
 
-		Badge_stage.new_text = Medals[i].promotion_text;
-		Badge_stage.new_recommendation_text = NULL;
+		Badge_stage.text = Medals[i].promotion_text;
+		Badge_stage.recommendation_text = "";
 
 		// choose appropriate voice
 		debrief_choose_voice(Badge_stage.voice, Medals[Player->stats.m_badge_earned].voice_base);
@@ -1081,11 +1081,7 @@ void debrief_traitor_init()
 		required_string("$Formula:");
 		stagep->formula = get_sexp_main();
 		required_string("$multi text");
-		if ( Fred_running )	{
-			stuff_string( stagep->new_text, F_MULTITEXT, MAX_DEBRIEF_LEN);
-		} else {
-			stagep->new_text = stuff_and_malloc_string( F_MULTITEXT, NULL, MAX_DEBRIEF_LEN);
-		}
+		stuff_string( stagep->text, F_MULTITEXT, NULL);
 		required_string("$Voice:");
 		char traitor_voice_file[MAX_FILENAME_LEN];
 		stuff_string(traitor_voice_file, F_FILESPEC, MAX_FILENAME_LEN);
@@ -1101,11 +1097,8 @@ void debrief_traitor_init()
 		debrief_choose_voice(stagep->voice, traitor_voice_file, 1);
 
 		required_string("$Recommendation text:");
-		if ( Fred_running )	{
-			stuff_string( stagep->new_recommendation_text, F_MULTITEXT, MAX_RECOMMENDATION_LEN);
-		} else {
-			stagep->new_recommendation_text = stuff_and_malloc_string( F_MULTITEXT, NULL, MAX_RECOMMENDATION_LEN);
-		}
+		stuff_string( stagep->recommendation_text, F_MULTITEXT, NULL);
+
 		inited = 1;
 
 		// close localization
@@ -1498,6 +1491,13 @@ void debrief_render_stagenum()
 	gr_set_color_fast(&Color_white);
 }
 
+// render the mission difficulty at the specified y location
+void debrief_render_mission_difficulty(int y_loc)
+{	
+	gr_string(0, y_loc, XSTR( "Skill Level", 1509));
+	gr_string(Debrief_text_x2[gr_screen.res], y_loc, Skill_level_names(Game_skill_level));	
+}
+
 // render the mission time at the specified y location
 void debrief_render_mission_time(int y_loc)
 {
@@ -1552,18 +1552,21 @@ void debrief_stats_render()
 	font_height = gr_get_font_height();
 	y = 30;
 	
+	gr_set_color_fast(&Color_white);
+	
+	debrief_render_mission_difficulty(y);
+	y += 2*font_height;
+	
 	switch ( Current_stage ) {
 		case DEBRIEF_MISSION_STATS:
 			i = Current_stage - 1;
 			if ( i < 0 )
 				i = 0;
 
-			gr_set_color_fast(&Color_white);
-
 			// display mission completion time
 			debrief_render_mission_time(y);
 
-			y += 20;
+			y += 2*font_height;
 			show_stats_label(i, 0, y, font_height);
 			show_stats_numbers(i, Debrief_text_x2[gr_screen.res], y, font_height);
 			break;
@@ -1572,14 +1575,12 @@ void debrief_stats_render()
 			if ( i < 0 )
 				i = 0;
 
-			gr_set_color_fast(&Color_white);
 			show_stats_label(i, 0, y, font_height);
 			show_stats_numbers(i, Debrief_text_x2[gr_screen.res], y, font_height);
 			break;
 
 		case DEBRIEF_ALLTIME_KILLS:
 		case DEBRIEF_MISSION_KILLS:
-			gr_set_color_fast(&Color_white);
 			i = Text_offset;
 			while (y + font_height <= Debrief_text_wnd_coords[gr_screen.res][3]) {
 				if (i >= Num_text_lines)
@@ -1848,11 +1849,11 @@ void debrief_check_buttons()
 	*/
 }
 
-void debrief_text_stage_init(char *src, int type)
+void debrief_text_stage_init(const char *src, int type)
 {
 	int i, n_lines, n_chars[MAX_DEBRIEF_LINES];
 	char line[MAX_DEBRIEF_LINE_LEN];
-	char *p_str[MAX_DEBRIEF_LINES];
+	const char *p_str[MAX_DEBRIEF_LINES];
 
 	n_lines = split_str(src, Debrief_text_wnd_coords[gr_screen.res][2], n_chars, p_str, MAX_DEBRIEF_LINES);
 	Assert(n_lines >= 0);
@@ -1890,7 +1891,7 @@ void debrief_free_text()
 void debrief_text_init()
 {
 	int r_count = 0;
-	char *src;
+	const char *src;
 	int i;
 
 	// If no wav files are being used use speech simulation
@@ -1913,9 +1914,9 @@ void debrief_text_init()
 			if (i)
 				Text[Num_text_lines++] = NULL;  // add a blank line between stages
 
-			src = Debrief_stages[i]->new_text;
+			src = Debrief_stages[i]->text.c_str();
 
-			if (src) {
+			if (*src) {
 				debrief_text_stage_init(src, TEXT_TYPE_NORMAL);
 
 				if (use_sim_speech && !Recommend_active) {
@@ -1925,11 +1926,12 @@ void debrief_text_init()
 			}
 
 			if (Recommend_active) {
-				src = Debrief_stages[i]->new_recommendation_text;
-				if (!src && (i == Num_debrief_stages - 1) && !r_count)
+				src = Debrief_stages[i]->recommendation_text.c_str();
+
+				if ((i == Num_debrief_stages - 1) && !r_count && !*src)
 					src = XSTR( "We have no recommendations for you.", 1054);
 
-				if (src) {
+				if (*src) {
 					Text[Num_text_lines++] = NULL;
 					debrief_text_stage_init(src, TEXT_TYPE_RECOMMENDATION);
 					r_count++;
@@ -2002,10 +2004,9 @@ void debrief_init()
 	}
 
 	// Goober5000 - replace any variables with their values
-	for (i = 0; i < Debriefing->num_stages; i++)
-	{
-		if (Debriefing->stages[i].new_text)
-			sexp_replace_variable_names_with_values(Debriefing->stages[i].new_text, MAX_DEBRIEF_LEN);
+	for (i = 0; i < Debriefing->num_stages; i++) {
+		sexp_replace_variable_names_with_values(Debriefing->stages[i].text);
+		sexp_replace_variable_names_with_values(Debriefing->stages[i].recommendation_text);
 	}
 
 	// no longer is mission

@@ -906,6 +906,8 @@
 		</Unit>
 		<Unit filename="../../../code/mm/mmreg.h" />
 		<Unit filename="../../../code/mm/msacm.h" />
+		<Unit filename="../../../code/mod_table/mod_table.cpp" />
+		<Unit filename="../../../code/mod_table/mod_table.h" />
 		<Unit filename="../../../code/model/model.h">
 			<Option virtualFolder="model/" />
 		</Unit>
@@ -1277,6 +1279,30 @@
 		</Unit>
 		<Unit filename="../../../code/physics/physics.h">
 			<Option virtualFolder="physics/" />
+		</Unit>
+		<Unit filename="../../../code/pilotfile/csg.cpp">
+			<Option virtualFolder="pilotfile/" />
+		</Unit>
+		<Unit filename="../../../code/pilotfile/csg_convert.cpp">
+			<Option virtualFolder="pilotfile/" />
+		</Unit>
+		<Unit filename="../../../code/pilotfile/pilotfile.cpp">
+			<Option virtualFolder="pilotfile/" />
+		</Unit>
+		<Unit filename="../../../code/pilotfile/pilotfile.h">
+			<Option virtualFolder="pilotfile/" />
+		</Unit>
+		<Unit filename="../../../code/pilotfile/pilotfile_convert.cpp">
+			<Option virtualFolder="pilotfile/" />
+		</Unit>
+		<Unit filename="../../../code/pilotfile/pilotfile_convert.h">
+			<Option virtualFolder="pilotfile/" />
+		</Unit>
+		<Unit filename="../../../code/pilotfile/plr.cpp">
+			<Option virtualFolder="pilotfile/" />
+		</Unit>
+		<Unit filename="../../../code/pilotfile/plr_convert.cpp">
+			<Option virtualFolder="pilotfile/" />
 		</Unit>
 		<Unit filename="../../../code/playerman/managepilot.cpp">
 			<Option virtualFolder="playerman/" />

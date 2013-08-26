@@ -29,7 +29,7 @@
 #include "gamesnd/gamesnd.h"
 #include "mission/missiongoals.h"
 #include "globalincs/alphacolors.h"
-#include "weapon/beam.h"
+#include "weapon/weapon.h"
 #include "sound/audiostr.h"
 #include "ship/ship.h"
 #include "parse/parselo.h"
@@ -282,13 +282,18 @@ void HudGaugeMessages::initLineHeight(int h)
 	Line_h = h;
 }
 
+void HudGaugeMessages::initHiddenByCommsMenu(bool hide)
+{
+	Hidden_by_comms_menu = hide;
+}
+
 void HudGaugeMessages::initialize()
 {
 	// calculate the window height based on the number of lines, and line height
 	Window_height = Max_lines * Line_h;
 
 	active_messages.clear();
-	pending_messages = SCP_queue<HUD_message_data>(); // there's no clear() method for queues :\
+	pending_messages = SCP_queue<HUD_message_data>(); // there's no clear() method for queues :/
 
 	Scroll_needed = false;
 	Scroll_in_progress = false;
@@ -415,6 +420,11 @@ void HudGaugeMessages::scrollMessages()
 	}
 }
 
+void HudGaugeMessages::clearMessages()
+{
+	active_messages.clear();
+}
+
 void HudGaugeMessages::preprocess()
 {
 	setFont();
@@ -422,10 +432,10 @@ void HudGaugeMessages::preprocess()
 	scrollMessages();
 }
 
-// ---------------------------------------------------------------------------------------
-// HudGaugeMessages::render() will display the active HUD messages on the HUD.  It will scroll
-// the messages up when a new message arrives.  
-//
+/**
+ * HudGaugeMessages::render() will display the active HUD messages on the HUD.  It will scroll
+ * the messages up when a new message arrives.
+ */
 void HudGaugeMessages::render(float frametime)
 {
 	hud_set_default_color();
@@ -435,7 +445,7 @@ void HudGaugeMessages::render(float frametime)
 
 	for ( SCP_vector<Hud_display_info>::iterator m = active_messages.begin(); m != active_messages.end(); ++m) {
 		if ( !timestamp_elapsed(m->total_life) ) {
-			if ( !(Player->flags & PLAYER_FLAGS_MSG_MODE) ) {
+			if ( !(Player->flags & PLAYER_FLAGS_MSG_MODE) || !Hidden_by_comms_menu) {
 				// set the appropriate color					
 				if ( m->msg.source ) {
 					setGaugeColor(HUD_C_BRIGHT);
@@ -580,7 +590,7 @@ void hud_sourced_print(int source, char *msg)
 	}
 
 	// add message to the scrollback log first
-	hud_add_msg_to_scrollback(msg, source, timestamp());
+	hud_add_msg_to_scrollback(msg, source, Missiontime);
 
 	HUD_message_data new_msg;
 
@@ -622,7 +632,7 @@ void HUD_add_to_scrollback(char *text, int source)
 		return;
 	}
 
-	hud_add_msg_to_scrollback(text, source, timestamp());
+	hud_add_msg_to_scrollback(text, source, Missiontime);
 }
 
 // hud_add_msg_to_scrollback() adds the new_msg to the scroll-back message list.  If there
@@ -910,7 +920,7 @@ void hud_scrollback_init()
 	scrollback_buttons *b;
 
 	// pause all game sounds
-	beam_pause_sounds();
+	weapon_pause_sounds();
 	audiostream_pause_all();
 
 	common_set_interface_palette("BriefingPalette");  // set the interface palette
@@ -966,7 +976,7 @@ void hud_scrollback_close()
 	game_flush();
 
 	// unpause all game sounds
-	beam_unpause_sounds();
+	weapon_unpause_sounds();
 	audiostream_unpause_all();
 
 }
@@ -1153,7 +1163,7 @@ void hud_scrollback_do_frame(float frametime)
 	}
 
 	gr_set_color_fast(&Color_text_heading);
-	gr_print_timestamp(Hud_mission_log_time_coords[gr_screen.res][0], Hud_mission_log_time_coords[gr_screen.res][1] - font_height, (int) (f2fl(Missiontime) * 1000));
+	gr_print_timestamp(Hud_mission_log_time_coords[gr_screen.res][0], Hud_mission_log_time_coords[gr_screen.res][1] - font_height, Missiontime);
 	gr_string(Hud_mission_log_time2_coords[gr_screen.res][0], Hud_mission_log_time_coords[gr_screen.res][1] - font_height, XSTR( "Current time", 289));
 	gr_flip();
 }
@@ -1202,6 +1212,9 @@ void HudGaugeTalkingHead::initBitmaps(char *fname)
 	}
 }
 
+/**
+ * Create a new head animation object
+ */
 anim_instance* HudGaugeTalkingHead::createAnim(int anim_start_frame, anim* anim_data)
 {
 	anim_play_struct aps;
@@ -1217,6 +1230,11 @@ anim_instance* HudGaugeTalkingHead::createAnim(int anim_start_frame, anim* anim_
 	return anim_play(&aps);
 }
 
+/**
+ * Renders everything for a head animation except the actual head animation
+ * ANI (see anim_render_all), i.e. the background, border & title
+ * Also checks for when new head ani's need to start playing
+ */
 void HudGaugeTalkingHead::render(float frametime)
 {
 	if ( Head_frame.first_frame == -1 ){
@@ -1224,7 +1242,7 @@ void HudGaugeTalkingHead::render(float frametime)
 	}
 
 	if(msg_id != -1 && head_anim != NULL) {
-		if(anim_playing(head_anim)) {
+		if(!head_anim->done_playing) {
 			// draw frame
 			// hud_set_default_color();
 			setGaugeColor();
@@ -1234,12 +1252,20 @@ void HudGaugeTalkingHead::render(float frametime)
 			gr_clear();
 			resetClip();
 
-			renderBitmap(Head_frame.first_frame, position[0], position[1]);		
-
+			renderBitmap(Head_frame.first_frame, position[0], position[1]);		// head ani border
+			gr_set_screen_scale(base_w, base_h);
+			setGaugeColor();
+			generic_anim_render(head_anim,frametime, position[0] + Anim_offsets[0] + fl2i(HUD_offset_x), position[1] + Anim_offsets[1] + fl2i(HUD_offset_y));
 			// draw title
 			renderString(position[0] + Header_offsets[0], position[1] + Header_offsets[1], XSTR("message", 217));
 		} else {
-			anim_stop_playing(head_anim);
+			for (int j = 0; j < Num_messages_playing; ++j) {
+				if (Playing_messages[j].id == msg_id) {
+					Playing_messages[j].play_anim = false;
+					break;  // only one head ani plays at a time
+				}
+			}
+			msg_id = -1;    // allow repeated messages to display a new head ani
 			head_anim = NULL; // Nothing to see here anymore, move along
 		}
 	}
@@ -1247,13 +1273,8 @@ void HudGaugeTalkingHead::render(float frametime)
 	for (int i = 0; i < Num_messages_playing; i++ ) {
 		if(Playing_messages[i].play_anim && Playing_messages[i].id != msg_id ) {
 			msg_id = Playing_messages[i].id;
-			if(head_anim) {
-				if(anim_playing(head_anim)) {
-					anim_stop_playing(head_anim);
-				}
-			} 
 			if (Playing_messages[i].anim_data)
-				head_anim = createAnim(Playing_messages[i].start_frame, Playing_messages[i].anim_data);	
+				head_anim = Playing_messages[i].anim_data;	
 			else
 				head_anim = NULL;
 
@@ -1273,7 +1294,7 @@ bool HudGaugeTalkingHead::canRender()
 		return false;
 	}
 
-	if (hud_disabled()) {
+	if (hud_disabled() && !hud_disabled_except_messages()) {
 		return false;
 	}
 

@@ -40,7 +40,7 @@ GLint GL_supported_texture_units = 2;
 int GL_should_preload = 0;
 ubyte GL_xlat[256];
 GLfloat GL_anisotropy = 1.0f;
-GLfloat GL_max_anisotropy = 2.0f;
+GLfloat GL_max_anisotropy = -1.0f;
 int GL_mipmap_filter = 0;
 GLenum GL_texture_target = GL_TEXTURE_2D;
 GLenum GL_texture_face = GL_TEXTURE_2D;
@@ -96,7 +96,7 @@ GLfloat opengl_get_max_anisotropy()
 		return 0.0f;
 	}
 
-	if ( !GL_max_anisotropy ) {
+	if ( GL_max_anisotropy < 0.0f ) {
 		glGetFloatv(GL_MAX_TEXTURE_MAX_ANISOTROPY_EXT, &GL_max_anisotropy);
 	}
 
@@ -1386,6 +1386,70 @@ int opengl_export_image( int slot, int width, int height, int alpha, int num_mip
 	GL_CHECK_FOR_ERRORS("end of export_image()");
 
 	return m_offset;
+}
+
+void gr_opengl_update_texture(int bitmap_handle, int bpp, ubyte* data, int width, int height)
+{
+	GLenum texFormat, glFormat;
+	int n = bm_get_cache_slot (bitmap_handle, 1);
+	tcache_slot_opengl *t = &Textures[n];
+	if(!t->texture_id)
+		return;
+	int byte_mult = (bpp >> 3);
+	int true_byte_mult = (t->bpp >> 3);
+	ubyte* texmem = NULL;
+	// GL_BGRA_EXT is *much* faster with some hardware/drivers
+	if (true_byte_mult == 4) {
+		texFormat = GL_UNSIGNED_INT_8_8_8_8_REV;
+		glFormat = GL_BGRA;
+	} else if (true_byte_mult == 3) {
+		texFormat = GL_UNSIGNED_BYTE;
+		glFormat = GL_BGR;
+	} else {
+		texFormat = GL_UNSIGNED_SHORT_1_5_5_5_REV;
+		glFormat = GL_BGRA;
+	}
+	if (byte_mult == 1) {
+		texFormat = GL_UNSIGNED_BYTE;
+		glFormat = GL_ALPHA;
+		texmem = (ubyte *) vm_malloc (width*height*byte_mult);
+		ubyte* texmemp = texmem;
+
+		Assert( texmem != NULL );
+
+		int luminance = 0;
+		for (int i = 0; i < height; i++) {
+			for (int j = 0; j < width; j++) {
+				if ( (i < height) && (j < width) ) {
+					if ( true_byte_mult > 1 ) {
+						luminance = 0;
+
+						if ( true_byte_mult > 3 ) {
+							for (int k = 0; k < 3; k++) {
+								luminance += data[(i*width+j)*true_byte_mult+k];
+							}
+
+							*texmemp++ = (ubyte)((luminance / 3) * (data[(i*width+j)*true_byte_mult+3]/255.0f));
+						} else {
+							for (int k = 0; k < true_byte_mult; k++) {
+								luminance += data[(i*width+j)*true_byte_mult+k]; 
+							}
+
+							*texmemp++ = (ubyte)(luminance / true_byte_mult);
+						}
+					} else {
+						*texmemp++ = GL_xlat[data[i*width+j]];
+					}
+				} else {
+					*texmemp++ = 0;
+				}
+			}
+		}
+	}
+	glBindTexture(GL_TEXTURE_2D, t->texture_id);
+	glTexSubImage2D(GL_TEXTURE_2D, 0, 0, 0, width, height, glFormat, texFormat, (texmem)?texmem:data);
+	if (texmem != NULL)
+		vm_free(texmem);
 }
 
 // -----------------------------------------------------------------------------

@@ -20,6 +20,7 @@
 #include "ship/ship.h"
 #include "globalincs/linklist.h"
 #include "globalincs/version.h"
+#include "globalincs/alphacolors.h"
 #include "mission/missionparse.h"
 #include "mission/missionmessage.h"
 #include "mission/missiongoals.h"
@@ -132,9 +133,10 @@ int query_ship_name_duplicate(int ship);
 char *reg_read_string( char *section, char *name, char *default_value );
 
 extern int Nmodel_num;
+extern matrix Nmodel_orient;
 extern int Nmodel_bitmap;
 
-void string_copy(char *dest, CString &src, int max_len, int modify)
+void string_copy(char *dest, const CString &src, int max_len, int modify)
 {
 	int len;
 
@@ -150,75 +152,46 @@ void string_copy(char *dest, CString &src, int max_len, int modify)
 	dest[len] = 0;
 }
 
+void string_copy(SCP_string &dest, const CString &src, int modify)
+{
+	if (modify)
+		if (strcmp(src, dest.c_str()))
+			set_modified();
+
+	dest = src;
+}
+
 // converts a multiline string (one with newlines in it) into a windows format multiline
 // string (newlines changed to '\r\n').
-CString convert_multiline_string(char *src)
+void convert_multiline_string(CString &dest, const SCP_string &src)
 {
-	char *ptr, buf[256];
-	int i;
-	static CString str;
+	dest = src.c_str();
+	dest.Replace("\n", "\r\n");
+}
 
-	str = _T("");
-	while ((ptr = strchr(src, '\n'))!=NULL) {
-		i = ptr - src;
-		while (i > 250) {
-			strncpy(buf, src, 250);
-			buf[250] = 0;
-			str += buf;
-			src += 250;
-			i -= 250;
-		}
-
-		if (i)
-			strncpy(buf, src, i);
-
-		buf[i] = 0;
-		str += buf;
-		str += "\r\n";
-		src = ptr + 1;
-	}
-
-	i = strlen(src);
-	if (i)
-		str += src;
-
-	return str;
+// converts a multiline string (one with newlines in it) into a windows format multiline
+// string (newlines changed to '\r\n').
+void convert_multiline_string(CString &dest, const char *src)
+{
+	dest = src;
+	dest.Replace("\n", "\r\n");
 }
 
 // Converts a windows format multiline CString back into a normal multiline string.
-void deconvert_multiline_string(char *buf, CString &str, int max_len)
+void deconvert_multiline_string(char *dest, const CString &str, int max_len)
 {
-	char *ptr = buf;
-	int i, j;
-	CString str2;
+	// leave room for the null terminator
+	memset(dest, 0, max_len);
+	strncpy(dest, (LPCTSTR) str, max_len - 1);
 
-	Assert(max_len > 1);
-	Assert(ptr!=NULL);
-	max_len -= 2;
-	while ((i = str.Find("\r\n")) >= 0) {
-		for (j=0; j<i; j++)
-			if (max_len) {
-				*ptr++ = str[j];
-				max_len--;
-			}
+	replace_all(dest, "\r\n", "\n", max_len);
+}
 
-		*ptr++ = '\n';
-		str2 = str.Mid(i + 2);
-		str = str2;
-	}
-
-	i = str.GetLength();
-	for (j=0; j<i; j++)
-		if (max_len) {
-			*ptr++ = str[j];
-			max_len--;
-		}
-
-	// removed 10/29/98 by DB
-	// this was generating an extra newline - why?
-	//if (*(ptr - 1) != '\n')
-	//	*ptr++ = '\n';
-	*ptr = 0;
+// ditto for SCP_string
+void deconvert_multiline_string(SCP_string &dest, const CString &str)
+{
+	dest = str;
+	replace_all(dest, "\r\n", "\n");
 }
 
 // medal_stuff Medals[NUM_MEDALS];
@@ -432,6 +405,10 @@ bool fred_init()
 	Voice_export_selection = 0;
 
 	hud_init_comm_orders();		// Goober5000
+
+	if (!new_alpha_colors_init()) {
+		old_alpha_colors_init();
+	}
 	
 	gamesnd_parse_soundstbl();		// needs to be loaded after species stuff but before interface/weapon/ship stuff - taylor
 	mission_brief_common_init();	
@@ -750,8 +727,8 @@ int create_object(vec3d *pos, int waypoint_instance)
 			obj = create_player(Player_starts, pos, NULL, Default_player_model);
 
 	} else if (cur_model_index == Id_select_type_jump_node) {
-		jump_node* jnp = new jump_node(pos);
-		obj = jnp->get_objnum();
+		CJumpNode* jnp = new CJumpNode(pos);
+		obj = jnp->GetSCPObjectNumber();
 		Jump_nodes.push_back(*jnp);
 	} else if(Ship_info[cur_model_index].flags & SIF_NO_FRED){		
 		obj = -1;
@@ -922,7 +899,8 @@ void clear_mission()
 				Team_data[i].ship_list[count] = j;
 				strcpy_s(Team_data[i].ship_list_variables[count], "");
 				Team_data[i].ship_count[count] = 5;
-				strcpy_s(Team_data[i].ship_count_variables[count++], "");
+				strcpy_s(Team_data[i].ship_count_variables[count], "");
+				count++;
 			}
 		}
 		Team_data[i].num_ship_choices = count;
@@ -937,8 +915,10 @@ void clear_mission()
 				}
 				Team_data[i].weaponry_pool[count] = j; 
 				strcpy_s(Team_data[i].weaponry_pool_variable[count], "");
-				strcpy_s(Team_data[i].weaponry_amount_variable[count++], "");
-			} 
+				strcpy_s(Team_data[i].weaponry_amount_variable[count], "");
+				count++;
+			}
+			Team_data[i].weapon_required[j] = false;
 		}
 		Team_data[i].num_weapon_choices = count; 
 	}
@@ -983,8 +963,8 @@ void clear_mission()
 	}
 
 	Nmodel_flags = DEFAULT_NMODEL_FLAGS;
-	The_mission.skybox_flags  = DEFAULT_NMODEL_FLAGS;
 	Nmodel_num = -1;
+	vm_set_identity(&Nmodel_orient);
 	Nmodel_bitmap = -1;
 
 	The_mission.contrail_threshold = CONTRAIL_THRESHOLD_DEFAULT;
@@ -1011,7 +991,9 @@ void clear_mission()
 	strcpy_s(The_mission.loading_screen[GR_640],"");
 	strcpy_s(The_mission.loading_screen[GR_1024],"");
 	strcpy_s(The_mission.skybox_model, "");
+	vm_set_identity(&The_mission.skybox_orientation);
 	strcpy_s(The_mission.envmap_name, "");
+	The_mission.skybox_flags = DEFAULT_NMODEL_FLAGS;
 
 	// no sound environment
 	The_mission.sound_environment.id = -1;
@@ -1258,7 +1240,7 @@ int common_object_delete(int obj)
 	char msg[255], *name;
 	int i, z, r, type;
 	object *objp;
-	SCP_list<jump_node>::iterator jnp;
+	SCP_list<CJumpNode>::iterator jnp;
 
 	type = Objects[obj].type;
 	if (type == OBJ_START) {
@@ -1380,7 +1362,7 @@ int common_object_delete(int obj)
 
 	} else if (type == OBJ_JUMP_NODE) {
 		for (jnp = Jump_nodes.begin(); jnp != Jump_nodes.end(); ++jnp) {
-			if(jnp->get_obj() == &Objects[obj])
+			if(jnp->GetSCPObject() == &Objects[obj])
 				break;
 		}
 		
@@ -1667,14 +1649,14 @@ void generate_ship_popup_menu(CMenu *mptr, int first_id, int state, int filter)
 // Alternate string lookup function, taking a CString instead.  The reason that it's here,
 // instead of parselo.cpp, is because the class CString require an include of windows.h,
 // which everyone wants to avoid including in any freespace header files.  So..
-int string_lookup(CString str1, char *strlist[], int max)
+int string_lookup(const CString &str1, char *strlist[], int max)
 {
 	int	i;
 
 	for (i=0; i<max; i++) {
 		Assert(strlen(strlist[i]));
 
-		if (!stricmp(str1, strlist[i])){
+		if (!stricmp((LPCTSTR) str1, strlist[i])){
 			return i;
 		}
 	}
@@ -1977,7 +1959,7 @@ int get_ship_from_obj(object *objp)
 	return 0;
 }
 
-void ai_update_goal_references(int type, char *old_name, char *new_name)
+void ai_update_goal_references(int type, const char *old_name, const char *new_name)
 {
 	int i;
 
@@ -2469,11 +2451,9 @@ void generate_weaponry_usage_list(int team, int *arr)
 	}
 }
 
-jump_node *jumpnode_get_by_name(CString& name)
+CJumpNode *jumpnode_get_by_name(const CString& name)
 {
-	jump_node *jnp = jumpnode_get_by_name(name.GetBuffer(name.GetLength()));
-	name.ReleaseBuffer();
-
+	CJumpNode *jnp = jumpnode_get_by_name((LPCTSTR) name);
 	return jnp;
 }
 
@@ -2660,7 +2640,7 @@ void stuff_special_arrival_anchor_name(char *buf, int anchor_num, int retail_for
 }
 
 // Goober5000
-void update_texture_replacements(char *old_name, char *new_name)
+void update_texture_replacements(const char *old_name, const char *new_name)
 {
 	int i;
 
